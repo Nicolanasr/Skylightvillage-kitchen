@@ -417,13 +417,6 @@ function POSContent() {
                         <ChefHat className="h-4 w-4 text-amber-400" />
                         <span>Kitchen KDS Terminal</span>
                     </a>
-                    <a
-                        href="/qr"
-                        className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all"
-                    >
-                        <QrCode className="h-4 w-4" />
-                        <span>Generate Table QR Codes</span>
-                    </a>
                     <div className="bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-400 flex items-center gap-2">
                         <span>Rate: 89,500 LBP / $1</span>
                     </div>
@@ -779,8 +772,8 @@ function POSContent() {
                                                     <div
                                                         key={gName}
                                                         className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${isAllPaid
-                                                                ? 'bg-emerald-500/10 border-emerald-500/40'
-                                                                : 'bg-slate-950 border-purple-500/40'
+                                                            ? 'bg-emerald-500/10 border-emerald-500/40'
+                                                            : 'bg-slate-950 border-purple-500/40'
                                                             }`}
                                                     >
                                                         <div>
@@ -849,12 +842,12 @@ function POSContent() {
                                             <div
                                                 key={item.id}
                                                 className={`bg-slate-950 border rounded-xl p-3 ${item.is_paid
-                                                        ? 'border-emerald-500/40 bg-emerald-500/10'
-                                                        : item.status === 'cancelled'
-                                                            ? 'border-red-500/20 opacity-50'
-                                                            : item.status === 'ready'
-                                                                ? 'border-emerald-500/50 bg-emerald-500/5'
-                                                                : 'border-slate-800'
+                                                    ? 'border-emerald-500/40 bg-emerald-500/10'
+                                                    : item.status === 'cancelled'
+                                                        ? 'border-red-500/20 opacity-50'
+                                                        : item.status === 'ready'
+                                                            ? 'border-emerald-500/50 bg-emerald-500/5'
+                                                            : 'border-slate-800'
                                                     }`}
                                             >
                                                 <div className="flex justify-between items-start">
@@ -923,12 +916,12 @@ function POSContent() {
                                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-900">
                                                     <span
                                                         className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${item.is_paid
-                                                                ? 'bg-emerald-500/20 text-emerald-300'
-                                                                : item.status === 'cancelled'
-                                                                    ? 'bg-red-500/20 text-red-400'
-                                                                    : item.status === 'ready'
-                                                                        ? 'bg-emerald-500 text-slate-950 font-black'
-                                                                        : 'bg-slate-800 text-slate-300'
+                                                            ? 'bg-emerald-500/20 text-emerald-300'
+                                                            : item.status === 'cancelled'
+                                                                ? 'bg-red-500/20 text-red-400'
+                                                                : item.status === 'ready'
+                                                                    ? 'bg-emerald-500 text-slate-950 font-black'
+                                                                    : 'bg-slate-800 text-slate-300'
                                                             }`}
                                                     >
                                                         STATUS: {item.is_paid ? 'PAID / CHECKOUT' : item.status.toUpperCase()}
@@ -1093,8 +1086,8 @@ function POSContent() {
                                         }
                                     }}
                                     className={`w-full font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-all mt-2 ${isClosingSession
-                                            ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
-                                            : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 active:scale-95'
+                                        ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
+                                        : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 active:scale-95'
                                         }`}
                                 >
                                     <X className="h-4 w-4 text-red-400" />
@@ -1178,8 +1171,8 @@ function POSContent() {
                                         <div
                                             key={item.id}
                                             className={`p-3 rounded-xl border flex justify-between items-center transition-all ${currentAssignQty > 0
-                                                    ? 'bg-purple-500/10 border-purple-500 text-purple-300'
-                                                    : 'bg-slate-900 border-slate-800 text-slate-300'
+                                                ? 'bg-purple-500/10 border-purple-500 text-purple-300'
+                                                : 'bg-slate-900 border-slate-800 text-slate-300'
                                                 }`}
                                         >
                                             <div>
@@ -1272,8 +1265,8 @@ function POSContent() {
                                     <button
                                         onClick={() => setPaymentCurrency('USD')}
                                         className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentCurrency === 'USD'
-                                                ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                                : 'bg-slate-950 text-slate-400 border-slate-800'
+                                            ? 'bg-amber-500 text-slate-950 border-amber-400'
+                                            : 'bg-slate-950 text-slate-400 border-slate-800'
                                             }`}
                                     >
                                         USD ($)
@@ -1281,8 +1274,8 @@ function POSContent() {
                                     <button
                                         onClick={() => setPaymentCurrency('LBP')}
                                         className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentCurrency === 'LBP'
-                                                ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                                : 'bg-slate-950 text-slate-400 border-slate-800'
+                                            ? 'bg-amber-500 text-slate-950 border-amber-400'
+                                            : 'bg-slate-950 text-slate-400 border-slate-800'
                                             }`}
                                     >
                                         LBP (LL)
@@ -1296,8 +1289,8 @@ function POSContent() {
                                     <button
                                         onClick={() => setPaymentMethod('cash')}
                                         className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentMethod === 'cash'
-                                                ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                                : 'bg-slate-950 text-slate-400 border-slate-800'
+                                            ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                                            : 'bg-slate-950 text-slate-400 border-slate-800'
                                             }`}
                                     >
                                         Cash
@@ -1305,8 +1298,8 @@ function POSContent() {
                                     <button
                                         onClick={() => setPaymentMethod('card')}
                                         className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentMethod === 'card'
-                                                ? 'bg-blue-500 text-slate-950 border-blue-400'
-                                                : 'bg-slate-950 text-slate-400 border-slate-800'
+                                            ? 'bg-blue-500 text-slate-950 border-blue-400'
+                                            : 'bg-slate-950 text-slate-400 border-slate-800'
                                             }`}
                                     >
                                         Card
@@ -1362,8 +1355,8 @@ function POSContent() {
                                     <button
                                         onClick={() => setSelectedCategoryFilter('all')}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border ${selectedCategoryFilter === 'all'
-                                                ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                                : 'bg-slate-950 text-slate-400 border-slate-800'
+                                            ? 'bg-amber-500 text-slate-950 border-amber-400'
+                                            : 'bg-slate-950 text-slate-400 border-slate-800'
                                             }`}
                                     >
                                         All Items
@@ -1373,8 +1366,8 @@ function POSContent() {
                                             key={cat.id}
                                             onClick={() => setSelectedCategoryFilter(cat.id)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border ${selectedCategoryFilter === cat.id
-                                                    ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                                    : 'bg-slate-950 text-slate-400 border-slate-800'
+                                                ? 'bg-amber-500 text-slate-950 border-amber-400'
+                                                : 'bg-slate-950 text-slate-400 border-slate-800'
                                                 }`}
                                         >
                                             {cat.name}
@@ -1392,8 +1385,8 @@ function POSContent() {
                                             key={item.id}
                                             onClick={() => setSelectedMenuItemForWaiter(item)}
                                             className={`p-3 rounded-xl border text-left transition-all flex justify-between items-start ${isSelected
-                                                    ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-400'
-                                                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                                                ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-400'
+                                                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                                                 }`}
                                         >
                                             <div>
@@ -1495,8 +1488,8 @@ function POSContent() {
                                                                         }
                                                                     }}
                                                                     className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all border ${isSelected
-                                                                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                                                                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 active:scale-95'
+                                                                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                                                                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 active:scale-95'
                                                                         }`}
                                                                 >
                                                                     {opt.name} {opt.price_extra_usd ? `(+$${opt.price_extra_usd})` : ''}
@@ -1559,8 +1552,8 @@ function POSContent() {
                                                 }
                                             }}
                                             className={`w-full p-3 rounded-xl border text-xs font-bold flex justify-between items-center transition-all ${isChecked
-                                                    ? 'bg-purple-500/10 border-purple-500 text-purple-300'
-                                                    : 'bg-slate-950 border-slate-800 text-slate-300'
+                                                ? 'bg-purple-500/10 border-purple-500 text-purple-300'
+                                                : 'bg-slate-950 border-slate-800 text-slate-300'
                                                 }`}
                                         >
                                             <span>Table #{t.table_number}</span>
@@ -1595,8 +1588,8 @@ function POSContent() {
                             <button
                                 onClick={() => setDiscountType('percentage')}
                                 className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${discountType === 'percentage'
-                                        ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                        : 'bg-slate-950 text-slate-400 border-slate-800'
+                                    ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                                    : 'bg-slate-950 text-slate-400 border-slate-800'
                                     }`}
                             >
                                 Percentage (%)
@@ -1604,8 +1597,8 @@ function POSContent() {
                             <button
                                 onClick={() => setDiscountType('fixed')}
                                 className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${discountType === 'fixed'
-                                        ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                        : 'bg-slate-950 text-slate-400 border-slate-800'
+                                    ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                                    : 'bg-slate-950 text-slate-400 border-slate-800'
                                     }`}
                             >
                                 Fixed Cash ($ USD)

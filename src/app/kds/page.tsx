@@ -20,6 +20,7 @@ import {
     ChevronRight,
     Monitor,
     CheckSquare,
+    Loader2,
 } from 'lucide-react';
 
 export default function KDSPage() {
@@ -35,7 +36,8 @@ function KDSContent() {
     const [activeTab, setActiveTab] = useState<'tickets' | 'expediter'>('tickets');
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
     const [printedItemIds, setPrintedItemIds] = useState<string[]>([]);
-    const [isBumpingItemId, setIsBumpingItemId] = useState<string | null>(null);
+    const [bumpingItemIds, setBumpingItemIds] = useState<Record<string, boolean>>({});
+    const [bumpingTrayTableNum, setBumpingTrayTableNum] = useState<number | null>(null);
     const [isPrinting, setIsPrinting] = useState<boolean>(false);
     const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
@@ -47,8 +49,8 @@ function KDSContent() {
     }, []);
 
     const handleStatusClick = async (itemId: string, currentStatus: ItemStatus) => {
-        if (isBumpingItemId === itemId) return;
-        setIsBumpingItemId(itemId);
+        if (bumpingItemIds[itemId]) return;
+        setBumpingItemIds((prev) => ({ ...prev, [itemId]: true }));
         try {
             const nextStatusMap: Record<ItemStatus, ItemStatus> = {
                 pending: 'preparing',
@@ -62,18 +64,18 @@ function KDSContent() {
             await updateOrderItemStatus(itemId, nextStatus);
             refreshKDSData();
         } finally {
-            setIsBumpingItemId(null);
+            setBumpingItemIds((prev) => ({ ...prev, [itemId]: false }));
         }
     };
 
     const handleUndoStatus = async (itemId: string) => {
-        if (isBumpingItemId === itemId) return;
-        setIsBumpingItemId(itemId);
+        if (bumpingItemIds[itemId]) return;
+        setBumpingItemIds((prev) => ({ ...prev, [itemId]: true }));
         try {
             await revertOrderItemStatus(itemId);
             refreshKDSData();
         } finally {
-            setIsBumpingItemId(null);
+            setBumpingItemIds((prev) => ({ ...prev, [itemId]: false }));
         }
     };
 
@@ -513,8 +515,9 @@ function KDSContent() {
                                         <div className="flex items-center gap-1.5">
                                             {item.status !== 'pending' && (
                                                 <button
+                                                    disabled={Boolean(bumpingItemIds[item.id])}
                                                     onClick={() => handleUndoStatus(item.id)}
-                                                    className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                                                    className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Undo / Step Back Status"
                                                 >
                                                     <RotateCcw className="h-3.5 w-3.5" />
@@ -523,20 +526,30 @@ function KDSContent() {
                                             )}
 
                                             <button
+                                                disabled={Boolean(bumpingItemIds[item.id])}
                                                 onClick={() => handleStatusClick(item.id, item.status)}
-                                                className={`px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md ${statusButtonStyles[item.status]
+                                                className={`px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${statusButtonStyles[item.status]
                                                     }`}
                                             >
-                                                <span>
-                                                    {item.status === 'pending'
-                                                        ? 'Start Cooking'
-                                                        : item.status === 'preparing'
-                                                            ? 'Mark Ready'
-                                                            : item.status === 'ready'
-                                                                ? 'Deliver'
-                                                                : 'Done'}
-                                                </span>
-                                                <ChevronRight className="h-4 w-4" />
+                                                {bumpingItemIds[item.id] ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
+                                                        <span>Updating...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span>
+                                                            {item.status === 'pending'
+                                                                ? 'Start Cooking'
+                                                                : item.status === 'preparing'
+                                                                    ? 'Mark Ready'
+                                                                    : item.status === 'ready'
+                                                                        ? 'Deliver'
+                                                                        : 'Done'}
+                                                        </span>
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
                                     </div>

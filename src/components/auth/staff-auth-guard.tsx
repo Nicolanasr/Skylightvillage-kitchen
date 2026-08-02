@@ -3,24 +3,20 @@
 import { useState, useEffect } from 'react';
 import { Lock, ShieldAlert, LogOut, UserCheck, Users, Shield } from 'lucide-react';
 import { StaffMember } from '@/lib/types';
-import { logStaffActivity } from '@/app/actions/audit-actions';
+import { logStaffActivity, getStaffRoster } from '@/app/actions/audit-actions';
 
 interface StaffAuthGuardProps {
     children: React.ReactNode;
     pageTitle?: string;
 }
 
-// Pre-seeded Staff PIN Registry
+// Fallback Default Staff Roster
 const DEFAULT_STAFF_MEMBERS: StaffMember[] = [
-    { id: 'stf-1', name: 'John', pin: '1001', role: 'Waiter' },
-    { id: 'stf-2', name: 'Sarah', pin: '1002', role: 'Waiter' },
-    { id: 'stf-3', name: 'Charbel', pin: '1003', role: 'Cashier' },
-    { id: 'stf-4', name: 'Chef Antoine', pin: '2001', role: 'Chef' },
-    { id: 'stf-5', name: 'Manager Admin', pin: '1234', role: 'Manager' },
 ];
 
 export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAuthGuardProps) {
     const [activeStaff, setActiveStaff] = useState<StaffMember | null>(null);
+    const [staffRoster, setStaffRoster] = useState<StaffMember[]>(DEFAULT_STAFF_MEMBERS);
     const [pinInput, setPinInput] = useState<string>('');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -33,12 +29,22 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                 sessionStorage.removeItem('skylight_staff_member');
             }
         }
+
+        getStaffRoster().then((roster) => {
+            if (roster && roster.length > 0) {
+                setStaffRoster(roster);
+            }
+        }).catch(() => { });
     }, []);
 
     const handlePinSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
-        const matchedStaff = DEFAULT_STAFF_MEMBERS.find((s) => s.pin === pinInput) ||
+        // 1. Check live database roster first
+        // 2. Check fallback default roster
+        // 3. Fallback admin 9999 PIN
+        const matchedStaff = staffRoster.find((s) => s.pin === pinInput) ||
+            DEFAULT_STAFF_MEMBERS.find((s) => s.pin === pinInput) ||
             (pinInput === '9999' ? { id: 'stf-admin', name: 'Admin Manager', pin: '9999', role: 'Manager' as const } : null);
 
         if (matchedStaff) {
@@ -54,7 +60,7 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                 details: `Logged into ${pageTitle}`,
             });
         } else {
-            setErrorMsg('Invalid PIN. Check staff roster');
+            setErrorMsg('Invalid PIN. Check staff roster in Admin');
             setPinInput('');
         }
     };

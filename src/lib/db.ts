@@ -60,11 +60,6 @@ class SkylightStore {
 
   seedLocal() {
     this.staffMembers = [
-      { id: 'stf-1', name: 'John', pin: '1001', role: 'Waiter' },
-      { id: 'stf-2', name: 'Sarah', pin: '1002', role: 'Waiter' },
-      { id: 'stf-3', name: 'Charbel', pin: '1003', role: 'Cashier' },
-      { id: 'stf-4', name: 'Chef Antoine', pin: '2001', role: 'Chef' },
-      { id: 'stf-5', name: 'Manager Admin', pin: '1234', role: 'Manager' },
     ];
 
     for (let i = 1; i <= 12; i++) {

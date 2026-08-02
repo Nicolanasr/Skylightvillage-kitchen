@@ -174,7 +174,8 @@ export async function addStaffMember(name: string, pin: string, role: string) {
 
   if (pool) {
     try {
-      await pool.query('INSERT INTO staff_members (id, name, pin, role) VALUES ($1, $2, $3, $4)', [
+      await pool.query('CREATE TABLE IF NOT EXISTS staff_members (id TEXT PRIMARY KEY, name TEXT NOT NULL, pin TEXT NOT NULL UNIQUE, role TEXT NOT NULL)');
+      await pool.query('INSERT INTO staff_members (id, name, pin, role) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, pin = EXCLUDED.pin, role = EXCLUDED.role', [
         newStaff.id,
         newStaff.name,
         newStaff.pin,

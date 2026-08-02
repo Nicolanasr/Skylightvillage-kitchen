@@ -46,6 +46,20 @@ export async function getPOSData() {
     }
   }
 
+  tables = tables.map((tbl) => {
+    const activeSess = sessions.find(
+      (s) =>
+        s.status === 'active' &&
+        (s.primary_table_id === tbl.id ||
+          (tbl.table_number && s.primary_table_id === `tbl-${tbl.table_number}`) ||
+          s.merged_table_ids?.includes(tbl.id))
+    );
+    if (!activeSess) {
+      return { ...tbl, status: 'available' };
+    }
+    return tbl;
+  });
+
   return {
     tables,
     sessions,

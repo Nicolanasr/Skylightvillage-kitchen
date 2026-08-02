@@ -95,6 +95,7 @@ function AdminContent() {
 
     // Search State
     const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('');
+    const [menuSearchTerm, setMenuSearchTerm] = useState('');
     const [dbTestResult, setDbTestResult] = useState<any>(null);
     const [isTestingDb, setIsTestingDb] = useState(false);
 
@@ -463,26 +464,51 @@ function AdminContent() {
             {/* TAB 1: MENU ITEMS & PRICES MANAGER */}
             {activeTab === 'menu' && (
                 <div>
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div>
-                            <h2 className="text-xl font-black text-slate-100">Skylight Village Menu Items</h2>
+                            <h2 className="text-xl font-black text-slate-100">Skylight Village Menu Items ({menuItems.length})</h2>
                             <p className="text-xs text-slate-400 mt-0.5">Edit full details, change prices, update Google Drive images, or add new items</p>
                         </div>
 
-                        <button
-                            onClick={() => {
-                                if (categories.length > 0) setNewItemCatId(categories[0].id);
-                                setIsAddItemModalOpen(true);
-                            }}
-                            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-3 rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
-                        >
-                            <PlusCircle className="h-4 w-4" />
-                            <span>Add New Menu Item</span>
-                        </button>
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            {/* Menu Search Bar Input */}
+                            <div className="relative flex-1 md:w-72">
+                                <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Search items by name, category..."
+                                    value={menuSearchTerm}
+                                    onChange={(e) => setMenuSearchTerm(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition-all"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    if (categories.length > 0) setNewItemCatId(categories[0].id);
+                                    setIsAddItemModalOpen(true);
+                                }}
+                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2.5 rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all whitespace-nowrap"
+                            >
+                                <PlusCircle className="h-4 w-4" />
+                                <span>Add New Menu Item</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {menuItems.map((item) => {
+                        {menuItems
+                            .filter((item) => {
+                                const term = menuSearchTerm.toLowerCase().trim();
+                                if (!term) return true;
+                                const catName = categories.find((c) => c.id === item.category_id)?.name || '';
+                                return (
+                                    item.name.toLowerCase().includes(term) ||
+                                    (item.description && item.description.toLowerCase().includes(term)) ||
+                                    catName.toLowerCase().includes(term)
+                                );
+                            })
+                            .map((item) => {
                             const catName = categories.find((c) => c.id === item.category_id)?.name || 'Unassigned';
                             const displayImage = transformGoogleDriveUrl(item.image_url || '');
 

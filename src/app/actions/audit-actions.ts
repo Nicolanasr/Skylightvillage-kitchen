@@ -51,8 +51,18 @@ export async function getStaffRoster(): Promise<StaffMember[]> {
   let roster = dbStore.staffMembers;
   if (pool) {
     try {
+      await pool.query('CREATE TABLE IF NOT EXISTS staff_members (id TEXT PRIMARY KEY, name TEXT NOT NULL, pin TEXT NOT NULL UNIQUE, role TEXT NOT NULL)');
       const res = await pool.query('SELECT * FROM staff_members ORDER BY name ASC');
-      if (res.rows.length > 0) roster = res.rows;
+      if (res.rows.length > 0) {
+        roster = res.rows;
+      } else {
+        for (const stf of dbStore.staffMembers) {
+          await pool.query(
+            'INSERT INTO staff_members (id, name, pin, role) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
+            [stf.id, stf.name, stf.pin, stf.role]
+          );
+        }
+      }
     } catch (e) {}
   }
   return roster;

@@ -310,7 +310,7 @@ function CustomerOrderContent() {
                 </div>
             )}
             {/* Category Navigation Bar */}
-            <div className="sticky top-[80px] md:top-[61px] z-20 bg-slate-950/80 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-slate-800/80 scrollbar-none flex gap-2">
+            <div className="sticky top-[60px] md:top-[61px] z-20 bg-slate-950/80 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-slate-800/80 scrollbar-none flex gap-2">
                 <button
                     onClick={() => setActiveCategory('all')}
                     className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === 'all'
@@ -334,77 +334,98 @@ function CustomerOrderContent() {
                 ))}
             </div>
 
-            {/* Menu Item Grid with Images & USD Pricing */}
-            <main className="px-4 py-6 max-w-3xl mx-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {filteredMenuItems.map((item) => {
-                        const isOutOfStock = !item.available;
-                        const displayImage = transformGoogleDriveUrl(item.image_url || '') || '/images/Skylight-logo-icon.png';
+            {/* Menu Item Grid with Category Titles & Sticky Section Headers */}
+            <main className="px-4 py-6 max-w-3xl mx-auto space-y-8">
+                {categories.map((cat) => {
+                    const catItems = filteredMenuItems.filter((item) => item.category_id === cat.id);
+                    if (catItems.length === 0) return null;
 
-                        return (
-                            <div
-                                key={item.id}
-                                onClick={() => handleItemClick(item)}
-                                className={`glass-card rounded-2xl overflow-hidden flex flex-col justify-between transition-all group border border-slate-800/80 ${isOutOfStock
-                                    ? 'opacity-50 grayscale cursor-not-allowed border-slate-800'
-                                    : 'hover:border-amber-500/50 cursor-pointer active:scale-[0.98]'
-                                    }`}
-                            >
-                                {/* Menu Image Banner */}
-                                <div className="relative h-40 w-full bg-slate-900 overflow-hidden flex items-center justify-center">
-                                    <img
-                                        src={displayImage}
-                                        alt={item.name}
-                                        className={`w-full h-full ${item.image_url ? 'object-cover' : 'object-contain p-6 opacity-40'} group-hover:scale-105 transition-transform duration-500`}
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = '/images/Skylight-logo-icon.png';
-                                            (e.target as HTMLImageElement).className = 'w-full h-full object-contain p-6 opacity-40';
-                                        }}
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-                                    <div className="absolute top-3 right-3 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-lg shadow-lg border border-amber-300">
-                                        {formatUsd(Number(item.price_usd))}
-                                    </div>
-                                </div>
-
-                                <div className="p-4 flex flex-col justify-between flex-1">
-                                    <div>
-                                        <div className="flex justify-between items-start mb-1.5">
-                                            <h3 className="font-bold text-sm text-slate-100 leading-snug">{item.name}</h3>
-                                            {isOutOfStock && (
-                                                <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-extrabold px-2 py-0.5 rounded-md whitespace-nowrap ml-2">
-                                                    Out of Stock
-                                                </span>
-                                            )}
-                                        </div>
-                                        {item.description && (
-                                            <p className="text-slate-400 text-xs line-clamp-2 mb-3 leading-relaxed">
-                                                {item.description}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 mt-2">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-black text-amber-400">
-                                                {formatUsd(Number(item.price_usd))}
-                                            </span>
-                                            <span className="text-[10px] text-slate-500 font-medium">
-                                                {formatLbp(Number(item.price_usd), exchangeRate)}
-                                            </span>
-                                        </div>
-
-                                        {!isOutOfStock && (
-                                            <div className="bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-amber-400 h-8 w-8 rounded-xl flex items-center justify-center transition-colors">
-                                                <Plus className="h-4 w-4" />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                    return (
+                        <section key={cat.id} id={`category-${cat.id}`} className="scroll-mt-36">
+                            {/* Sticky Category Title Header */}
+                            <div className="sticky top-[115px] z-20 bg-slate-950/90 backdrop-blur-md px-4 mb-2 border-b border-amber-500/30 flex items-center justify-between shadow-md">
+                                <h2 className="text-base font-black text-amber-400 flex items-center gap-2 tracking-wide">
+                                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                                    <span>{cat.name}</span>
+                                </h2>
+                                <span className="text-[11px] font-bold text-slate-400 bg-slate-900 px-2.5 py-1 rounded-full border border-slate-800">
+                                    {catItems.length} {catItems.length === 1 ? 'item' : 'items'}
+                                </span>
                             </div>
-                        );
-                    })}
-                </div>
+
+                            {/* Category Items List (Horizontal Row Layout) */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                {catItems.map((item) => {
+                                    const isOutOfStock = !item.available;
+                                    const displayImage = transformGoogleDriveUrl(item.image_url || '') || '/images/Skylight-logo-icon.png';
+
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => handleItemClick(item)}
+                                            className={`glass-card rounded-2xl overflow-hidden flex flex-row items-center p-3 gap-3.5 transition-all group border border-slate-800/80 ${isOutOfStock
+                                                ? 'opacity-50 grayscale cursor-not-allowed border-slate-800'
+                                                : 'hover:border-amber-500/50 cursor-pointer active:scale-[0.99]'
+                                                }`}
+                                        >
+                                            {/* Left Square Thumbnail Image */}
+                                            <div className="relative h-24 w-24 sm:h-28 sm:w-28 bg-slate-900 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-slate-800">
+                                                <img
+                                                    src={displayImage}
+                                                    alt={item.name}
+                                                    className={`w-full h-full ${item.image_url ? 'object-cover' : 'object-contain p-4 opacity-40'} group-hover:scale-105 transition-transform duration-300`}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = '/images/Skylight-logo-icon.png';
+                                                        (e.target as HTMLImageElement).className = 'w-full h-full object-contain p-4 opacity-40';
+                                                    }}
+                                                />
+                                                {isOutOfStock && (
+                                                    <div className="absolute inset-0 bg-slate-950/80 flex items-center justify-center text-[10px] font-black text-red-400">
+                                                        OUT OF STOCK
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Right Column: Name, Description, Price & Add Button */}
+                                            <div className="flex-1 flex flex-col justify-between min-h-[96px] py-0.5">
+                                                <div>
+                                                    <div className="flex justify-between items-start gap-2 mb-1">
+                                                        <h3 className="font-extrabold text-sm text-slate-100 leading-snug group-hover:text-amber-300 transition-colors">
+                                                            {item.name}
+                                                        </h3>
+                                                    </div>
+                                                    {item.description && (
+                                                        <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed mb-2">
+                                                            {item.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-slate-800/50">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black text-amber-400">
+                                                            {formatUsd(Number(item.price_usd))}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-500 font-medium">
+                                                            {formatLbp(Number(item.price_usd), exchangeRate)}
+                                                        </span>
+                                                    </div>
+
+                                                    {!isOutOfStock && (
+                                                        <div className="bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-amber-400 h-8 px-3 rounded-xl flex items-center gap-1 text-xs font-bold transition-all shadow-md">
+                                                            <Plus className="h-3.5 w-3.5" />
+                                                            <span>Add</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    );
+                })}
             </main>
 
             {/* Item Modifier Drawer / Modal */}

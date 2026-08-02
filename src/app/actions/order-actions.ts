@@ -1,7 +1,7 @@
 'use server';
 
 import { dbStore, pool } from '@/lib/db';
-import { ItemStatus, SelectedModifier, StationType } from '@/lib/types';
+import { ItemStatus, SelectedModifier, StationType, OrderItem } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 
@@ -136,16 +136,6 @@ export async function submitCustomerOrder(data: {
   let tableNumber = 1;
 
   if (pool) {
-    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_station_check'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_status_check'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1'); } catch (e) {}
-    try { await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false'); } catch (e) {}
-
     try {
       const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1', [data.sessionId]);
       if (sessRes.rows.length > 0) {
@@ -174,22 +164,12 @@ export async function submitCustomerOrder(data: {
   }
 
   const orderId = randomUUID();
-
-  if (pool) {
-    try {
-      await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, data.sessionId]);
-    } catch (e) {
-      console.error('Neon orders table insert error:', e);
-    }
-  }
+  const itemsToInsert: OrderItem[] = [];
 
   for (const item of data.items) {
-    // Unroll multi-quantity orders into individual 1x items so each dish status is tracked independently on KDS
     for (let q = 0; q < item.quantity; q++) {
-      const itemId = randomUUID();
-
-      const newItem = {
-        id: itemId,
+      const newItem: OrderItem = {
+        id: randomUUID(),
         order_id: orderId,
         session_id: data.sessionId,
         table_number: tableNumber,
@@ -204,40 +184,52 @@ export async function submitCustomerOrder(data: {
         is_comped: false,
         created_at: new Date().toISOString(),
       };
-
       dbStore.orderItems.push(newItem);
-
-      if (pool) {
-        try {
-          await pool.query(
-            `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [
-              newItem.id,
-              newItem.order_id,
-              newItem.session_id,
-              newItem.table_number,
-              newItem.menu_item_id,
-              newItem.item_name,
-              1,
-              newItem.unit_price_usd,
-              newItem.station,
-              newItem.status,
-              JSON.stringify(newItem.selected_modifiers),
-              newItem.special_notes,
-            ]
-          );
-        } catch (e) {
-          console.error('Neon order_items insert error:', e);
-        }
-      }
+      itemsToInsert.push(newItem);
     }
   }
 
-  if (pool && primaryTable) {
+  if (pool) {
     try {
-      await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1", [primaryTable.id]);
-    } catch (e) {}
+      await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, data.sessionId]);
+
+      const valuePlaceholders: string[] = [];
+      const params: any[] = [];
+      let pIdx = 1;
+
+      for (const newItem of itemsToInsert) {
+        valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11})`);
+        params.push(
+          newItem.id,
+          newItem.order_id,
+          newItem.session_id,
+          newItem.table_number,
+          newItem.menu_item_id,
+          newItem.item_name,
+          1,
+          newItem.unit_price_usd,
+          newItem.station,
+          newItem.status,
+          JSON.stringify(newItem.selected_modifiers || []),
+          newItem.special_notes || ''
+        );
+        pIdx += 12;
+      }
+
+      if (valuePlaceholders.length > 0) {
+        await pool.query(
+          `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes)
+           VALUES ${valuePlaceholders.join(', ')}`,
+          params
+        );
+      }
+
+      if (primaryTable) {
+        await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [primaryTable.id, tableNumber]);
+      }
+    } catch (e) {
+      console.error('Neon fast bulk order insert error:', e);
+    }
   }
 
   revalidatePath('/order');
