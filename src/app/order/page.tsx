@@ -117,6 +117,38 @@ function CustomerOrderContent() {
         return () => clearInterval(interval);
     }, [tableParam, tokenParam]);
 
+    // Restoring cart from localStorage on initial load
+    useEffect(() => {
+        try {
+            const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
+            const storageKey = `skylight_cart_tbl_${tableNum}`;
+            const savedCart = localStorage.getItem(storageKey);
+            if (savedCart) {
+                const parsed = JSON.parse(savedCart);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setCart(parsed);
+                }
+            }
+        } catch (e) {
+            console.error('Error reading cart from localStorage:', e);
+        }
+    }, [tableParam]);
+
+    // Saving cart to localStorage whenever cart changes
+    useEffect(() => {
+        try {
+            const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
+            const storageKey = `skylight_cart_tbl_${tableNum}`;
+            if (cart.length > 0) {
+                localStorage.setItem(storageKey, JSON.stringify(cart));
+            } else {
+                localStorage.removeItem(storageKey);
+            }
+        } catch (e) {
+            console.error('Error saving cart to localStorage:', e);
+        }
+    }, [cart, tableParam]);
+
     const filteredMenuItems =
         activeCategory === 'all'
             ? menuItems

@@ -18,31 +18,27 @@ export async function getPOSData() {
 
   if (pool) {
     try {
-      const tblRes = await pool.query('SELECT * FROM tables ORDER BY table_number ASC');
+      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes] = await Promise.all([
+        pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
+        pool.query('SELECT * FROM table_sessions ORDER BY created_at DESC'),
+        pool.query('SELECT * FROM order_items ORDER BY created_at DESC'),
+        pool.query('SELECT * FROM payments ORDER BY created_at DESC'),
+        pool.query('SELECT * FROM discounts ORDER BY created_at DESC'),
+        pool.query('SELECT * FROM service_calls ORDER BY created_at DESC'),
+        pool.query('SELECT * FROM menu_items ORDER BY name ASC'),
+        pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
+      ]);
+
       tables = tblRes.rows;
-
-      const sessRes = await pool.query('SELECT * FROM table_sessions ORDER BY created_at DESC');
       sessions = sessRes.rows;
-
-      const ordRes = await pool.query('SELECT * FROM order_items ORDER BY created_at DESC');
       orderItems = ordRes.rows;
-
-      const payRes = await pool.query('SELECT * FROM payments ORDER BY created_at DESC');
       payments = payRes.rows;
-
-      const discRes = await pool.query('SELECT * FROM discounts ORDER BY created_at DESC');
       discounts = discRes.rows;
-
-      const callRes = await pool.query('SELECT * FROM service_calls ORDER BY created_at DESC');
       serviceCalls = callRes.rows;
-
-      const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY name ASC');
       menuItems = itemRes.rows.map((m: any) => ({
         ...m,
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
-
-      const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
       categories = catRes.rows;
     } catch (e) {
       console.error('Neon getPOSData query error:', e);
@@ -322,10 +318,6 @@ export async function processSplitPayment(data: {
     console.error('Neon processSplitPayment error:', e);
   }
 
-  revalidatePath('/pos');
-  revalidatePath('/kds');
-  revalidatePath('/order');
-  revalidatePath('/admin');
   return { success: true, paymentId };
 }
 
@@ -358,10 +350,6 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
     console.error('Neon closeTableSessionAction error:', e);
   }
 
-  revalidatePath('/pos');
-  revalidatePath('/kds');
-  revalidatePath('/order');
-  revalidatePath('/admin');
   return { success: true };
 }
 
@@ -374,8 +362,6 @@ export async function compOrderItem(orderItemId: string) {
     console.error('Neon error comping item:', e);
   }
 
-  revalidatePath('/pos');
-  revalidatePath('/order');
   return { success: true };
 }
 
@@ -388,9 +374,6 @@ export async function cancelOrderItem(orderItemId: string) {
     console.error('Neon error cancelling item:', e);
   }
 
-  revalidatePath('/kds');
-  revalidatePath('/pos');
-  revalidatePath('/order');
   return { success: true };
 }
 
@@ -403,9 +386,6 @@ export async function restoreCancelledOrderItem(orderItemId: string) {
     console.error('Neon error restoring item:', e);
   }
 
-  revalidatePath('/kds');
-  revalidatePath('/pos');
-  revalidatePath('/order');
   return { success: true };
 }
 
@@ -422,9 +402,6 @@ export async function updateOrderItemQuantity(orderItemId: string, newQty: numbe
     console.error('Neon error updating item qty:', e);
   }
 
-  revalidatePath('/kds');
-  revalidatePath('/pos');
-  revalidatePath('/order');
   return { success: true };
 }
 
@@ -440,8 +417,6 @@ export async function requestPreBill(sessionId: string) {
     console.error('Neon error requesting prebill:', e);
   }
 
-  revalidatePath('/pos');
-  revalidatePath('/order');
   return { success: true };
 }
 
@@ -454,6 +429,5 @@ export async function resolveServiceCall(callId: string) {
     console.error('Neon error resolving service call:', e);
   }
 
-  revalidatePath('/pos');
   return { success: true };
 }

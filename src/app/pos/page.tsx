@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRealtimePOS } from '@/hooks/useRealtimePOS';
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
 import { Table, TableSession, OrderItem, MenuItem } from '@/lib/types';
@@ -20,13 +20,14 @@ import {
     closeTableSessionAction,
     updateTableStatusAction,
 } from '../actions/payment-actions';
-import { updateOrderItemStatus, addWaiterManualOrderItem } from '../actions/order-actions';
+import { updateOrderItemStatus, updateMultipleOrderItemsStatus, addWaiterManualOrderItem } from '../actions/order-actions';
 import { ThermalReceipt } from '@/components/pos/invoice-receipt';
 import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
 import {
     Bell,
     ChefHat,
     CheckCircle2,
+    Loader2,
     ChevronRight,
     CreditCard,
     DollarSign,
@@ -70,6 +71,12 @@ function POSContent() {
     const { tables, sessions, serviceCalls, orderItems, discounts, payments, menuItems, categories, refreshPOSData } =
         useRealtimePOS();
 
+    const [localOrderItems, setLocalOrderItems] = useState<OrderItem[]>([]);
+
+    useEffect(() => {
+        setLocalOrderItems(orderItems);
+    }, [orderItems]);
+
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
     // Modals & Triggers
@@ -105,6 +112,7 @@ function POSContent() {
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [isClosingSession, setIsClosingSession] = useState(false);
+    const [deliveringItemIds, setDeliveringItemIds] = useState<Set<string>>(new Set());
 
     // Print Trigger State
     const [receiptToPrint, setReceiptToPrint] = useState<{
@@ -126,7 +134,7 @@ function POSContent() {
         : null;
 
     const sessionItems = activeSession
-        ? orderItems.filter((i) => i.session_id === activeSession.id)
+        ? localOrderItems.filter((i) => i.session_id === activeSession.id)
         : [];
     const sessionDiscounts = activeSession
         ? discounts.filter((d) => d.session_id === activeSession.id)
@@ -143,7 +151,7 @@ function POSContent() {
     );
 
     const pendingServiceCalls = serviceCalls.filter((c) => c.status === 'pending');
-    const readyForDeliveryItems = orderItems.filter((i) => i.status === 'ready');
+    const readyForDeliveryItems = localOrderItems.filter((i) => i.status === 'ready');
 
     // Collect unique dynamic guest names for active session
     const dynamicGuestNames = Array.from(
@@ -245,50 +253,63 @@ function POSContent() {
     };
 
     const handleCompleteGuestPayment = async () => {
-        if (!activeSession || !targetPaymentGuestName) return;
+        if (!activeSession || !targetPaymentGuestName || isProcessingPayment) return;
+        setIsProcessingPayment(true);
 
-        const targetItems = sessionItems.filter(
-            (i) => i.guest_name === targetPaymentGuestName && i.status !== 'cancelled' && !i.is_paid
-        );
+        try {
+            const targetItems = sessionItems.filter(
+                (i) => i.guest_name === targetPaymentGuestName && i.status !== 'cancelled' && !i.is_paid
+            );
 
-        if (targetItems.length === 0) {
-            alert(`All items for ${targetPaymentGuestName} are already paid!`);
-            setIsPaymentModalOpen(false);
-            return;
-        }
+            if (targetItems.length === 0) {
+                alert(`All items for ${targetPaymentGuestName} are already paid!`);
+                setIsPaymentModalOpen(false);
+                return;
+            }
 
-        const payAmountUsd = targetItems.reduce((acc, item) => {
-            return acc + (item.is_comped ? 0 : Number(item.unit_price_usd) * item.quantity);
-        }, 0);
+            const targetItemIds = targetItems.map((i) => i.id);
+            const targetIdSet = new Set(targetItemIds);
 
-        const res = await processSplitPayment({
-            sessionId: activeSession.id,
-            amountUsd: payAmountUsd,
-            currency: paymentCurrency,
-            paymentMethod,
-            paymentType: 'item_split',
-            itemIdsPaid: targetItems.map((i) => i.id),
-        });
+            // OPTIMISTIC LOCAL UPDATE (0ms delay! Items update to is_paid immediately!)
+            setLocalOrderItems((prev) =>
+                prev.map((i) => (targetIdSet.has(i.id) ? { ...i, is_paid: true } : i))
+            );
 
-        if (res.success) {
-            const guestBillTotals = calculateBillTotals(targetItems, [], [], 89500);
+            const payAmountUsd = targetItems.reduce((acc, item) => {
+                return acc + (item.is_comped ? 0 : Number(item.unit_price_usd) * item.quantity);
+            }, 0);
 
-            // Print Paid Thermal Receipt for Guest
-            setReceiptToPrint({
-                tableNumber: selectedTable?.table_number || 1,
-                items: targetItems,
-                totals: guestBillTotals,
-                isFinal: true,
-                guestName: targetPaymentGuestName,
+            const res = await processSplitPayment({
+                sessionId: activeSession.id,
+                amountUsd: payAmountUsd,
+                currency: paymentCurrency,
+                paymentMethod,
+                paymentType: 'item_split',
+                itemIdsPaid: targetItemIds,
             });
 
-            setTimeout(() => {
-                window.print();
-            }, 300);
+            if (res.success) {
+                const guestBillTotals = calculateBillTotals(targetItems, [], [], 89500);
 
-            setIsPaymentModalOpen(false);
-            setTargetPaymentGuestName(null);
-            refreshPOSData();
+                // Print Paid Thermal Receipt for Guest
+                setReceiptToPrint({
+                    tableNumber: selectedTable?.table_number || 1,
+                    items: targetItems,
+                    totals: guestBillTotals,
+                    isFinal: true,
+                    guestName: targetPaymentGuestName,
+                });
+
+                setTimeout(() => {
+                    window.print();
+                }, 300);
+
+                setIsPaymentModalOpen(false);
+                setTargetPaymentGuestName(null);
+                await refreshPOSData();
+            }
+        } finally {
+            setIsProcessingPayment(false);
         }
     };
 
@@ -353,8 +374,26 @@ function POSContent() {
 
     // Handle Mark Delivered from POS Tray
     const handleMarkItemDelivered = async (itemId: string) => {
-        await updateOrderItemStatus(itemId, 'delivered');
-        refreshPOSData();
+        if (deliveringItemIds.has(itemId)) return;
+        setDeliveringItemIds((prev) => new Set([...Array.from(prev), itemId]));
+
+        // OPTIMISTIC LOCAL UPDATE: Dish vanishes from ready tray in 0ms!
+        setLocalOrderItems((prev) =>
+            prev.map((i) => (i.id === itemId ? { ...i, status: 'delivered' } : i))
+        );
+
+        try {
+            await updateOrderItemStatus(itemId, 'delivered');
+            await refreshPOSData();
+        } catch (e) {
+            console.error('Error delivering item:', e);
+        } finally {
+            setDeliveringItemIds((prev) => {
+                const next = new Set(Array.from(prev));
+                next.delete(itemId);
+                return next;
+            });
+        }
     };
 
     const filteredMenuItemsForWaiter = menuItems.filter((item) => {
@@ -467,18 +506,38 @@ function POSContent() {
                                             >
                                                 <div>
                                                     <span className="font-extrabold text-xs text-slate-100 block">
-                                                        1x {item.item_name}
+                                                        {item.quantity > 1 ? `${item.quantity}x ` : '1x '}{item.item_name}
                                                     </span>
-                                                    <span className="text-[9px] text-amber-400 font-bold uppercase block mt-0.5">
+                                                    {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                                        <div className="text-[10px] text-amber-300 font-semibold pl-1.5 mt-0.5 space-y-0.5">
+                                                            {item.selected_modifiers.map((m: any, idx: number) => (
+                                                                <div key={idx}>• {m.group}: {m.option}</div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
+                                                        <div className="text-[10px] text-emerald-300 font-medium italic pl-1.5 mt-0.5">
+                                                            Note: {item.special_notes}
+                                                        </div>
+                                                    )}
+                                                    <span className="text-[9px] text-slate-400 font-bold uppercase block mt-1">
                                                         Station: {item.station.replace('_', ' ')}
                                                     </span>
                                                 </div>
 
                                                 <button
+                                                    disabled={deliveringItemIds.has(item.id)}
                                                     onClick={() => handleMarkItemDelivered(item.id)}
-                                                    className="bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold px-2.5 py-1 rounded-lg text-[10px] transition-colors border border-emerald-500/30"
+                                                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-emerald-400 font-extrabold px-3 py-1.5 rounded-xl text-[10px] transition-all border border-emerald-500/30 shrink-0 ml-2 flex items-center gap-1.5 shadow-sm"
                                                 >
-                                                    Deliver Dish
+                                                    {deliveringItemIds.has(item.id) ? (
+                                                        <>
+                                                            <span className="h-3 w-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></span>
+                                                            <span>Delivering...</span>
+                                                        </>
+                                                    ) : (
+                                                        <span>Deliver Dish</span>
+                                                    )}
                                                 </button>
                                             </div>
                                         ))}
@@ -486,15 +545,41 @@ function POSContent() {
                                 </div>
 
                                 <button
+                                    disabled={tableItems.some((i) => deliveringItemIds.has(i.id))}
                                     onClick={async () => {
-                                        for (const item of tableItems) {
-                                            await handleMarkItemDelivered(item.id);
+                                        const ids = tableItems.map((i) => i.id);
+                                        setDeliveringItemIds((prev) => new Set([...Array.from(prev), ...ids]));
+
+                                        // OPTIMISTIC LOCAL UPDATE: Entire table tray vanishes in 0ms!
+                                        const idSet = new Set(ids);
+                                        setLocalOrderItems((prev) =>
+                                            prev.map((i) => (idSet.has(i.id) ? { ...i, status: 'delivered' } : i))
+                                        );
+
+                                        try {
+                                            await updateMultipleOrderItemsStatus(ids, 'delivered');
+                                            await refreshPOSData();
+                                        } finally {
+                                            setDeliveringItemIds((prev) => {
+                                                const next = new Set(Array.from(prev));
+                                                ids.forEach((id) => next.delete(id));
+                                                return next;
+                                            });
                                         }
                                     }}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-slate-950 font-black py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
                                 >
-                                    <span>Deliver Entire Table #{tblNum} Tray</span>
-                                    <CheckCircle2 className="h-4 w-4" />
+                                    {tableItems.some((i) => deliveringItemIds.has(i.id)) ? (
+                                        <>
+                                            <span className="h-3.5 w-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+                                            <span>Delivering Tray...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>Deliver Entire Table #{tblNum} Tray</span>
+                                            <CheckCircle2 className="h-4 w-4" />
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         ))}
@@ -921,8 +1006,14 @@ function POSContent() {
                                                 </div>
 
                                                 {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                                    <div className="text-[10px] text-slate-400 mt-1">
+                                                    <div className="text-[10px] text-amber-300 font-semibold mt-1">
                                                         {item.selected_modifiers.map((m) => `${m.group}: ${m.option}`).join(', ')}
+                                                    </div>
+                                                )}
+
+                                                {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
+                                                    <div className="text-[10px] text-emerald-300 font-medium italic mt-0.5">
+                                                        Note: {item.special_notes}
                                                     </div>
                                                 )}
 
@@ -1324,10 +1415,20 @@ function POSContent() {
 
                         <button
                             onClick={handleCompleteGuestPayment}
-                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+                            disabled={isProcessingPayment}
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
                         >
-                            <CreditCard className="h-4 w-4" />
-                            <span>Mark Paid & Print Receipt for {targetPaymentGuestName}</span>
+                            {isProcessingPayment ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
+                                    <span>Processing Payment & Printing...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <CreditCard className="h-4 w-4" />
+                                    <span>Mark Paid & Print Receipt for {targetPaymentGuestName}</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -1521,11 +1622,20 @@ function POSContent() {
 
                         <button
                             onClick={handleAddWaiterItemSubmit}
-                            disabled={!selectedMenuItemForWaiter}
-                            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
+                            disabled={!selectedMenuItemForWaiter || isAddingItem}
+                            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
                         >
-                            <PlusCircle className="h-4 w-4" />
-                            <span>Add Item to Table #{selectedTable.table_number} Check</span>
+                            {isAddingItem ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
+                                    <span>Adding Item to Check...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <PlusCircle className="h-4 w-4" />
+                                    <span>Add Item to Table #{selectedTable.table_number} Check</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>

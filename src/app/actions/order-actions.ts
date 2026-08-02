@@ -190,10 +190,6 @@ export async function submitCustomerOrder(data: {
     console.error('Neon fast bulk order insert error:', e);
   }
 
-  revalidatePath('/order');
-  revalidatePath('/kds');
-  revalidatePath('/pos');
-
   return { success: true, orderId };
 }
 
@@ -210,18 +206,6 @@ export async function addWaiterManualOrderItem(data: {
   specialNotes?: string;
 }) {
   if (!pool) return { success: false, error: 'DB connection error' };
-
-  try {
-    await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey');
-    await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_station_check');
-    await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_status_check');
-    await pool.query('ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text');
-    await pool.query('ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text');
-    await pool.query('ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text');
-    await pool.query('ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text');
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1');
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false');
-  } catch (e) {}
 
   let session: any = null;
   try {
@@ -254,11 +238,12 @@ export async function addWaiterManualOrderItem(data: {
     const params: any[] = [];
     let pIdx = 1;
 
-    for (let q = 0; q < data.quantity; q++) {
-      const newItemId = randomUUID();
-      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11})`);
+    for (let i = 0; i < data.quantity; i++) {
+      valuePlaceholders.push(
+        `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11})`
+      );
       params.push(
-        newItemId,
+        randomUUID(),
         orderId,
         session.id,
         data.tableNumber,
@@ -285,9 +270,6 @@ export async function addWaiterManualOrderItem(data: {
     console.error('Neon waiter manual order item insert error:', e);
   }
 
-  revalidatePath('/order');
-  revalidatePath('/kds');
-  revalidatePath('/pos');
   return { success: true };
 }
 
@@ -297,8 +279,9 @@ export async function triggerServiceCall(sessionId: string, tableNumber: number,
   const callId = randomUUID();
   try {
     await pool.query(
-      `INSERT INTO service_calls (id, session_id, table_number, type, status) VALUES ($1, $2, $3, $4, $5)`,
-      [callId, sessionId, tableNumber, type, 'pending']
+      `INSERT INTO service_calls (id, session_id, table_number, type, status)
+       VALUES ($1, $2, $3, $4, 'pending')`,
+      [callId, sessionId, tableNumber, type]
     );
 
     if (type === 'bill') {
@@ -308,12 +291,10 @@ export async function triggerServiceCall(sessionId: string, tableNumber: number,
       }
     }
   } catch (e) {
-    console.error('Neon service call insert error:', e);
+    console.error('Neon service call trigger error:', e);
   }
 
-  revalidatePath('/pos');
-  revalidatePath('/order');
-  return { success: true };
+  return { success: true, callId };
 }
 
 // Data Fetch Action for KDS (Strictly filters for ACTIVE table sessions only)
@@ -340,9 +321,11 @@ export async function getKDSData(stationFilter: string) {
 
     query += ' ORDER BY oi.created_at ASC';
 
-    const res = await pool.query(query, queryParams);
+    const [res, menuRes] = await Promise.all([
+      pool.query(query, queryParams),
+      pool.query('SELECT * FROM menu_items ORDER BY name ASC'),
+    ]);
 
-    const menuRes = await pool.query('SELECT * FROM menu_items ORDER BY name ASC');
     menuItems = menuRes.rows.filter((m: any) => !m.is_staff_only);
 
     const staffOnlyItemIds = new Set(
@@ -370,9 +353,18 @@ export async function updateOrderItemStatus(itemId: string, status: ItemStatus) 
     console.error('Neon updateOrderItemStatus error:', e);
   }
 
-  revalidatePath('/kds');
-  revalidatePath('/pos');
-  revalidatePath('/order');
+  return { success: true };
+}
+
+export async function updateMultipleOrderItemsStatus(itemIds: string[], status: ItemStatus) {
+  if (!pool || !itemIds || itemIds.length === 0) return { success: false, error: 'DB connection error' };
+
+  try {
+    await pool.query('UPDATE order_items SET status = $1 WHERE id::text = ANY($2::text[])', [status, itemIds]);
+  } catch (e) {
+    console.error('Neon updateMultipleOrderItemsStatus error:', e);
+  }
+
   return { success: true };
 }
 
@@ -400,9 +392,6 @@ export async function revertOrderItemStatus(itemId: string) {
     console.error('Neon revertOrderItemStatus error:', e);
   }
 
-  revalidatePath('/kds');
-  revalidatePath('/pos');
-  revalidatePath('/order');
   return { success: true };
 }
 
@@ -415,9 +404,6 @@ export async function toggleMenuItemAvailability(menuItemId: string, available: 
     console.error('Neon toggleMenuItemAvailability error:', e);
   }
 
-  revalidatePath('/order');
-  revalidatePath('/kds');
-  revalidatePath('/pos');
   return { success: true, available };
 }
 
@@ -430,9 +416,6 @@ export async function updateMenuItemImageUrl(menuItemId: string, imageUrl: strin
     console.error('Neon updateMenuItemImageUrl error:', e);
   }
 
-  revalidatePath('/order');
-  revalidatePath('/kds');
-  revalidatePath('/pos');
   return { success: true, imageUrl };
 }
 
@@ -445,6 +428,5 @@ export async function markKDSItemsPrinted(itemIds: string[]) {
     console.error('Neon markKDSItemsPrinted error:', e);
   }
 
-  revalidatePath('/kds');
   return { success: true };
 }

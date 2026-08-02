@@ -37,11 +37,17 @@ function KDSContent() {
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
     const [printedItemIds, setPrintedItemIds] = useState<string[]>([]);
     const [bumpingItemIds, setBumpingItemIds] = useState<Record<string, boolean>>({});
+    const isAnyBumping = Object.values(bumpingItemIds).some(Boolean);
     const [bumpingTrayTableNum, setBumpingTrayTableNum] = useState<number | null>(null);
     const [isPrinting, setIsPrinting] = useState<boolean>(false);
     const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
     const { items, menuItems, refreshKDSData } = useRealtimeKDS(stationFilter);
+    const [localItems, setLocalItems] = useState<OrderItem[]>([]);
+
+    useEffect(() => {
+        setLocalItems(items);
+    }, [items]);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(Date.now()), 10000);
@@ -51,33 +57,80 @@ function KDSContent() {
     const handleStatusClick = async (itemId: string, currentStatus: ItemStatus) => {
         if (bumpingItemIds[itemId]) return;
         setBumpingItemIds((prev) => ({ ...prev, [itemId]: true }));
-        try {
-            const nextStatusMap: Record<ItemStatus, ItemStatus> = {
-                pending: 'preparing',
-                preparing: 'ready',
-                ready: 'delivered',
-                delivered: 'delivered',
-                cancelled: 'cancelled',
-            };
-            const nextStatus = nextStatusMap[currentStatus];
+        const nextStatusMap: Record<ItemStatus, ItemStatus> = {
+            pending: 'preparing',
+            preparing: 'ready',
+            ready: 'delivered',
+            delivered: 'delivered',
+            cancelled: 'cancelled',
+        };
+        const nextStatus = nextStatusMap[currentStatus];
 
+        // Optimistic local status bump
+        setLocalItems((prev) =>
+            prev.map((item) => (item.id === itemId ? { ...item, status: nextStatus } : item))
+        );
+
+        try {
             await updateOrderItemStatus(itemId, nextStatus);
-            refreshKDSData();
+            await refreshKDSData();
         } finally {
             setBumpingItemIds((prev) => ({ ...prev, [itemId]: false }));
         }
-    };
+    }
 
     const handleUndoStatus = async (itemId: string) => {
         if (bumpingItemIds[itemId]) return;
         setBumpingItemIds((prev) => ({ ...prev, [itemId]: true }));
+
+        const prevStatusMap: Record<ItemStatus, ItemStatus> = {
+            pending: 'pending',
+            preparing: 'pending',
+            ready: 'preparing',
+            delivered: 'ready',
+            cancelled: 'pending',
+        };
+
+        // Optimistic local undo bump
+        setLocalItems((prev) =>
+            prev.map((item) => {
+                if (item.id === itemId) {
+                    const prevStatus = prevStatusMap[item.status] || 'pending';
+                    return { ...item, status: prevStatus };
+                }
+                return item;
+            })
+        );
+
         try {
             await revertOrderItemStatus(itemId);
-            refreshKDSData();
+            await refreshKDSData();
         } finally {
             setBumpingItemIds((prev) => ({ ...prev, [itemId]: false }));
         }
     };
+
+    const activeKitchenItems = localItems.filter((i) => i.status !== 'cancelled' && i.status !== 'delivered');
+
+    const statusPriority: Record<string, number> = {
+        pending: 1,
+        preparing: 2,
+        ready: 3,
+    };
+
+    const sortedItems = [...activeKitchenItems].sort((a, b) => {
+        const prioA = statusPriority[a.status] || 99;
+        const prioB = statusPriority[b.status] || 99;
+        if (prioA !== prioB) {
+            return prioA - prioB;
+        }
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+    const displayedItems =
+        stationFilter === 'all'
+            ? sortedItems
+            : sortedItems.filter((item) => item.station === stationFilter);
 
     const readyItemsByTable = items.reduce<Record<number, OrderItem[]>>((acc, item) => {
         if (item.status === 'ready') {
@@ -145,15 +198,6 @@ function KDSContent() {
         }
         setTimeout(() => setIsPrinting(false), 500);
     };
-
-    const activeKitchenItems = items.filter(
-        (item) => item.status !== 'delivered' && item.status !== 'cancelled'
-    );
-
-    const displayedItems = activeKitchenItems.filter((item) => {
-        if (stationFilter === 'all') return true;
-        return item.station === stationFilter;
-    });
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6">
@@ -242,8 +286,8 @@ function KDSContent() {
                     <button
                         onClick={() => setShowPrintedItems(!showPrintedItems)}
                         className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${showPrintedItems
-                                ? 'bg-purple-500/20 text-purple-300 border-purple-500'
-                                : 'bg-slate-900 text-slate-400 border-slate-800'
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500'
+                            : 'bg-slate-900 text-slate-400 border-slate-800'
                             }`}
                         title="Toggle re-printing already printed chits"
                     >
@@ -255,8 +299,8 @@ function KDSContent() {
                         onClick={handlePrintKDSChits}
                         disabled={isPrinting || itemsToPrint.length === 0}
                         className={`font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg ${isPrinting || itemsToPrint.length === 0
-                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                                : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20 active:scale-95'
+                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                            : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20 active:scale-95'
                             }`}
                     >
                         <Printer className="h-4 w-4" />
@@ -273,8 +317,8 @@ function KDSContent() {
                         setStationFilter('all');
                     }}
                     className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === 'all'
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
-                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
                         }`}
                 >
                     <Filter className="h-4 w-4" />
@@ -287,8 +331,8 @@ function KDSContent() {
                 <button
                     onClick={() => setActiveTab('expediter')}
                     className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'expediter'
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
-                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
                         }`}
                 >
                     <Truck className="h-4 w-4" />
@@ -315,8 +359,8 @@ function KDSContent() {
                                 setStationFilter(st.id);
                             }}
                             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === st.id
-                                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
-                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
+                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
                                 }`}
                         >
                             <Icon className="h-4 w-4" />
@@ -375,15 +419,17 @@ function KDSContent() {
 
                                                 <div className="flex items-center gap-2">
                                                     <button
+                                                        disabled={isAnyBumping}
                                                         onClick={() => handleUndoStatus(item.id)}
-                                                        className="bg-slate-800 hover:bg-slate-700 text-amber-400 p-2 rounded-lg text-xs font-bold transition-all"
+                                                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-amber-400 p-2 rounded-lg text-xs font-bold transition-all"
                                                         title="Undo Status"
                                                     >
                                                         <RotateCcw className="h-3.5 w-3.5" />
                                                     </button>
                                                     <button
+                                                        disabled={isAnyBumping}
                                                         onClick={() => handleStatusClick(item.id, 'ready')}
-                                                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1"
+                                                        className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-extrabold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1"
                                                     >
                                                         <span>Deliver</span>
                                                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -518,7 +564,7 @@ function KDSContent() {
                                         <div className="flex items-center gap-1.5">
                                             {item.status !== 'pending' && (
                                                 <button
-                                                    disabled={Boolean(bumpingItemIds[item.id])}
+                                                    disabled={isAnyBumping}
                                                     onClick={() => handleUndoStatus(item.id)}
                                                     className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Undo / Step Back Status"
@@ -529,9 +575,9 @@ function KDSContent() {
                                             )}
 
                                             <button
-                                                disabled={Boolean(bumpingItemIds[item.id])}
+                                                disabled={isAnyBumping}
                                                 onClick={() => handleStatusClick(item.id, item.status)}
-                                                className={`px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${statusButtonStyles[item.status]
+                                                className={`w-32 h-9 rounded-xl text-xs font-black inline-flex items-center justify-center gap-1.5 transition-all shadow-md shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${statusButtonStyles[item.status]
                                                     }`}
                                             >
                                                 {bumpingItemIds[item.id] ? (
