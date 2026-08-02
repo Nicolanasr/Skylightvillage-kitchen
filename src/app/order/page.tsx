@@ -815,7 +815,7 @@ function CustomerOrderContent() {
                 )}
                 {/* Added Item Toast Confirmation Banner */}
                 {addedToastMsg && (
-                    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black text-xs px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-amber-300 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="fixed bottom-6 w-max left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black text-xs px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-amber-300 animate-in fade-in slide-in-from-bottom-4">
                         <CheckCircle2 className="h-4 w-4 text-slate-950" />
                         <span>{addedToastMsg}</span>
                     </div>
