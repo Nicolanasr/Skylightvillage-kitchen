@@ -9,6 +9,7 @@ export function ThermalReceipt({
     isFinal,
     guestName,
     sessionId,
+    forceVisible = false,
 }: {
     tableNumber: number;
     items: OrderItem[];
@@ -16,6 +17,7 @@ export function ThermalReceipt({
     isFinal: boolean;
     guestName?: string;
     sessionId?: string;
+    forceVisible?: boolean;
 }) {
     const activeItems = items.filter((i) => i.status !== 'cancelled');
 
@@ -63,7 +65,7 @@ export function ThermalReceipt({
     const billId = getInvoiceReference(tableNumber, sessionId || items[0]?.session_id);
 
     return (
-        <div className="print-receipt-container hidden print:block text-black bg-white font-sans text-xs w-[2.8in] p-2">
+        <div className={`print-receipt-container text-black bg-white font-sans text-xs w-[2.8in] p-2 mx-auto ${forceVisible ? 'block' : 'hidden print:block'}`}>
             {/* Header / Logo */}
             <header className="text-center mb-2">
                 <img

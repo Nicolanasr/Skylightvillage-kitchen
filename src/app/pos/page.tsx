@@ -31,6 +31,7 @@ import {
     ChevronRight,
     CreditCard,
     DollarSign,
+    Eye,
     Flame,
     Layers,
     Lock,
@@ -108,6 +109,7 @@ function POSContent() {
     const [isPayingEntireBill, setIsPayingEntireBill] = useState(false);
     const [paymentCurrency, setPaymentCurrency] = useState<'USD' | 'LBP'>('USD');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
+    const [isPreviewReceiptModalOpen, setIsPreviewReceiptModalOpen] = useState(false);
 
     // Button Loading & Double-Click Prevention States
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -1157,30 +1159,40 @@ function POSContent() {
                                         <span>REMAINING UNPAID TOTAL USD:</span>
                                         <span className="text-emerald-400">{formatUsd(billTotals.remainingUsd)}</span>
                                     </div>
-
                                     <div className="flex justify-between text-xs font-bold text-amber-400">
                                         <span>REMAINING UNPAID LBP:</span>
                                         <span>{billTotals.remainingLbp}</span>
                                     </div>
-                                </div>
 
-                                {/* Button Action Bar */}
-                                <div className="grid grid-cols-2 gap-2 pt-2">
-                                    <button
-                                        onClick={() => setIsDiscountModalOpen(true)}
-                                        className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all"
-                                    >
-                                        <Percent className="h-4 w-4 text-emerald-400" />
-                                        <span>Apply Discount</span>
-                                    </button>
+                                    {/* Button Action Bar */}
+                                    <div className="grid grid-cols-3 gap-2 pt-2">
+                                        <button
+                                            onClick={() => setIsDiscountModalOpen(true)}
+                                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                            title="Apply Session Discount"
+                                        >
+                                            <Percent className="h-4 w-4 text-emerald-400" />
+                                            <span>Discount</span>
+                                        </button>
 
-                                    <button
-                                        onClick={handlePrintPreBill}
-                                        className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all"
-                                    >
-                                        <Printer className="h-4 w-4 text-amber-400" />
-                                        <span>Print Table Bill</span>
-                                    </button>
+                                        <button
+                                            onClick={() => setIsPreviewReceiptModalOpen(true)}
+                                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                            title="Preview Thermal Receipt On-Screen"
+                                        >
+                                            <Eye className="h-4 w-4 text-blue-400" />
+                                            <span>Preview</span>
+                                        </button>
+
+                                        <button
+                                            onClick={handlePrintPreBill}
+                                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                            title="Print Table Bill"
+                                        >
+                                            <Printer className="h-4 w-4 text-amber-400" />
+                                            <span>Print</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* PAY ENTIRE TABLE BILL AS 1 CHECK BUTTON */}
@@ -1801,6 +1813,54 @@ function POSContent() {
                         >
                             Apply Discount to Session
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ON-SCREEN THERMAL RECEIPT PREVIEW MODAL */}
+            {isPreviewReceiptModalOpen && selectedTable && activeSession && (
+                <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col items-center max-h-[90vh]">
+                        <div className="flex justify-between items-center w-full mb-3 pb-2 border-b border-slate-800">
+                            <div className="flex items-center gap-2">
+                                <Eye className="h-5 w-5 text-blue-400" />
+                                <span className="font-extrabold text-sm text-slate-100">80mm Thermal Receipt Preview</span>
+                            </div>
+                            <button onClick={() => setIsPreviewReceiptModalOpen(false)} className="text-slate-400 hover:text-white">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Simulated 80mm Thermal Paper Roll */}
+                        <div className="w-full overflow-y-auto bg-white p-4 rounded-2xl shadow-2xl text-black border border-slate-300 max-h-[65vh]">
+                            <ThermalReceipt
+                                tableNumber={selectedTable.table_number}
+                                items={sessionItems}
+                                totals={billTotals}
+                                isFinal={false}
+                                sessionId={activeSession.id}
+                                forceVisible={true}
+                            />
+                        </div>
+
+                        <div className="flex gap-2 w-full mt-4">
+                            <button
+                                onClick={() => {
+                                    setIsPreviewReceiptModalOpen(false);
+                                    handlePrintPreBill();
+                                }}
+                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                            >
+                                <Printer className="h-4 w-4" />
+                                <span>Print Now</span>
+                            </button>
+                            <button
+                                onClick={() => setIsPreviewReceiptModalOpen(false)}
+                                className="px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-xs transition-all cursor-pointer"
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
