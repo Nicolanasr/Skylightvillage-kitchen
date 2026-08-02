@@ -136,16 +136,17 @@ export async function submitCustomerOrder(data: {
   let tableNumber = 1;
 
   if (pool) {
+    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_station_check'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_status_check'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false'); } catch (e) {}
+
     try {
-      await pool.query(`
-        ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey;
-        ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text;
-        ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text;
-        ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text;
-        ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text;
-        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1;
-        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false;
-      `);
       const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1', [data.sessionId]);
       if (sessRes.rows.length > 0) {
         session = sessRes.rows[0];
@@ -259,17 +260,15 @@ export async function addWaiterManualOrderItem(data: {
   specialNotes?: string;
 }) {
   if (pool) {
-    try {
-      await pool.query(`
-        ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey;
-        ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text;
-        ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text;
-        ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text;
-        ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text;
-        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1;
-        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false;
-      `);
-    } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_station_check'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_status_check'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1'); } catch (e) {}
+    try { await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false'); } catch (e) {}
   }
 
   let session: any = dbStore.tableSessions.find(

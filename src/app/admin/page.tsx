@@ -18,6 +18,7 @@ import {
     updateTableAction,
     deleteTableAction,
     setTotalTablesCountAction,
+    testDatabaseConnectionAction,
 } from '../actions/admin-actions';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import {
@@ -94,6 +95,20 @@ function AdminContent() {
 
     // Search State
     const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('');
+    const [dbTestResult, setDbTestResult] = useState<any>(null);
+    const [isTestingDb, setIsTestingDb] = useState(false);
+
+    const handleRunDbTest = async () => {
+        setIsTestingDb(true);
+        try {
+            const res = await testDatabaseConnectionAction();
+            setDbTestResult(res);
+        } catch (e: any) {
+            setDbTestResult({ connected: false, reason: e.message });
+        } finally {
+            setIsTestingDb(false);
+        }
+    };
 
     // New Category State
     const [newCatName, setNewCatName] = useState('');
@@ -284,34 +299,16 @@ function AdminContent() {
                     </div>
                 </div>
 
-                {/* Quick Nav Links, DB Seed & Wipe Buttons */}
+                {/* Quick Nav Links, DB Test, Seed & Wipe Buttons */}
                 <div className="flex flex-wrap items-center gap-3">
                     <button
-                        onClick={handleSeedDatabaseClick}
-                        disabled={isSeeding}
-                        className={`font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md ${isSeeding
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 active:scale-95'
-                            }`}
-                        title="Push all menu categories & items to Postgres Neon Database"
+                        onClick={handleRunDbTest}
+                        disabled={isTestingDb}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md shadow-amber-500/20"
                     >
-                        <Database className="h-4 w-4 text-emerald-400" />
-                        <span>{isSeeding ? 'Syncing DB...' : 'Sync DB Menu'}</span>
+                        <Globe className="h-4 w-4" />
+                        <span>{isTestingDb ? 'Testing DB Connection...' : '⚡ Test Vercel DB Connection'}</span>
                     </button>
-
-                    <button
-                        onClick={handleWipeTestDataClick}
-                        disabled={isWiping}
-                        className={`font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md ${isWiping
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                            : 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 active:scale-95'
-                            }`}
-                        title="Wipe all test orders, active sessions, and payment history"
-                    >
-                        <RotateCcw className="h-4 w-4 text-red-400" />
-                        <span>{isWiping ? 'Wiping DB...' : 'Reset / Wipe Test Data'}</span>
-                    </button>
-
                     <a
                         href="/pos"
                         className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md"
@@ -328,6 +325,65 @@ function AdminContent() {
                     </a>
                 </div>
             </header>
+
+            {/* DB Test Diagnostic Card */}
+            {dbTestResult && (
+                <div className={`mb-6 p-5 rounded-2xl border text-xs shadow-xl animate-in fade-in ${dbTestResult.connected
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                    : 'bg-red-500/10 border-red-500/30 text-red-200'
+                    }`}>
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2 font-black text-sm">
+                            <span className={`h-3 w-3 rounded-full ${dbTestResult.connected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                            <span>{dbTestResult.connected ? 'CONNECTED TO NEON POSTGRESQL (LIVE)' : 'DATABASE DISCONNECTED / MEMORY FALLBACK'}</span>
+                        </div>
+                        <button
+                            onClick={() => setDbTestResult(null)}
+                            className="text-slate-400 hover:text-white text-xs font-bold"
+                        >
+                            ✕ Close
+                        </button>
+                    </div>
+
+                    {dbTestResult.connected ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-950/60 p-4 rounded-xl border border-emerald-500/20 font-mono text-[11px]">
+                            <div>
+                                <span className="text-slate-400 block text-[10px]">Database Name</span>
+                                <span className="font-bold text-amber-300">{dbTestResult.databaseName}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-400 block text-[10px]">Tables Count</span>
+                                <span className="font-bold text-emerald-300">{dbTestResult.tablesCount} Tables</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-400 block text-[10px]">Menu Items</span>
+                                <span className="font-bold text-emerald-300">{dbTestResult.menuItemsCount} Items</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-400 block text-[10px]">Order Items</span>
+                                <span className="font-bold text-emerald-300">{dbTestResult.orderItemsCount} Items</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2 bg-slate-950/80 p-4 rounded-xl border border-red-500/30 font-sans">
+                            <p className="font-bold text-red-300">Diagnostic Details: {dbTestResult.reason}</p>
+                            {!dbTestResult.databaseUrlConfigured && (
+                                <div className="text-slate-300 text-xs space-y-1.5 pt-2 border-t border-red-500/20">
+                                    <p className="font-bold text-amber-400">How to Fix on Vercel:</p>
+                                    <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                                        <li>Go to your <strong className="text-white">Vercel Dashboard</strong> → select your project</li>
+                                        <li>Navigate to <strong className="text-white">Settings</strong> → <strong className="text-white">Environment Variables</strong></li>
+                                        <li>Add <strong className="text-amber-300">DATABASE_URL</strong> with your Neon Postgres connection string:
+                                            <code className="block bg-slate-900 px-3 py-1.5 rounded-lg text-amber-300 font-mono text-[11px] mt-1">postgres://neondb_owner:YOUR_PASSWORD@ep-YOUR-ENDPOINT.neon.tech/neondb?sslmode=require</code>
+                                        </li>
+                                        <li>Click <strong className="text-white">Save</strong> and then trigger a <strong className="text-white">Redeploy</strong> in Vercel Deployments tab.</li>
+                                    </ol>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {seedStatus && (
                 <div className="mb-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold p-4 rounded-2xl animate-in fade-in">
@@ -987,38 +1043,6 @@ function AdminContent() {
                             <span>Save Staff Member</span>
                         </button>
                     </form>
-
-                    {/* Active Staff List */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {[
-                            { name: 'John', pin: '1001', role: 'Waiter' },
-                            { name: 'Sarah', pin: '1002', role: 'Waiter' },
-                            { name: 'Charbel', pin: '1003', role: 'Cashier' },
-                            { name: 'Chef Antoine', pin: '2001', role: 'Chef' },
-                            { name: 'Manager Admin', pin: '1234', role: 'Manager' },
-                        ].map((st, sIdx) => (
-                            <div
-                                key={sIdx}
-                                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between"
-                            >
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-extrabold text-sm text-slate-100">{st.name}</span>
-                                        <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                            {st.role}
-                                        </span>
-                                    </div>
-                                    <span className="text-xs font-mono text-slate-400 block mt-1">
-                                        PIN Code: <strong className="text-amber-400">{st.pin}</strong>
-                                    </span>
-                                </div>
-
-                                <button className="text-slate-600 hover:text-red-400 p-2 rounded-xl text-xs transition-colors">
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             )}
 

@@ -54,7 +54,7 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                 details: `Logged into ${pageTitle}`,
             });
         } else {
-            setErrorMsg('Invalid PIN. Check staff roster or use 1234 for Manager');
+            setErrorMsg('Invalid PIN. Check staff roster');
             setPinInput('');
         }
     };
@@ -110,23 +110,6 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                     <p className="text-xs text-slate-400 mt-1 mb-6 font-medium">
                         Enter your personal PIN code for <strong className="text-slate-200">{pageTitle}</strong>
                     </p>
-
-                    {/* Staff Roster Quick Reference */}
-                    <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-3 mb-6 text-left">
-                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-2 flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            <span>Staff PIN Roster:</span>
-                        </span>
-                        <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-300">
-                            <div>• John (Waiter): <code className="text-amber-300 font-bold">1001</code></div>
-                            <div>• Sarah (Waiter): <code className="text-amber-300 font-bold">1002</code></div>
-                            <div>• Charbel (Cashier): <code className="text-amber-300 font-bold">1003</code></div>
-                            <div>• Chef Antoine: <code className="text-amber-300 font-bold">2001</code></div>
-                            <div className="col-span-2 text-center pt-1 border-t border-slate-800 text-[11px] text-slate-400">
-                                Manager Admin PIN: <code className="text-emerald-400 font-bold">1234</code>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* PIN Input Form */}
                     <form onSubmit={handlePinSubmit} className="mb-4">

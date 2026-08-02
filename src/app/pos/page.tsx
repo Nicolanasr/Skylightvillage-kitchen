@@ -366,10 +366,12 @@ function POSContent() {
         return matchesCategory && matchesSearch;
     });
 
-    // SIMPLIFIED FLOOR MATRIX: Show all available/occupied tables, plus primary merged tables (hide only secondary merged tables)
+    // SIMPLIFIED FLOOR MATRIX: Show only 1 unified card per merged table group (hides all secondary merged tables)
     const visibleTablesOnMatrix = tables.filter((t) => {
-        if (t.status !== 'merged') return true;
-        return sessions.some((s) => s.primary_table_id === t.id && s.status === 'active');
+        const isSecondaryMerged = sessions.some(
+            (s) => s.status === 'active' && Array.isArray(s.merged_table_ids) && s.merged_table_ids.includes(t.id)
+        );
+        return !isSecondaryMerged;
     });
 
     return (

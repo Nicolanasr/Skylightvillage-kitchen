@@ -367,7 +367,10 @@ export async function processSplitPayment(data: {
       if (pool) {
         try {
           await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [session.id]);
-          await pool.query("UPDATE tables SET status = 'available' WHERE id = ANY($1::text[])", [tableIdsToReset]);
+          await pool.query(
+            "UPDATE tables SET status = 'available' WHERE id = ANY($1::text[]) OR id = $2",
+            [tableIdsToReset, session.primary_table_id]
+          );
         } catch (e) {
           console.error('Neon session close error:', e);
         }
@@ -387,6 +390,7 @@ export async function processSplitPayment(data: {
   revalidatePath('/pos');
   revalidatePath('/kds');
   revalidatePath('/order');
+  revalidatePath('/admin');
   return { success: true, paymentId };
 }
 
@@ -418,7 +422,10 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
   if (pool) {
     try {
       await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [session.id]);
-      await pool.query("UPDATE tables SET status = 'available' WHERE id = ANY($1::text[])", [tableIdsToReset]);
+      await pool.query(
+        "UPDATE tables SET status = 'available' WHERE id = ANY($1::text[]) OR id = $2",
+        [tableIdsToReset, session.primary_table_id]
+      );
       await pool.query("UPDATE order_items SET status = 'cancelled' WHERE session_id = $1 AND status IN ('pending', 'preparing')", [sessionId]);
       await pool.query("UPDATE service_calls SET status = 'resolved' WHERE session_id = $1 AND status = 'pending'", [sessionId]);
     } catch (e) {
@@ -438,6 +445,7 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
   revalidatePath('/pos');
   revalidatePath('/kds');
   revalidatePath('/order');
+  revalidatePath('/admin');
   return { success: true };
 }
 

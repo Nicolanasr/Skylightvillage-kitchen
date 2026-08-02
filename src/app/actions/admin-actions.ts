@@ -485,3 +485,44 @@ export async function setTotalTablesCountAction(targetCount: number) {
 
   return { success: true, message: `Successfully configured floor plan with ${targetCount} tables!`, tables: dbStore.tables };
 }
+
+export async function testDatabaseConnectionAction() {
+  if (!process.env.DATABASE_URL) {
+    return {
+      connected: false,
+      databaseUrlConfigured: false,
+      reason: 'DATABASE_URL environment variable is missing in Vercel settings.',
+    };
+  }
+
+  if (!pool) {
+    return {
+      connected: false,
+      databaseUrlConfigured: true,
+      reason: 'Neon Pool failed to initialize.',
+    };
+  }
+
+  try {
+    const res = await pool.query('SELECT NOW() as now, current_database() as db_name');
+    const tablesRes = await pool.query('SELECT COUNT(*)::int as count FROM tables');
+    const itemsRes = await pool.query('SELECT COUNT(*)::int as count FROM menu_items');
+    const ordersRes = await pool.query('SELECT COUNT(*)::int as count FROM order_items');
+
+    return {
+      connected: true,
+      databaseUrlConfigured: true,
+      timestamp: String(res.rows[0]?.now),
+      databaseName: String(res.rows[0]?.db_name),
+      tablesCount: Number(tablesRes.rows[0]?.count || 0),
+      menuItemsCount: Number(itemsRes.rows[0]?.count || 0),
+      orderItemsCount: Number(ordersRes.rows[0]?.count || 0),
+    };
+  } catch (e: any) {
+    return {
+      connected: false,
+      databaseUrlConfigured: true,
+      reason: e.message,
+    };
+  }
+}

@@ -1,5 +1,10 @@
-import { Pool } from '@neondatabase/serverless';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import { Table, TableSession, MenuItem, MenuCategory, OrderItem, ServiceCall, Payment, Discount, StaffMember, ActivityLog } from './types';
+
+if (typeof window === 'undefined') {
+  neonConfig.webSocketConstructor = ws;
+}
 
 const connectionString = process.env.DATABASE_URL;
 export const pool = connectionString ? new Pool({ connectionString }) : null;
