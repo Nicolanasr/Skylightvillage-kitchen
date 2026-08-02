@@ -82,6 +82,7 @@ function CustomerOrderContent() {
     const [serviceMessage, setServiceMessage] = useState<string | null>(null);
     const [orderSubmitting, setOrderSubmitting] = useState(false);
     const [orderSuccessMsg, setOrderSuccessMsg] = useState<string | null>(null);
+    const [addedToastMsg, setAddedToastMsg] = useState<string | null>(null);
 
     // Live order items for active session
     const [liveOrderItems, setLiveOrderItems] = useState<OrderItem[]>([]);
@@ -176,8 +177,24 @@ function CustomerOrderContent() {
             },
         ]);
 
+        const itemName = selectedItemForModifier.name;
         setSelectedItemForModifier(null);
-        setIsCartOpen(true);
+        setAddedToastMsg(`Added "${itemName}" to cart!`);
+        setTimeout(() => setAddedToastMsg(null), 3000);
+    };
+
+    const handleCategoryClick = (catId: string) => {
+        setActiveCategory(catId);
+        if (catId === 'all') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            const el = document.getElementById(`category-${catId}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
     };
 
     // Submit Order (Continuous workflow)
@@ -312,7 +329,7 @@ function CustomerOrderContent() {
             {/* Category Navigation Bar */}
             <div className="sticky top-[60px] md:top-[61px] z-20 bg-slate-950/80 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-slate-800/80 scrollbar-none flex gap-2">
                 <button
-                    onClick={() => setActiveCategory('all')}
+                    onClick={() => handleCategoryClick('all')}
                     className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === 'all'
                         ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                         : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
@@ -323,7 +340,7 @@ function CustomerOrderContent() {
                 {categories.map((cat) => (
                     <button
                         key={cat.id}
-                        onClick={() => setActiveCategory(cat.id)}
+                        onClick={() => handleCategoryClick(cat.id)}
                         className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === cat.id
                             ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                             : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
@@ -781,6 +798,13 @@ function CustomerOrderContent() {
                             <Receipt className="h-4 w-4 text-emerald-400" />
                             <span>Request Bill</span>
                         </button>
+                    </div>
+                )}
+                {/* Added Item Toast Confirmation Banner */}
+                {addedToastMsg && (
+                    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black text-xs px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-amber-300 animate-in fade-in slide-in-from-bottom-4">
+                        <CheckCircle2 className="h-4 w-4 text-slate-950" />
+                        <span>{addedToastMsg}</span>
                     </div>
                 )}
             </div>

@@ -83,11 +83,14 @@ export async function getOrderPageData(tableNumber: number, token: string) {
 
   if (pool && session) {
     try {
+      await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
       const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
       if (catRes.rows.length > 0) liveCategories = catRes.rows;
 
-      const itemRes = await pool.query('SELECT * FROM menu_items WHERE (is_staff_only IS NOT TRUE) ORDER BY name ASC');
-      if (itemRes.rows.length > 0) liveMenuItems = itemRes.rows;
+      const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY name ASC');
+      if (itemRes.rows.length > 0) {
+        liveMenuItems = itemRes.rows.filter((m: any) => !m.is_staff_only);
+      }
 
       const ordItemsRes = await pool.query('SELECT * FROM order_items WHERE session_id = $1 ORDER BY created_at ASC', [session.id]);
       liveItems = ordItemsRes.rows;

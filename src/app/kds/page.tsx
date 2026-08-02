@@ -150,7 +150,10 @@ function KDSContent() {
         (item) => item.status !== 'delivered' && item.status !== 'cancelled'
     );
 
-    const displayedItems = activeKitchenItems;
+    const displayedItems = activeKitchenItems.filter((item) => {
+        if (stationFilter === 'all') return true;
+        return item.station === stationFilter;
+    });
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6">
