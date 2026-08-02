@@ -409,8 +409,8 @@ export async function triggerServiceCall(sessionId: string, tableNumber: number,
 
 // Data Fetch Action for KDS (Strictly filters for ACTIVE table sessions only)
 export async function getKDSData(stationFilter: string) {
-  let items = dbStore.orderItems;
-  let menuItems = dbStore.menuItems;
+  let items: any[] = [];
+  let menuItems: any[] = [];
 
   if (pool) {
     try {
@@ -418,10 +418,8 @@ export async function getKDSData(stationFilter: string) {
         SELECT oi.* 
         FROM order_items oi
         JOIN table_sessions ts ON oi.session_id = ts.id
-        LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
         WHERE ts.status = 'active'
         AND oi.status NOT IN ('delivered', 'cancelled')
-        AND (mi.is_staff_only IS NOT TRUE)
       `;
       const queryParams: any[] = [];
 
@@ -435,8 +433,8 @@ export async function getKDSData(stationFilter: string) {
       const res = await pool.query(query, queryParams);
       items = res.rows;
 
-      const menuRes = await pool.query('SELECT * FROM menu_items WHERE (is_staff_only IS NOT TRUE) ORDER BY name ASC');
-      menuItems = menuRes.rows;
+      const menuRes = await pool.query('SELECT * FROM menu_items ORDER BY name ASC');
+      menuItems = menuRes.rows.filter((m: any) => !m.is_staff_only);
     } catch (e) {
       console.error('Neon KDS fetch error:', e);
     }
@@ -444,7 +442,7 @@ export async function getKDSData(stationFilter: string) {
     const activeSessionIds = new Set(dbStore.tableSessions.filter((s) => s.status === 'active').map((s) => s.id));
     const staffOnlyItemIds = new Set(dbStore.menuItems.filter((m) => m.is_staff_only).map((m) => m.id));
 
-    items = items.filter(
+    items = dbStore.orderItems.filter(
       (i) =>
         activeSessionIds.has(i.session_id) &&
         i.status !== 'delivered' &&
