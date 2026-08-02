@@ -45,7 +45,7 @@ export async function getOrderPageData(tableNumber: number, token: string) {
   if (pool && table) {
     try {
       const sessRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+        "SELECT * FROM table_sessions WHERE primary_table_id = $1 AND status = 'active'",
         [table.id]
       );
       if (sessRes.rows.length > 0) {
@@ -53,10 +53,10 @@ export async function getOrderPageData(tableNumber: number, token: string) {
       } else {
         const newSessId = randomUUID();
         const insertSess = await pool.query(
-          "INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status) VALUES ($1, $2, '{}', 'active') RETURNING *",
+          "INSERT INTO table_sessions (id, primary_table_id, status) VALUES ($1, $2, 'active') RETURNING *",
           [newSessId, table.id]
         );
-        session = insertSess.rows[0];
+        session = insertSess.rows[0] || { id: newSessId, primary_table_id: table.id, status: 'active' };
       }
     } catch (e) {
       console.error('Neon session fetch error:', e);
@@ -83,7 +83,7 @@ export async function getOrderPageData(tableNumber: number, token: string) {
 
   if (pool && session) {
     try {
-      const catRes = await pool.query('SELECT * FROM menu_categories WHERE sort_order < 6 ORDER BY sort_order ASC');
+      const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
       if (catRes.rows.length > 0) liveCategories = catRes.rows;
 
       const itemRes = await pool.query('SELECT * FROM menu_items WHERE (is_staff_only IS NOT TRUE) ORDER BY name ASC');
@@ -137,6 +137,15 @@ export async function submitCustomerOrder(data: {
 
   if (pool) {
     try {
+      await pool.query(`
+        ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey;
+        ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text;
+        ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text;
+        ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text;
+        ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text;
+        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1;
+        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false;
+      `);
       const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1', [data.sessionId]);
       if (sessRes.rows.length > 0) {
         session = sessRes.rows[0];
@@ -249,6 +258,20 @@ export async function addWaiterManualOrderItem(data: {
   selectedModifiers?: SelectedModifier[];
   specialNotes?: string;
 }) {
+  if (pool) {
+    try {
+      await pool.query(`
+        ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_menu_item_id_fkey;
+        ALTER TABLE order_items ALTER COLUMN id TYPE TEXT USING id::text;
+        ALTER TABLE order_items ALTER COLUMN order_id TYPE TEXT USING order_id::text;
+        ALTER TABLE order_items ALTER COLUMN session_id TYPE TEXT USING session_id::text;
+        ALTER TABLE order_items ALTER COLUMN menu_item_id TYPE TEXT USING menu_item_id::text;
+        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS table_number INT DEFAULT 1;
+        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false;
+      `);
+    } catch (e) {}
+  }
+
   let session: any = dbStore.tableSessions.find(
     (s) => (s.primary_table_id === data.tableId || s.merged_table_ids?.includes(data.tableId)) && s.status === 'active'
   );
@@ -256,7 +279,7 @@ export async function addWaiterManualOrderItem(data: {
   if (pool && !session) {
     try {
       const sessRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+        "SELECT * FROM table_sessions WHERE primary_table_id = $1 AND status = 'active'",
         [data.tableId]
       );
       if (sessRes.rows.length > 0) {
@@ -264,14 +287,14 @@ export async function addWaiterManualOrderItem(data: {
       } else {
         const newSessId = randomUUID();
         const insertSess = await pool.query(
-          "INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status) VALUES ($1, $2, '{}', 'active') RETURNING *",
+          "INSERT INTO table_sessions (id, primary_table_id, status) VALUES ($1, $2, 'active') RETURNING *",
           [newSessId, data.tableId]
         );
-        session = insertSess.rows[0];
-        await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1", [data.tableId]);
+        session = insertSess.rows[0] || { id: newSessId, primary_table_id: data.tableId, status: 'active' };
+        await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [data.tableId, data.tableNumber]);
       }
     } catch (e) {
-      console.error('Neon session creation error:', e);
+      console.error('Neon waiter session creation error:', e);
     }
   }
 
@@ -284,7 +307,7 @@ export async function addWaiterManualOrderItem(data: {
       created_at: new Date().toISOString(),
     };
     dbStore.tableSessions.push(session);
-    const tbl = dbStore.tables.find((t) => t.id === data.tableId);
+    const tbl = dbStore.tables.find((t) => t.id === data.tableId || t.table_number === data.tableNumber);
     if (tbl) tbl.status = 'occupied';
   }
 
@@ -293,7 +316,9 @@ export async function addWaiterManualOrderItem(data: {
   if (pool) {
     try {
       await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, session.id]);
-    } catch (e) {}
+    } catch (e) {
+      console.error('Neon orders table insert error:', e);
+    }
   }
 
   // Insert individual 1x items for per-dish KDS status tracking
@@ -340,7 +365,7 @@ export async function addWaiterManualOrderItem(data: {
           ]
         );
       } catch (e) {
-        console.error('Neon waiter manual order error:', e);
+        console.error('Neon waiter manual order item insert error:', e);
       }
     }
   }
@@ -526,4 +551,24 @@ export async function updateMenuItemImageUrl(menuItemId: string, imageUrl: strin
   revalidatePath('/kds');
   revalidatePath('/pos');
   return { success: true, imageUrl };
+}
+
+export async function markKDSItemsPrinted(itemIds: string[]) {
+  if (!itemIds || itemIds.length === 0) return { success: true };
+
+  itemIds.forEach((id) => {
+    const item = dbStore.orderItems.find((i) => i.id === id);
+    if (item) item.is_printed = true;
+  });
+
+  if (pool) {
+    try {
+      await pool.query('UPDATE order_items SET is_printed = true WHERE id = ANY($1::text[])', [itemIds]);
+    } catch (e) {
+      console.error('Neon markKDSItemsPrinted error:', e);
+    }
+  }
+
+  revalidatePath('/kds');
+  return { success: true };
 }

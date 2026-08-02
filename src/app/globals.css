@@ -48,13 +48,9 @@ body {
   background: #f59e0b;
 }
 
-/* Thermal Printer Template Rules (2.8in x 11in roll format) */
+/* Page Print Rules */
 @page {
-  size: 2.8in 11in;
-  margin-top: 0cm;
-  margin-left: 0cm;
-  margin-right: 0cm;
-  margin-bottom: 0cm;
+  margin: 0.5cm;
 }
 
 @media print {
@@ -63,7 +59,11 @@ body {
   }
 
   .print-receipt-container,
-  .print-receipt-container * {
+  .print-receipt-container *,
+  .print-qr-container,
+  .print-qr-container *,
+  .print-kds-container,
+  .print-kds-container * {
     visibility: visible !important;
   }
 
@@ -82,5 +82,42 @@ body {
     font-size: 12px !important;
     line-height: 1.2 !important;
     box-sizing: border-box !important;
+  }
+
+  .print-qr-container {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5in !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .print-kds-container {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 2.8in !important;
+    max-width: 2.8in !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'PT Sans', sans-serif, monospace !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    box-sizing: border-box !important;
+  }
+
+  .kds-chit-ticket {
+    page-break-after: always !important;
+    break-after: page !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 16px !important;
+    border-bottom: 2px dashed #000000 !important;
   }
 }

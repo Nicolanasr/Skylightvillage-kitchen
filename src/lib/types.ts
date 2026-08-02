@@ -75,6 +75,7 @@ export interface OrderItem {
   special_notes?: string;
   is_comped?: boolean;
   is_paid?: boolean;
+  is_printed?: boolean;
   created_at: string;
 }
 
@@ -122,4 +123,21 @@ export interface CalculatedBill {
   remainingUsd: number;
   finalTotalLbp: string;
   remainingLbp: string;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  pin: string;
+  role: 'Waiter' | 'Cashier' | 'Chef' | 'Manager';
+}
+
+export interface ActivityLog {
+  id: string;
+  staff_name: string;
+  staff_role: string;
+  action_type: string;
+  table_number?: number;
+  details: string;
+  created_at: string;
 }

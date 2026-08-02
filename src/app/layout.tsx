@@ -2,8 +2,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Skylight Village - Restaurant Self-Ordering, KDS & POS',
-  description: 'Continuous QR Self-Ordering, Kitchen Display System, and Waiter Cashier POS for Skylight Village',
+  title: 'Skylight Village - Mountain Dining, KDS & POS',
+  description: 'Continuous QR Self-Ordering, Kitchen Display System, and Waiter Cashier POS for Skylight Village Jaj, Mount Lebanon',
+  icons: {
+    icon: '/images/Skylight-logo-white.png',
+    shortcut: '/images/Skylight-logo-white.png',
+    apple: '/images/Skylight-logo-white.png',
+  },
 };
 
 export default function RootLayout({
@@ -14,6 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+        <link rel="icon" href="/images/Skylight-logo-white.png" type="image/png" />
+        <link rel="shortcut icon" href="/images/Skylight-logo-white.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/images/Skylight-logo-white.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />

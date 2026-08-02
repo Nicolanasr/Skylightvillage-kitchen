@@ -1,4 +1,4 @@
-import { CalculatedBill, formatLbp, formatUsd } from '@/lib/currency';
+import { CalculatedBill, formatLbp, formatUsd, getInvoiceReference } from '@/lib/currency';
 import { OrderItem } from '@/lib/types';
 
 export function ThermalReceipt({
@@ -7,12 +7,14 @@ export function ThermalReceipt({
     totals,
     isFinal,
     guestName,
+    sessionId,
 }: {
     tableNumber: number;
     items: OrderItem[];
     totals: CalculatedBill;
     isFinal: boolean;
     guestName?: string;
+    sessionId?: string;
 }) {
     const activeItems = items.filter((i) => i.status !== 'cancelled');
 
@@ -57,7 +59,7 @@ export function ThermalReceipt({
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const billId = `SKL-${tableNumber}-${now.getHours()}${now.getMinutes()}`;
+    const billId = getInvoiceReference(tableNumber, sessionId || items[0]?.session_id);
 
     return (
         <div className="print-receipt-container hidden print:block text-black bg-white font-sans text-xs w-[2.8in] p-2">
@@ -124,12 +126,12 @@ export function ThermalReceipt({
                                 <td className="py-1 text-left align-top font-semibold pr-1">
                                     <div>{item.item_name}</div>
                                     {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                        <div className="text-[9px] text-gray-600 font-normal">
-                                            {item.selected_modifiers.map((m: any) => `${m.group}: ${m.option}`).join(', ')}
+                                        <div className="text-[10px] text-gray-800 font-bold pl-1">
+                                            {item.selected_modifiers.map((m: any) => `• ${m.group}: ${m.option}`).join(' | ')}
                                         </div>
                                     )}
-                                    {item.special_notes && item.special_notes !== 'Added by Waiter' && (
-                                        <div className="text-[9px] text-gray-600 italic font-normal">Note: {item.special_notes}</div>
+                                    {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
+                                        <div className="text-[10px] text-black font-extrabold italic pl-1">Note: {item.special_notes}</div>
                                     )}
                                 </td>
                                 <td className="py-1 text-center align-top font-bold">{item.quantity}</td>

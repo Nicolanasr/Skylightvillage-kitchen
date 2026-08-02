@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { dbStore } from '@/lib/db';
 import { formatLbp, formatUsd } from '@/lib/currency';
+import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
+import { getStaffActivityLogs } from '@/app/actions/audit-actions';
+import { ActivityLog } from '@/lib/types';
 import {
   FileSpreadsheet,
   Printer,
@@ -14,11 +17,33 @@ import {
   Wine,
   ChefHat,
   ArrowLeft,
+  ShieldCheck,
+  User,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ZReportPage() {
+  return (
+    <StaffAuthGuard pageTitle="End-of-Day Z-Report & Audit Trail">
+      <ZReportContent />
+    </StaffAuthGuard>
+  );
+}
+
+function ZReportContent() {
   const [reportDate] = useState<string>(new Date().toLocaleDateString());
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      const logs = await getStaffActivityLogs();
+      setActivityLogs(logs);
+    };
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Aggregate metrics from dbStore
   const allPayments = dbStore.payments;
@@ -94,13 +119,13 @@ export default function ZReportPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-100 tracking-tight">End-of-Day Z-Report</h1>
-            <p className="text-xs text-slate-400 font-medium">Daily Shift Revenue & Financial Summary &bull; {reportDate}</p>
+            <p className="text-xs text-slate-400 font-medium">Daily Shift Revenue & Staff Audit Activity Logs &bull; {reportDate}</p>
           </div>
         </div>
 
         <button
           onClick={handlePrintReport}
-          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
+          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all print:hidden"
         >
           <Printer className="h-4 w-4" />
           <span>Print Shift Report</span>
@@ -169,7 +194,7 @@ export default function ZReportPage() {
           </div>
         </div>
 
-        {/* Category Sales Volume */}
+        {/* Station Sales Volume */}
         <div className="glass-card rounded-3xl p-6 border border-slate-800">
           <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
             <ChefHat className="h-5 w-5 text-amber-400" />
@@ -207,6 +232,61 @@ export default function ZReportPage() {
               <span className="text-lg font-bold text-slate-100">{stationVolume.shisha} items</span>
             </div>
           </div>
+        </div>
+
+        {/* STAFF AUDIT ACTIVITY TRAIL */}
+        <div className="glass-card rounded-3xl p-6 border border-slate-800">
+          <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-amber-400" />
+              <span>Realtime Staff Activity Audit Trail</span>
+            </div>
+            <span className="text-xs text-slate-500 font-mono">
+              {activityLogs.length} Logged Events
+            </span>
+          </h3>
+
+          {activityLogs.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs font-semibold">
+              No staff activity recorded yet today.
+            </div>
+          ) : (
+            <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-2">
+              {activityLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-2"
+                >
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs text-slate-100">
+                          {log.staff_name}
+                        </span>
+                        <span className="text-[10px] bg-slate-900 text-amber-400 px-2 py-0.5 rounded-md font-bold uppercase border border-slate-800">
+                          {log.staff_role}
+                        </span>
+                        {log.table_number && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-black">
+                            Table #{log.table_number}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">{log.details}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono self-end sm:self-auto">
+                    <Clock className="h-3 w-3" />
+                    <span>{new Date(log.created_at).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

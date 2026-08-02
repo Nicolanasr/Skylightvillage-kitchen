@@ -2,30 +2,57 @@
 
 import { dbStore, pool } from '@/lib/db';
 import { calculateBillTotals } from '@/lib/currency';
+import { logStaffActivity } from './audit-actions';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 
 export async function getPOSData() {
+  let tables = dbStore.tables;
+  let sessions = dbStore.tableSessions;
+  let serviceCalls = dbStore.serviceCalls;
+  let orderItems = dbStore.orderItems;
+  let discounts = dbStore.discounts;
+  let payments = dbStore.payments;
   let menuItems = dbStore.menuItems;
   let categories = dbStore.categories;
 
   if (pool) {
     try {
+      const tblRes = await pool.query('SELECT * FROM tables ORDER BY table_number ASC');
+      if (tblRes.rows.length > 0) tables = tblRes.rows;
+
+      const sessRes = await pool.query('SELECT * FROM table_sessions ORDER BY created_at DESC');
+      if (sessRes.rows.length > 0) sessions = sessRes.rows;
+
+      const ordRes = await pool.query('SELECT * FROM order_items ORDER BY created_at DESC');
+      if (ordRes.rows.length > 0) orderItems = ordRes.rows;
+
+      const payRes = await pool.query('SELECT * FROM payments ORDER BY created_at DESC');
+      if (payRes.rows.length > 0) payments = payRes.rows;
+
+      const discRes = await pool.query('SELECT * FROM discounts ORDER BY created_at DESC');
+      if (discRes.rows.length > 0) discounts = discRes.rows;
+
+      const callRes = await pool.query('SELECT * FROM service_calls ORDER BY created_at DESC');
+      if (callRes.rows.length > 0) serviceCalls = callRes.rows;
+
       const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY name ASC');
       if (itemRes.rows.length > 0) menuItems = itemRes.rows;
 
       const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
       if (catRes.rows.length > 0) categories = catRes.rows;
-    } catch (e) {}
+    } catch (e) {
+      console.error('Neon getPOSData query error:', e);
+    }
   }
 
   return {
-    tables: dbStore.tables,
-    sessions: dbStore.tableSessions,
-    serviceCalls: dbStore.serviceCalls,
-    orderItems: dbStore.orderItems,
-    discounts: dbStore.discounts,
-    payments: dbStore.payments,
+    tables,
+    sessions,
+    serviceCalls,
+    orderItems,
+    discounts,
+    payments,
     menuItems,
     categories,
   };
@@ -42,7 +69,6 @@ export async function assignItemsToGuest(
     if (!item || assignQty <= 0) continue;
 
     if (assignQty >= item.quantity) {
-      // Assign full item
       item.guest_name = guestName;
       if (pool) {
         try {
@@ -50,7 +76,6 @@ export async function assignItemsToGuest(
         } catch (e) {}
       }
     } else {
-      // Split quantity: reduce original quantity and create a new item for guest
       item.quantity -= assignQty;
       const newItemId = randomUUID();
 
@@ -101,19 +126,181 @@ export async function assignItemsToGuest(
   return { success: true };
 }
 
+export async function mergeTables(primaryTableId: string, secondaryTableIds: string[]) {
+  if (!secondaryTableIds || secondaryTableIds.length === 0) {
+    return { success: false, error: 'No tables selected to merge' };
+  }
+
+  let primarySession = dbStore.tableSessions.find(
+    (s) => (s.primary_table_id === primaryTableId || s.merged_table_ids.includes(primaryTableId)) && s.status === 'active'
+  );
+
+  if (!primarySession) {
+    const newSessId = randomUUID();
+    primarySession = {
+      id: newSessId,
+      primary_table_id: primaryTableId,
+      merged_table_ids: [],
+      status: 'active',
+      created_at: new Date().toISOString(),
+    };
+    dbStore.tableSessions.push(primarySession);
+
+    if (pool) {
+      try {
+        await pool.query(
+          "INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status) VALUES ($1, $2, '{}', 'active')",
+          [primarySession.id, primaryTableId]
+        );
+      } catch (e) {}
+    }
+  }
+
+  const primaryTbl = dbStore.tables.find((t) => t.id === primaryTableId);
+  if (primaryTbl) primaryTbl.status = 'merged';
+
+  for (const secId of secondaryTableIds) {
+    if (!primarySession.merged_table_ids.includes(secId)) {
+      primarySession.merged_table_ids.push(secId);
+    }
+    const secTbl = dbStore.tables.find((t) => t.id === secId);
+    if (secTbl) secTbl.status = 'merged';
+
+    const secSession = dbStore.tableSessions.find(
+      (s) => s.primary_table_id === secId && s.status === 'active' && s.id !== primarySession.id
+    );
+    if (secSession) {
+      secSession.status = 'closed';
+      dbStore.orderItems.forEach((i) => {
+        if (i.session_id === secSession.id) {
+          i.session_id = primarySession.id;
+        }
+      });
+      if (pool) {
+        try {
+          await pool.query("UPDATE table_sessions SET status = 'closed' WHERE id = $1", [secSession.id]);
+          await pool.query('UPDATE order_items SET session_id = $1 WHERE session_id = $2', [
+            primarySession.id,
+            secSession.id,
+          ]);
+        } catch (e) {}
+      }
+    }
+  }
+
+  if (pool) {
+    try {
+      await pool.query(
+        "UPDATE table_sessions SET merged_table_ids = $1 WHERE id = $2",
+        [primarySession.merged_table_ids, primarySession.id]
+      );
+      await pool.query("UPDATE tables SET status = 'merged' WHERE id = ANY($1::text[])", [
+        [primaryTableId, ...secondaryTableIds],
+      ]);
+    } catch (e) {
+      console.error('Neon mergeTables error:', e);
+    }
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
+export async function unmergeSingleTable(primarySessionId: string, tableIdToUnmerge: string) {
+  const session = dbStore.tableSessions.find((s) => s.id === primarySessionId);
+  if (!session) return { success: false, error: 'Session not found' };
+
+  session.merged_table_ids = session.merged_table_ids.filter((id) => id !== tableIdToUnmerge);
+  const tbl = dbStore.tables.find((t) => t.id === tableIdToUnmerge);
+  if (tbl) tbl.status = 'available';
+
+  if (session.merged_table_ids.length === 0 && session.primary_table_id) {
+    const primTbl = dbStore.tables.find((t) => t.id === session.primary_table_id);
+    if (primTbl) primTbl.status = 'occupied';
+  }
+
+  if (pool) {
+    try {
+      await pool.query('UPDATE table_sessions SET merged_table_ids = $1 WHERE id = $2', [
+        session.merged_table_ids,
+        session.id,
+      ]);
+      await pool.query("UPDATE tables SET status = 'available' WHERE id = $1", [tableIdToUnmerge]);
+      if (session.merged_table_ids.length === 0) {
+        await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1", [session.primary_table_id]);
+      }
+    } catch (e) {
+      console.error('Neon unmergeSingleTable error:', e);
+    }
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
+export async function applyDiscount(sessionId: string, type: 'percentage' | 'fixed', value: number, reason = '') {
+  const discountId = randomUUID();
+  const disc = {
+    id: discountId,
+    session_id: sessionId,
+    type,
+    value,
+    reason,
+    created_at: new Date().toISOString(),
+  };
+
+  dbStore.discounts.push(disc);
+
+  if (pool) {
+    try {
+      await pool.query(
+        `INSERT INTO discounts (id, session_id, type, value, reason) VALUES ($1, $2, $3, $4, $5)`,
+        [disc.id, disc.session_id, disc.type, disc.value, disc.reason]
+      );
+    } catch (e) {
+      console.error('Neon error applying discount:', e);
+    }
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
+export async function removeDiscount(discountId: string) {
+  const idx = dbStore.discounts.findIndex((d) => d.id === discountId);
+  if (idx !== -1) dbStore.discounts.splice(idx, 1);
+
+  if (pool) {
+    try {
+      await pool.query('DELETE FROM discounts WHERE id = $1', [discountId]);
+    } catch (e) {
+      console.error('Neon error removing discount:', e);
+    }
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
 export async function processSplitPayment(data: {
   sessionId: string;
+  paymentType: 'full' | 'item_split' | 'equal_split' | 'partial';
   amountUsd: number;
   currency: 'USD' | 'LBP';
   paymentMethod: 'cash' | 'card';
-  paymentType: 'full' | 'item_split' | 'equal_split' | 'partial';
-  paidItemIds?: Array<{ id: string; qty: number }>;
+  itemIdsPaid?: string[];
+  guestName?: string;
+  staffName?: string;
+  staffRole?: string;
 }) {
-  const session = dbStore.tableSessions.find((s) => s.id === data.sessionId);
-  if (!session) return { success: false, error: 'Session not found' };
+  const paymentId = randomUUID();
 
   const payment = {
-    id: `pay-${Date.now()}`,
+    id: paymentId,
     session_id: data.sessionId,
     amount_usd: data.amountUsd,
     currency: data.currency,
@@ -141,177 +328,112 @@ export async function processSplitPayment(data: {
         ]
       );
     } catch (e) {
-      console.error('Neon error on processSplitPayment:', e);
+      console.error('Neon payment insert error:', e);
     }
   }
 
-  // Mark specific paid items as is_paid = true for Person A / Person B item split checks
-  if (data.paidItemIds && data.paidItemIds.length > 0) {
-    const itemIds = data.paidItemIds.map((i) => i.id);
-
-    dbStore.orderItems.forEach((item) => {
-      if (itemIds.includes(item.id)) {
+  if (data.itemIdsPaid && data.itemIdsPaid.length > 0) {
+    for (const itemId of data.itemIdsPaid) {
+      const item = dbStore.orderItems.find((i) => i.id === itemId);
+      if (item) {
         item.is_paid = true;
-      }
-    });
-
-    if (pool) {
-      try {
-        await pool.query('UPDATE order_items SET is_paid = true WHERE id = ANY($1)', [itemIds]);
-      } catch (e) {
-        console.error('Neon error updating order_items is_paid:', e);
-      }
-    }
-  }
-
-  const sessionItems = dbStore.orderItems.filter((i) => i.session_id === data.sessionId);
-  const sessionDiscounts = dbStore.discounts.filter((d) => d.session_id === data.sessionId);
-  const sessionPayments = dbStore.payments.filter((p) => p.session_id === data.sessionId);
-
-  const bill = calculateBillTotals(sessionItems, sessionDiscounts, sessionPayments, dbStore.exchangeRate);
-
-  // Check if all non-cancelled items in session are paid/comped
-  const unpaidItemsLeft = sessionItems.filter(
-    (i) => i.status !== 'cancelled' && !i.is_comped && !i.is_paid
-  );
-
-  if (unpaidItemsLeft.length === 0 || bill.remainingUsd <= 0.01) {
-    session.status = 'closed';
-    session.closed_at = new Date().toISOString();
-
-    const primaryTable = dbStore.tables.find((t) => t.id === session.primary_table_id);
-    if (primaryTable) primaryTable.status = 'available';
-
-    if (session.merged_table_ids && session.merged_table_ids.length > 0) {
-      session.merged_table_ids.forEach((id) => {
-        const mergedTbl = dbStore.tables.find((t) => t.id === id);
-        if (mergedTbl) mergedTbl.status = 'available';
-      });
-    }
-
-    if (pool) {
-      try {
-        await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [
-          session.id,
-        ]);
-        await pool.query("UPDATE tables SET status = 'available' WHERE id = $1", [
-          session.primary_table_id,
-        ]);
-        if (session.merged_table_ids && session.merged_table_ids.length > 0) {
-          await pool.query("UPDATE tables SET status = 'available' WHERE id = ANY($1)", [
-            session.merged_table_ids,
-          ]);
+        if (pool) {
+          try {
+            await pool.query('UPDATE order_items SET is_paid = true WHERE id = $1', [itemId]);
+          } catch (e) {}
         }
-      } catch (e) {
-        console.error('Neon error closing session:', e);
       }
     }
   }
+
+  const session = dbStore.tableSessions.find((s) => s.id === data.sessionId);
+  if (session) {
+    const sessionOrderItems = dbStore.orderItems.filter((i) => i.session_id === data.sessionId && i.status !== 'cancelled');
+    const sessionDiscounts = dbStore.discounts.filter((d) => d.session_id === data.sessionId);
+    const sessionPayments = dbStore.payments.filter((p) => p.session_id === data.sessionId);
+
+    const bill = calculateBillTotals(sessionOrderItems, sessionDiscounts, sessionPayments, dbStore.exchangeRate);
+
+    if (bill.remainingUsd <= 0.01) {
+      session.status = 'closed';
+      session.closed_at = new Date().toISOString();
+
+      const tableIdsToReset = [session.primary_table_id, ...(session.merged_table_ids || [])];
+      tableIdsToReset.forEach((tblId) => {
+        const tbl = dbStore.tables.find((t) => t.id === tblId);
+        if (tbl) tbl.status = 'available';
+      });
+
+      if (pool) {
+        try {
+          await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [session.id]);
+          await pool.query("UPDATE tables SET status = 'available' WHERE id = ANY($1::text[])", [tableIdsToReset]);
+        } catch (e) {
+          console.error('Neon session close error:', e);
+        }
+      }
+    }
+  }
+
+  const tblNum = dbStore.tables.find((t) => t.id === session?.primary_table_id)?.table_number;
+  await logStaffActivity({
+    staffName: data.staffName || 'Staff Member',
+    staffRole: data.staffRole || 'Cashier',
+    actionType: 'payment_processed',
+    tableNumber: tblNum,
+    details: `Processed $${data.amountUsd.toFixed(2)} (${data.paymentMethod.toUpperCase()}) payment for Table #${tblNum}`,
+  });
 
   revalidatePath('/pos');
+  revalidatePath('/kds');
   revalidatePath('/order');
-  return {
-    success: true,
-    remainingUsd: bill.remainingUsd,
-    sessionClosed: session.status === 'closed',
-  };
+  return { success: true, paymentId };
 }
 
-export async function mergeTables(primaryTableId: string, secondaryTableIds: string[]) {
-  if (!secondaryTableIds || secondaryTableIds.length === 0) {
-    return { success: false, error: 'Select at least one table to merge' };
-  }
+export async function closeTableSessionAction(sessionId: string, staffName = 'Waiter', staffRole = 'Staff') {
+  const session = dbStore.tableSessions.find((s) => s.id === sessionId);
+  if (!session) return { success: false, error: 'Session not found' };
 
-  let primarySession = dbStore.tableSessions.find(
-    (s) => s.primary_table_id === primaryTableId && s.status === 'active'
-  );
+  session.status = 'closed';
+  session.closed_at = new Date().toISOString();
 
-  if (!primarySession) {
-    primarySession = {
-      id: `sess-${primaryTableId}-${Date.now()}`,
-      primary_table_id: primaryTableId,
-      merged_table_ids: secondaryTableIds,
-      status: 'active',
-      created_at: new Date().toISOString(),
-    };
-    dbStore.tableSessions.push(primarySession);
-  } else {
-    primarySession.merged_table_ids = Array.from(
-      new Set([...(primarySession.merged_table_ids || []), ...secondaryTableIds])
-    );
-  }
+  const tableIdsToReset = [session.primary_table_id, ...(session.merged_table_ids || [])];
+  tableIdsToReset.forEach((tblId) => {
+    const tbl = dbStore.tables.find((t) => t.id === tblId);
+    if (tbl) tbl.status = 'available';
+  });
 
-  const primaryTable = dbStore.tables.find((t) => t.id === primaryTableId);
-  if (primaryTable) primaryTable.status = 'occupied';
+  dbStore.orderItems.forEach((item) => {
+    if (item.session_id === sessionId && (item.status === 'pending' || item.status === 'preparing')) {
+      item.status = 'cancelled';
+    }
+  });
 
-  secondaryTableIds.forEach((id) => {
-    const secTable = dbStore.tables.find((t) => t.id === id);
-    if (secTable) secTable.status = 'merged';
+  dbStore.serviceCalls.forEach((call) => {
+    if (call.session_id === sessionId && call.status === 'pending') {
+      call.status = 'resolved';
+    }
   });
 
   if (pool) {
     try {
-      await pool.query('UPDATE table_sessions SET merged_table_ids = $1 WHERE id = $2', [
-        primarySession.merged_table_ids,
-        primarySession.id,
-      ]);
-      await pool.query("UPDATE tables SET status = 'merged' WHERE id = ANY($1)", [secondaryTableIds]);
-      await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1", [primaryTableId]);
+      await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [session.id]);
+      await pool.query("UPDATE tables SET status = 'available' WHERE id = ANY($1::text[])", [tableIdsToReset]);
+      await pool.query("UPDATE order_items SET status = 'cancelled' WHERE session_id = $1 AND status IN ('pending', 'preparing')", [sessionId]);
+      await pool.query("UPDATE service_calls SET status = 'resolved' WHERE session_id = $1 AND status = 'pending'", [sessionId]);
     } catch (e) {
-      console.error('Neon mergeTables error:', e);
+      console.error('Neon closeTableSessionAction error:', e);
     }
   }
 
-  revalidatePath('/pos');
-  return { success: true, sessionId: primarySession.id };
-}
-
-export async function unmergeSingleTable(sessionId: string, tableIdToUnmerge: string) {
-  const session = dbStore.tableSessions.find((s) => s.id === sessionId);
-  if (!session) return { success: false, error: 'Session not found' };
-
-  session.merged_table_ids = (session.merged_table_ids || []).filter((id) => id !== tableIdToUnmerge);
-  const unmergedTable = dbStore.tables.find((t) => t.id === tableIdToUnmerge);
-  if (unmergedTable) unmergedTable.status = 'available';
-
-  if (pool) {
-    try {
-      await pool.query('UPDATE table_sessions SET merged_table_ids = $1 WHERE id = $2', [
-        session.merged_table_ids,
-        session.id,
-      ]);
-      await pool.query("UPDATE tables SET status = 'available' WHERE id = $1", [tableIdToUnmerge]);
-    } catch (e) {
-      console.error('Neon unmerge error:', e);
-    }
-  }
-
-  revalidatePath('/pos');
-  return { success: true };
-}
-
-export async function updateOrderItemQuantity(orderItemId: string, delta: number) {
-  const itemIndex = dbStore.orderItems.findIndex((i) => i.id === orderItemId);
-  if (itemIndex === -1) return { success: false, error: 'Item not found' };
-
-  const item = dbStore.orderItems[itemIndex];
-  const newQty = item.quantity + delta;
-
-  if (newQty <= 0) {
-    dbStore.orderItems.splice(itemIndex, 1);
-    if (pool) {
-      try {
-        await pool.query('DELETE FROM order_items WHERE id = $1', [orderItemId]);
-      } catch (e) {}
-    }
-  } else {
-    item.quantity = newQty;
-    if (pool) {
-      try {
-        await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [newQty, orderItemId]);
-      } catch (e) {}
-    }
-  }
+  const tblNum = dbStore.tables.find((t) => t.id === session.primary_table_id)?.table_number;
+  await logStaffActivity({
+    staffName,
+    staffRole,
+    actionType: 'table_session_closed',
+    tableNumber: tblNum,
+    details: `Closed Table #${tblNum} session & cleared pending items`,
+  });
 
   revalidatePath('/pos');
   revalidatePath('/kds');
@@ -319,83 +441,15 @@ export async function updateOrderItemQuantity(orderItemId: string, delta: number
   return { success: true };
 }
 
-export async function restoreCancelledOrderItem(orderItemId: string) {
+export async function compOrderItem(orderItemId: string) {
   const item = dbStore.orderItems.find((i) => i.id === orderItemId);
   if (!item) return { success: false, error: 'Item not found' };
 
-  item.status = 'pending';
+  item.is_comped = true;
 
   if (pool) {
     try {
-      await pool.query("UPDATE order_items SET status = 'pending' WHERE id = $1", [orderItemId]);
-    } catch (e) {}
-  }
-
-  revalidatePath('/pos');
-  revalidatePath('/kds');
-  revalidatePath('/order');
-  return { success: true };
-}
-
-export async function applyDiscount(
-  sessionId: string,
-  type: 'percentage' | 'fixed',
-  value: number,
-  reason?: string
-) {
-  if (value <= 0) return { success: false, error: 'Discount value must be greater than 0' };
-
-  const discount = {
-    id: `disc-${Date.now()}`,
-    session_id: sessionId,
-    type,
-    value,
-    reason: reason || 'Manager discount',
-    created_at: new Date().toISOString(),
-  };
-
-  dbStore.discounts.push(discount);
-
-  if (pool) {
-    try {
-      await pool.query(
-        `INSERT INTO discounts (id, session_id, type, value, reason) VALUES ($1, $2, $3, $4, $5)`,
-        [discount.id, discount.session_id, discount.type, discount.value, discount.reason]
-      );
-    } catch (e) {
-      console.error('Neon error applying discount:', e);
-    }
-  }
-
-  revalidatePath('/pos');
-  revalidatePath('/order');
-  return { success: true };
-}
-
-export async function removeDiscount(discountId: string) {
-  const idx = dbStore.discounts.findIndex((d) => d.id === discountId);
-  if (idx !== -1) dbStore.discounts.splice(idx, 1);
-
-  if (pool) {
-    try {
-      await pool.query('DELETE FROM discounts WHERE id = $1', [discountId]);
-    } catch (e) {}
-  }
-
-  revalidatePath('/pos');
-  revalidatePath('/order');
-  return { success: true };
-}
-
-export async function compOrderItem(orderItemId: string, comped: boolean) {
-  const item = dbStore.orderItems.find((i) => i.id === orderItemId);
-  if (!item) return { success: false, error: 'Item not found' };
-
-  item.is_comped = comped;
-
-  if (pool) {
-    try {
-      await pool.query('UPDATE order_items SET is_comped = $1 WHERE id = $2', [comped, orderItemId]);
+      await pool.query('UPDATE order_items SET is_comped = true WHERE id = $1', [orderItemId]);
     } catch (e) {
       console.error('Neon error comping item:', e);
     }
@@ -417,6 +471,54 @@ export async function cancelOrderItem(orderItemId: string) {
       await pool.query("UPDATE order_items SET status = 'cancelled' WHERE id = $1", [orderItemId]);
     } catch (e) {
       console.error('Neon error cancelling item:', e);
+    }
+  }
+
+  revalidatePath('/kds');
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
+export async function restoreCancelledOrderItem(orderItemId: string) {
+  const item = dbStore.orderItems.find((i) => i.id === orderItemId);
+  if (!item) return { success: false, error: 'Item not found' };
+
+  item.status = 'pending';
+
+  if (pool) {
+    try {
+      await pool.query("UPDATE order_items SET status = 'pending' WHERE id = $1", [orderItemId]);
+    } catch (e) {
+      console.error('Neon error restoring item:', e);
+    }
+  }
+
+  revalidatePath('/kds');
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
+export async function updateOrderItemQuantity(orderItemId: string, newQty: number) {
+  const item = dbStore.orderItems.find((i) => i.id === orderItemId);
+  if (!item) return { success: false, error: 'Item not found' };
+
+  if (newQty <= 0) {
+    item.status = 'cancelled';
+  } else {
+    item.quantity = newQty;
+  }
+
+  if (pool) {
+    try {
+      if (newQty <= 0) {
+        await pool.query("UPDATE order_items SET status = 'cancelled' WHERE id = $1", [orderItemId]);
+      } else {
+        await pool.query("UPDATE order_items SET quantity = $1 WHERE id = $2", [newQty, orderItemId]);
+      }
+    } catch (e) {
+      console.error('Neon error updating item qty:', e);
     }
   }
 
