@@ -67,15 +67,11 @@ export function ThermalReceipt({
             {/* Header / Logo */}
             <header className="text-center mb-2">
                 <img
-                    src="/logo.png"
+                    src="/images/Skylight-logo-white.png"
                     alt="Skylight Village Logo"
-                    className="w-24 h-auto mx-auto mb-1 object-contain"
-                    onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                    }}
+                    className="w-40 h-auto mx-auto mb-1 object-contain brightness-0"
                 />
-                <h1 className="text-lg font-black tracking-widest uppercase m-0 p-0 text-black">SKYLIGHT VILLAGE</h1>
-                <p className="text-[10px] text-gray-600 m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
+                <p className="text-[10px] text-gray-700 font-medium m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
             </header>
 
             {/* Bill Details */}
@@ -96,13 +92,6 @@ export function ThermalReceipt({
                             </td>
                         </tr>
                     )}
-                    <tr>
-                        <th colSpan={2} className="center-align text-center py-1">
-                            <span className="receipt font-black uppercase text-xs tracking-wider border-b border-black pb-0.5 inline-block text-black">
-                                {isFinal ? 'Original Receipt' : 'Original Receipt'}
-                            </span>
-                        </th>
-                    </tr>
                 </tbody>
             </table>
 
@@ -199,7 +188,7 @@ export function ThermalReceipt({
 
             <footer className="text-center text-[10px] text-gray-600 border-t border-gray-300 pt-2">
                 <p className="m-0 font-bold text-black">Thank you for visiting Skylight Village!</p>
-                <p className="m-0 text-gray-500">www.skylightvillage.lb</p>
+                <p className="m-0 text-gray-500">www.skylightvillagelb.com</p>
             </footer>
         </div>
     );
