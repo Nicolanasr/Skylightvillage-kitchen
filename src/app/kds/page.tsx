@@ -34,6 +34,7 @@ export default function KDSPage() {
 function KDSContent() {
     const [stationFilter, setStationFilter] = useState<string>('all');
     const [activeTab, setActiveTab] = useState<'tickets' | 'expediter'>('tickets');
+    const [sortBy, setSortBy] = useState<'received' | 'status' | 'time' | 'alphabet'>('received');
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
     const [printedItemIds, setPrintedItemIds] = useState<string[]>([]);
     const [bumpingItemIds, setBumpingItemIds] = useState<Record<string, boolean>>({});
@@ -112,19 +113,43 @@ function KDSContent() {
 
     const activeKitchenItems = localItems.filter((i) => i.status !== 'cancelled' && i.status !== 'delivered');
 
-    const statusPriority: Record<string, number> = {
-        pending: 1,
-        preparing: 2,
-        ready: 3,
-    };
-
     const sortedItems = [...activeKitchenItems].sort((a, b) => {
-        const prioA = statusPriority[a.status] || 99;
-        const prioB = statusPriority[b.status] || 99;
-        if (prioA !== prioB) {
-            return prioA - prioB;
+        if (sortBy === 'received' || sortBy === 'time') {
+            // Default: Oldest received orders first (FIFO). Strict deterministic tie-breaker so card position NEVER changes when status is updated!
+            const timeA = new Date(a.created_at).getTime();
+            const timeB = new Date(b.created_at).getTime();
+            if (timeA !== timeB) {
+                return timeA - timeB;
+            }
+            return a.id.localeCompare(b.id);
         }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+
+        if (sortBy === 'status') {
+            const statusPriority: Record<string, number> = {
+                pending: 1,
+                preparing: 2,
+                ready: 3,
+            };
+            const prioA = statusPriority[a.status] || 99;
+            const prioB = statusPriority[b.status] || 99;
+            if (prioA !== prioB) {
+                return prioA - prioB;
+            }
+            const timeA = new Date(a.created_at).getTime();
+            const timeB = new Date(b.created_at).getTime();
+            if (timeA !== timeB) {
+                return timeA - timeB;
+            }
+            return a.id.localeCompare(b.id);
+        }
+
+        if (sortBy === 'alphabet') {
+            const nameComp = a.item_name.localeCompare(b.item_name);
+            if (nameComp !== 0) return nameComp;
+            return a.id.localeCompare(b.id);
+        }
+
+        return a.id.localeCompare(b.id);
     });
 
     const displayedItems =
@@ -309,70 +334,116 @@ function KDSContent() {
                 </div>
             </header>
 
-            {/* Station Filter Tabs */}
-            <div className="flex flex-wrap gap-2 mb-6 print:hidden">
-                <button
-                    onClick={() => {
-                        setActiveTab('tickets');
-                        setStationFilter('all');
-                    }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === 'all'
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
-                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
-                        }`}
-                >
-                    <Filter className="h-4 w-4" />
-                    <span>All Stations</span>
-                    <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
-                        {activeKitchenItems.length}
-                    </span>
-                </button>
+            {/* Station Filter & Sorting Control Toolbar */}
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 print:hidden">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => {
+                            setActiveTab('tickets');
+                            setStationFilter('all');
+                        }}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === 'all'
+                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
+                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                            }`}
+                    >
+                        <Filter className="h-4 w-4" />
+                        <span>All Stations</span>
+                        <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                            {activeKitchenItems.length}
+                        </span>
+                    </button>
 
-                <button
-                    onClick={() => setActiveTab('expediter')}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'expediter'
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
-                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
-                        }`}
-                >
-                    <Truck className="h-4 w-4" />
-                    <span>Table Expediter / Pass</span>
-                    <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
-                        {Object.keys(readyItemsByTable).length}
-                    </span>
-                </button>
+                    <button
+                        onClick={() => setActiveTab('expediter')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'expediter'
+                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
+                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                            }`}
+                    >
+                        <Truck className="h-4 w-4" />
+                        <span>Table Expediter / Pass</span>
+                        <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                            {Object.keys(readyItemsByTable).length}
+                        </span>
+                    </button>
 
-                {[
-                    { id: 'cold_mezza', name: 'Cold Mezza', icon: Utensils },
-                    { id: 'hot_mezza', name: 'Hot Mezza', icon: Flame },
-                    { id: 'grill', name: 'Grill & Charcoal', icon: Flame },
-                    { id: 'bar', name: 'Bar & Refreshments', icon: Wine },
-                    { id: 'shisha', name: 'Shisha Lounge', icon: Sparkles },
-                ].map((st) => {
-                    const Icon = st.icon;
-                    const count = activeKitchenItems.filter((i) => i.station === st.id).length;
-                    return (
+                    {[
+                        { id: 'cold_mezza', name: 'Cold Mezza', icon: Utensils },
+                        { id: 'hot_mezza', name: 'Hot Mezza', icon: Flame },
+                        { id: 'grill', name: 'Grill & Charcoal', icon: Flame },
+                        { id: 'bar', name: 'Bar & Refreshments', icon: Wine },
+                        { id: 'shisha', name: 'Shisha Lounge', icon: Sparkles },
+                    ].map((st) => {
+                        const Icon = st.icon;
+                        const count = activeKitchenItems.filter((i) => i.station === st.id).length;
+                        return (
+                            <button
+                                key={st.id}
+                                onClick={() => {
+                                    setActiveTab('tickets');
+                                    setStationFilter(st.id);
+                                }}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === st.id
+                                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
+                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                                    }`}
+                            >
+                                <Icon className="h-4 w-4" />
+                                <span>{st.name}</span>
+                                {count > 0 && (
+                                    <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                                        {count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Sort Mode Controls */}
+                {activeTab === 'tickets' && (
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-2xl shrink-0">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase px-2">Sort By:</span>
                         <button
-                            key={st.id}
-                            onClick={() => {
-                                setActiveTab('tickets');
-                                setStationFilter(st.id);
-                            }}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === st.id
-                                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
-                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                            onClick={() => setSortBy('received')}
+                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'received'
+                                ? 'bg-amber-500 text-slate-950 shadow-md'
+                                : 'text-slate-400 hover:text-slate-200'
+                                }`}
+                            title="Cards stay fixed in received order (Changing status does NOT move card position)"
+                        >
+                            As Received
+                        </button>
+                        <button
+                            onClick={() => setSortBy('status')}
+                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'status'
+                                ? 'bg-amber-500 text-slate-950 shadow-md'
+                                : 'text-slate-400 hover:text-slate-200'
                                 }`}
                         >
-                            <Icon className="h-4 w-4" />
-                            <span>{st.name}</span>
-                            {count > 0 && (
-                                <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
-                                    {count}
-                                </span>
-                            )}
+                            By Status
                         </button>
-                    );
-                })}
+                        <button
+                            onClick={() => setSortBy('time')}
+                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'time'
+                                ? 'bg-amber-500 text-slate-950 shadow-md'
+                                : 'text-slate-400 hover:text-slate-200'
+                                }`}
+                        >
+                            By Time
+                        </button>
+                        <button
+                            onClick={() => setSortBy('alphabet')}
+                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'alphabet'
+                                ? 'bg-amber-500 text-slate-950 shadow-md'
+                                : 'text-slate-400 hover:text-slate-200'
+                                }`}
+                        >
+                            Alphabetical
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* EXPEDITER TABLE PASS VIEW */}

@@ -105,6 +105,7 @@ function POSContent() {
     // Payment Checkout Modal State
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [targetPaymentGuestName, setTargetPaymentGuestName] = useState<string | null>(null);
+    const [isPayingEntireBill, setIsPayingEntireBill] = useState(false);
     const [paymentCurrency, setPaymentCurrency] = useState<'USD' | 'LBP'>('USD');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
 
@@ -246,67 +247,122 @@ function POSContent() {
         }, 300);
     };
 
-    // ACTION 2: PAY & CLOSE GUEST ITEMS (Marks items as PAID and prints paid receipt)
+    // ACTION 2: PAY & CLOSE GUEST ITEMS / ENTIRE TABLE BILL
     const handleOpenPayGuestModal = (guestName: string) => {
+        setIsPayingEntireBill(false);
         setTargetPaymentGuestName(guestName);
         setIsPaymentModalOpen(true);
     };
 
+    const handleOpenPayEntireBillModal = () => {
+        setIsPayingEntireBill(true);
+        setTargetPaymentGuestName(null);
+        setIsPaymentModalOpen(true);
+    };
+
     const handleCompleteGuestPayment = async () => {
-        if (!activeSession || !targetPaymentGuestName || isProcessingPayment) return;
+        if (!activeSession || isProcessingPayment) return;
         setIsProcessingPayment(true);
 
         try {
-            const targetItems = sessionItems.filter(
-                (i) => i.guest_name === targetPaymentGuestName && i.status !== 'cancelled' && !i.is_paid
-            );
+            if (isPayingEntireBill) {
+                const unpaidItems = sessionItems.filter(
+                    (i) => i.status !== 'cancelled' && !i.is_paid
+                );
 
-            if (targetItems.length === 0) {
-                alert(`All items for ${targetPaymentGuestName} are already paid!`);
-                setIsPaymentModalOpen(false);
-                return;
-            }
+                if (unpaidItems.length === 0) {
+                    alert(`All items for Table #${selectedTable?.table_number} are already paid!`);
+                    setIsPaymentModalOpen(false);
+                    return;
+                }
 
-            const targetItemIds = targetItems.map((i) => i.id);
-            const targetIdSet = new Set(targetItemIds);
+                const targetItemIds = unpaidItems.map((i) => i.id);
+                const targetIdSet = new Set(targetItemIds);
 
-            // OPTIMISTIC LOCAL UPDATE (0ms delay! Items update to is_paid immediately!)
-            setLocalOrderItems((prev) =>
-                prev.map((i) => (targetIdSet.has(i.id) ? { ...i, is_paid: true } : i))
-            );
+                // OPTIMISTIC LOCAL UPDATE (0ms delay!)
+                setLocalOrderItems((prev) =>
+                    prev.map((i) => (targetIdSet.has(i.id) ? { ...i, is_paid: true } : i))
+                );
 
-            const payAmountUsd = targetItems.reduce((acc, item) => {
-                return acc + (item.is_comped ? 0 : Number(item.unit_price_usd) * item.quantity);
-            }, 0);
-
-            const res = await processSplitPayment({
-                sessionId: activeSession.id,
-                amountUsd: payAmountUsd,
-                currency: paymentCurrency,
-                paymentMethod,
-                paymentType: 'item_split',
-                itemIdsPaid: targetItemIds,
-            });
-
-            if (res.success) {
-                const guestBillTotals = calculateBillTotals(targetItems, [], [], 89500);
-
-                // Print Paid Thermal Receipt for Guest
-                setReceiptToPrint({
-                    tableNumber: selectedTable?.table_number || 1,
-                    items: targetItems,
-                    totals: guestBillTotals,
-                    isFinal: true,
-                    guestName: targetPaymentGuestName,
+                const res = await processSplitPayment({
+                    sessionId: activeSession.id,
+                    amountUsd: billTotals.remainingUsd,
+                    currency: paymentCurrency,
+                    paymentMethod,
+                    paymentType: 'full',
+                    itemIdsPaid: targetItemIds,
                 });
 
-                setTimeout(() => {
-                    window.print();
-                }, 300);
+                if (res.success) {
+                    setReceiptToPrint({
+                        tableNumber: selectedTable?.table_number || 1,
+                        items: sessionItems,
+                        totals: billTotals,
+                        isFinal: true,
+                    });
 
-                setIsPaymentModalOpen(false);
-                setTargetPaymentGuestName(null);
-                await refreshPOSData();
+                    setTimeout(() => {
+                        window.print();
+                    }, 300);
+
+                    setIsPaymentModalOpen(false);
+                    setIsPayingEntireBill(false);
+                    await refreshPOSData();
+                }
+            } else {
+                if (!targetPaymentGuestName) return;
+
+                const targetItems = sessionItems.filter(
+                    (i) => i.guest_name === targetPaymentGuestName && i.status !== 'cancelled' && !i.is_paid
+                );
+
+                if (targetItems.length === 0) {
+                    alert(`All items for ${targetPaymentGuestName} are already paid!`);
+                    setIsPaymentModalOpen(false);
+                    return;
+                }
+
+                const targetItemIds = targetItems.map((i) => i.id);
+                const targetIdSet = new Set(targetItemIds);
+
+                // OPTIMISTIC LOCAL UPDATE (0ms delay!)
+                setLocalOrderItems((prev) =>
+                    prev.map((i) => (targetIdSet.has(i.id) ? { ...i, is_paid: true } : i))
+                );
+
+                const payAmountUsd = targetItems.reduce((acc, item) => {
+                    return acc + (item.is_comped ? 0 : Number(item.unit_price_usd) * item.quantity);
+                }, 0);
+
+                const res = await processSplitPayment({
+                    sessionId: activeSession.id,
+                    amountUsd: payAmountUsd,
+                    currency: paymentCurrency,
+                    paymentMethod,
+                    paymentType: 'item_split',
+                    itemIdsPaid: targetItemIds,
+                });
+
+                if (res.success) {
+                    const guestBillTotals = calculateBillTotals(targetItems, [], [], 89500);
+
+                    // Print Paid Thermal Receipt for Guest
+                    setReceiptToPrint({
+                        tableNumber: selectedTable?.table_number || 1,
+                        items: targetItems,
+                        totals: guestBillTotals,
+                        isFinal: true,
+                        guestName: targetPaymentGuestName,
+                    });
+
+                    setTimeout(() => {
+                        window.print();
+                    }, 300);
+
+                    setIsPaymentModalOpen(false);
+                    setTargetPaymentGuestName(null);
+                    await refreshPOSData();
+                }
             }
         } finally {
             setIsProcessingPayment(false);
@@ -1129,32 +1185,9 @@ function POSContent() {
 
                                 {/* PAY ENTIRE TABLE BILL AS 1 CHECK BUTTON */}
                                 <button
-                                    onClick={async () => {
-                                        if (!activeSession || billTotals.remainingUsd <= 0) return;
-                                        const unpaidItems = sessionItems.filter((i) => i.status !== 'cancelled' && !i.is_paid);
-                                        const res = await processSplitPayment({
-                                            sessionId: activeSession.id,
-                                            amountUsd: billTotals.remainingUsd,
-                                            currency: paymentCurrency,
-                                            paymentMethod,
-                                            paymentType: 'full',
-                                            itemIdsPaid: unpaidItems.map((i) => i.id),
-                                        });
-                                        if (res.success) {
-                                            setReceiptToPrint({
-                                                tableNumber: selectedTable?.table_number || 1,
-                                                items: sessionItems,
-                                                totals: billTotals,
-                                                isFinal: true,
-                                            });
-                                            setTimeout(() => {
-                                                window.print();
-                                            }, 300);
-                                            refreshPOSData();
-                                        }
-                                    }}
+                                    onClick={handleOpenPayEntireBillModal}
                                     disabled={billTotals.remainingUsd <= 0}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-extrabold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-emerald-500/20 transition-all mt-2"
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-extrabold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-emerald-500/20 transition-all mt-2 cursor-pointer"
                                 >
                                     <CreditCard className="h-4 w-4" />
                                     <span>Pay Entire Table Bill ({formatUsd(billTotals.remainingUsd)})</span>
@@ -1339,25 +1372,29 @@ function POSContent() {
                 </div>
             )}
 
-            {/* PAY & CLOSE GUEST ITEMS PAYMENT MODAL */}
-            {isPaymentModalOpen && activeSession && targetPaymentGuestName && (
+            {/* PAY & CLOSE GUEST ITEMS / ENTIRE BILL PAYMENT MODAL */}
+            {isPaymentModalOpen && activeSession && (targetPaymentGuestName || isPayingEntireBill) && (
                 <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-100">
-                                    Pay & Close Items for {targetPaymentGuestName}
+                                    {isPayingEntireBill
+                                        ? `Pay Entire Table #${selectedTable?.table_number} Bill`
+                                        : `Pay & Close Items for ${targetPaymentGuestName}`}
                                 </h3>
                                 <p className="text-xs text-amber-400 font-semibold mt-0.5">
-                                    Guest Total:{' '}
+                                    Total Due:{' '}
                                     {formatUsd(
-                                        sessionItems
-                                            .filter((i) => i.guest_name === targetPaymentGuestName && i.status !== 'cancelled' && !i.is_paid)
-                                            .reduce((acc, i) => acc + (i.is_comped ? 0 : Number(i.unit_price_usd) * i.quantity), 0)
+                                        isPayingEntireBill
+                                            ? billTotals.remainingUsd
+                                            : sessionItems
+                                                .filter((i) => i.guest_name === targetPaymentGuestName && i.status !== 'cancelled' && !i.is_paid)
+                                                .reduce((acc, i) => acc + (i.is_comped ? 0 : Number(i.unit_price_usd) * i.quantity), 0)
                                     )}
                                 </p>
                             </div>
-                            <button onClick={() => setIsPaymentModalOpen(false)} className="text-slate-400">
+                            <button onClick={() => { setIsPaymentModalOpen(false); setIsPayingEntireBill(false); }} className="text-slate-400">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -1426,7 +1463,11 @@ function POSContent() {
                             ) : (
                                 <>
                                     <CreditCard className="h-4 w-4" />
-                                    <span>Mark Paid & Print Receipt for {targetPaymentGuestName}</span>
+                                    <span>
+                                        {isPayingEntireBill
+                                            ? `Confirm & Mark Entire Table #${selectedTable?.table_number} Paid`
+                                            : `Mark Paid & Print Receipt for ${targetPaymentGuestName}`}
+                                    </span>
                                 </>
                             )}
                         </button>
