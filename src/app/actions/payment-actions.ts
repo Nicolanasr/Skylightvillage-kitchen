@@ -189,10 +189,8 @@ export async function mergeTables(primaryTableId: string, secondaryTableIds: str
       }
     }
 
-    await pool.query("UPDATE tables SET status = 'merged' WHERE id = ANY($1::text[]) OR id = $2", [
-      secondaryTableIds,
-      primaryTableId,
-    ]);
+    const allTableIds = Array.from(new Set([primaryTableId, ...secondaryTableIds]));
+    await pool.query("UPDATE tables SET status = 'merged' WHERE id::text = ANY($1::text[])", [allTableIds]);
   } catch (e) {
     console.error('Neon mergeTables error:', e);
   }
@@ -291,7 +289,7 @@ export async function processSplitPayment(data: {
     );
 
     if (data.itemIdsPaid && data.itemIdsPaid.length > 0) {
-      await pool.query('UPDATE order_items SET is_paid = true WHERE id = ANY($1::text[])', [data.itemIdsPaid]);
+      await pool.query('UPDATE order_items SET is_paid = true WHERE id::text = ANY($1::text[])', [data.itemIdsPaid]);
     }
 
     const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1', [data.sessionId]);
@@ -304,12 +302,9 @@ export async function processSplitPayment(data: {
       const bill = calculateBillTotals(ordRes.rows, discRes.rows, payRes.rows, exchangeRateUsed);
 
       if (bill.remainingUsd <= 0.01) {
-        const tableIdsToReset = [session.primary_table_id, ...(session.merged_table_ids || [])];
+        const tableIdsToReset = Array.from(new Set([session.primary_table_id, ...(session.merged_table_ids || [])]));
         await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [session.id]);
-        await pool.query(
-          "UPDATE tables SET status = 'available' WHERE id = ANY($1::text[]) OR id = $2",
-          [tableIdsToReset, session.primary_table_id]
-        );
+        await pool.query("UPDATE tables SET status = 'available' WHERE id::text = ANY($1::text[])", [tableIdsToReset]);
       }
 
       const tblRes = await pool.query('SELECT table_number FROM tables WHERE id = $1', [session.primary_table_id]);
@@ -323,7 +318,7 @@ export async function processSplitPayment(data: {
         details: `Processed $${data.amountUsd.toFixed(2)} (${data.paymentMethod.toUpperCase()}) payment for Table #${tblNum || ''}`,
       });
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error('Neon processSplitPayment error:', e);
   }
 
@@ -342,13 +337,10 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
     if (sessRes.rows.length === 0) return { success: false, error: 'Session not found' };
 
     const session = sessRes.rows[0];
-    const tableIdsToReset = [session.primary_table_id, ...(session.merged_table_ids || [])];
+    const tableIdsToReset = Array.from(new Set([session.primary_table_id, ...(session.merged_table_ids || [])]));
 
     await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [sessionId]);
-    await pool.query(
-      "UPDATE tables SET status = 'available' WHERE id = ANY($1::text[]) OR id = $2",
-      [tableIdsToReset, session.primary_table_id]
-    );
+    await pool.query("UPDATE tables SET status = 'available' WHERE id::text = ANY($1::text[])", [tableIdsToReset]);
     await pool.query("UPDATE order_items SET status = 'cancelled' WHERE session_id = $1 AND status IN ('pending', 'preparing')", [sessionId]);
     await pool.query("UPDATE service_calls SET status = 'resolved' WHERE session_id = $1 AND status = 'pending'", [sessionId]);
 

@@ -440,7 +440,7 @@ export async function markKDSItemsPrinted(itemIds: string[]) {
   if (!itemIds || itemIds.length === 0 || !pool) return { success: true };
 
   try {
-    await pool.query('UPDATE order_items SET is_printed = true WHERE id = ANY($1::text[])', [itemIds]);
+    await pool.query('UPDATE order_items SET is_printed = true WHERE id::text = ANY($1::text[])', [itemIds]);
   } catch (e) {
     console.error('Neon markKDSItemsPrinted error:', e);
   }
