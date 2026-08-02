@@ -1,5 +1,6 @@
 import { CalculatedBill, formatLbp, formatUsd, getInvoiceReference } from '@/lib/currency';
 import { OrderItem } from '@/lib/types';
+import { QRCodeSVG } from 'qrcode.react';
 
 export function ThermalReceipt({
     tableNumber,
@@ -74,8 +75,7 @@ export function ThermalReceipt({
                     }}
                 />
                 <h1 className="text-lg font-black tracking-widest uppercase m-0 p-0 text-black">SKYLIGHT VILLAGE</h1>
-                <p className="text-[10px] text-gray-700 m-0">Mediterranean Family Restaurant & Lounge</p>
-                <p className="text-[10px] text-gray-600 m-0">Beirut, Lebanon | Tel: +961 70 123 456</p>
+                <p className="text-[10px] text-gray-600 m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
             </header>
 
             {/* Bill Details */}
@@ -123,15 +123,17 @@ export function ThermalReceipt({
                         const lineTotal = unitPrice * item.quantity;
                         return (
                             <tr key={item.id} className="border-b border-gray-300 text-[11px]">
-                                <td className="py-1 text-left align-top font-semibold pr-1">
-                                    <div>{item.item_name}</div>
+                                <td className="py-1 text-left align-top font-bold pr-1">
+                                    <div className="text-black font-extrabold">{item.item_name}</div>
                                     {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                        <div className="text-[10px] text-gray-800 font-bold pl-1">
-                                            {item.selected_modifiers.map((m: any) => `• ${m.group}: ${m.option}`).join(' | ')}
+                                        <div className="text-[9.5px] text-gray-700 font-medium pl-2 mt-0.5 space-y-0.5">
+                                            {item.selected_modifiers.map((m: any, mIdx: number) => (
+                                                <div key={mIdx}>- {m.group}: {m.option}</div>
+                                            ))}
                                         </div>
                                     )}
                                     {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
-                                        <div className="text-[10px] text-black font-extrabold italic pl-1">Note: {item.special_notes}</div>
+                                        <div className="text-[9.5px] text-black font-semibold italic pl-2 mt-0.5">Note: {item.special_notes}</div>
                                     )}
                                 </td>
                                 <td className="py-1 text-center align-top font-bold">{item.quantity}</td>
@@ -167,28 +169,37 @@ export function ThermalReceipt({
                         </th>
                     </tr>
 
-                    {/* Total LBP */}
+                    {/* Total LBP - Prevent line wrapping */}
                     <tr>
-                        <th colSpan={3} className="text-right py-1 text-[11px] font-extrabold text-gray-800">
+                        <th colSpan={3} className="text-right py-1 text-[10.5px] font-extrabold text-gray-800 whitespace-nowrap">
                             Total LBP (89,500/$)
                         </th>
-                        <th className="text-right py-1 text-[11px] font-extrabold text-gray-800">
-                            {totals.finalTotalLbp}
+                        <th className="text-right py-1 text-[10.5px] font-black text-gray-900 whitespace-nowrap">
+                            <span className="whitespace-nowrap inline-block">{totals.finalTotalLbp}</span>
                         </th>
                     </tr>
                 </tbody>
             </table>
 
-            {/* Footer Section */}
-            <section className="text-xs my-3 space-y-1 text-black">
-                <p className="text-center font-bold text-[11px]">
-                    Thank you for your visit!
+            {/* Google Review QR Code Section */}
+            <section className="text-center my-3 pt-2 border-t border-dashed border-black flex flex-col items-center justify-center">
+                <p className="text-[10px] font-black uppercase tracking-wider mb-1 text-black">
+                    LEAVE US A GOOGLE REVIEW
                 </p>
+                <div className="my-1 p-1 bg-white border border-black inline-block">
+                    <QRCodeSVG
+                        value="https://g.page/r/CVjTZaAHNiz0EAI/review"
+                        size={64}
+                        level="M"
+                        includeMargin={false}
+                    />
+                </div>
+                <p className="text-[9px] text-gray-800 font-bold m-0">Scan QR code to rate your experience!</p>
             </section>
 
             <footer className="text-center text-[10px] text-gray-600 border-t border-gray-300 pt-2">
-                <p className="m-0 font-semibold">Skylight Village Continuous Dining & POS</p>
-                <p className="m-0">www.skylightvillage.lb</p>
+                <p className="m-0 font-bold text-black">Thank you for visiting Skylight Village!</p>
+                <p className="m-0 text-gray-500">www.skylightvillage.lb</p>
             </footer>
         </div>
     );

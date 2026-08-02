@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRealtimePOS } from '@/hooks/useRealtimePOS';
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
-import { dbStore } from '@/lib/db';
 import { Table, TableSession, OrderItem, MenuItem } from '@/lib/types';
 import {
     applyDiscount,
@@ -19,6 +18,7 @@ import {
     resolveServiceCall,
     assignItemsToGuest,
     closeTableSessionAction,
+    updateTableStatusAction,
 } from '../actions/payment-actions';
 import { updateOrderItemStatus, addWaiterManualOrderItem } from '../actions/order-actions';
 import { ThermalReceipt } from '@/components/pos/invoice-receipt';
@@ -139,7 +139,7 @@ function POSContent() {
         sessionItems,
         sessionDiscounts,
         sessionPayments,
-        dbStore.exchangeRate
+        89500
     );
 
     const pendingServiceCalls = serviceCalls.filter((c) => c.status === 'pending');
@@ -223,7 +223,7 @@ function POSContent() {
             return;
         }
 
-        const guestBillTotals = calculateBillTotals(guestItems, [], [], dbStore.exchangeRate);
+        const guestBillTotals = calculateBillTotals(guestItems, [], [], 89500);
 
         setReceiptToPrint({
             tableNumber: selectedTable.table_number,
@@ -271,7 +271,7 @@ function POSContent() {
         });
 
         if (res.success) {
-            const guestBillTotals = calculateBillTotals(targetItems, [], [], dbStore.exchangeRate);
+            const guestBillTotals = calculateBillTotals(targetItems, [], [], 89500);
 
             // Print Paid Thermal Receipt for Guest
             setReceiptToPrint({
@@ -620,7 +620,7 @@ function POSContent() {
                                 }[tbl.status];
 
                             const tblItems = sess ? orderItems.filter((i) => i.session_id === sess.id) : [];
-                            const tblBill = calculateBillTotals(tblItems, [], [], dbStore.exchangeRate);
+                            const tblBill = calculateBillTotals(tblItems, [], [], 89500);
                             const hasReadyFood = tblItems.some((i) => i.status === 'ready');
 
                             // Table Number Label (e.g. Table #1 + #2 + #3)
@@ -696,9 +696,23 @@ function POSContent() {
                                                         .join(' + #')}`
                                                     : `Table #${selectedTable.table_number}`}
                                             </h2>
-                                            <p className="text-xs text-amber-400 font-semibold mt-0.5">
-                                                Status: {selectedTable.status.toUpperCase()}
-                                            </p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-[11px] font-bold text-slate-400">Status:</span>
+                                                <select
+                                                    value={selectedTable.status}
+                                                    onChange={async (e) => {
+                                                        const newStatus = e.target.value;
+                                                        await updateTableStatusAction(selectedTable.id, newStatus);
+                                                        refreshPOSData();
+                                                    }}
+                                                    className="bg-slate-900 border border-slate-700 text-amber-400 text-xs font-black px-2.5 py-1 rounded-xl focus:outline-none focus:border-amber-500 transition-all cursor-pointer"
+                                                >
+                                                    <option value="available">🟢 AVAILABLE</option>
+                                                    <option value="occupied">🔴 OCCUPIED</option>
+                                                    <option value="bill_requested">📄 BILL REQUESTED</option>
+                                                    <option value="merged">🟣 MERGED</option>
+                                                </select>
+                                            </div>
                                             {activeSession && activeSession.merged_table_ids?.length > 0 && (
                                                 <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                                                     <span className="text-[10px] text-purple-300 font-bold uppercase">Merged Tables:</span>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { dbStore } from '@/lib/db';
 import { formatLbp, formatUsd } from '@/lib/currency';
 import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
 import { getStaffActivityLogs } from '@/app/actions/audit-actions';
@@ -22,6 +21,7 @@ import {
   Clock,
 } from 'lucide-react';
 import Link from 'next/link';
+import { getPOSData } from '@/app/actions/payment-actions';
 
 export default function ZReportPage() {
   return (
@@ -34,32 +34,34 @@ export default function ZReportPage() {
 function ZReportContent() {
   const [reportDate] = useState<string>(new Date().toLocaleDateString());
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [posData, setPosData] = useState<any>({ payments: [], orderItems: [], discounts: [] });
 
   useEffect(() => {
-    const fetchLogs = async () => {
+    const fetchData = async () => {
       const logs = await getStaffActivityLogs();
       setActivityLogs(logs);
+      const data = await getPOSData();
+      setPosData(data);
     };
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 4000);
+    fetchData();
+    const interval = setInterval(fetchData, 4000);
     return () => clearInterval(interval);
   }, []);
 
-  // Aggregate metrics from dbStore
-  const allPayments = dbStore.payments;
-  const allOrderItems = dbStore.orderItems.filter((i) => i.status !== 'cancelled');
-  const allDiscounts = dbStore.discounts;
+  const allPayments = posData.payments || [];
+  const allOrderItems = (posData.orderItems || []).filter((i: any) => i.status !== 'cancelled');
+  const allDiscounts = posData.discounts || [];
 
-  const totalGrossSalesUsd = allOrderItems.reduce((acc, item) => {
+  const totalGrossSalesUsd = allOrderItems.reduce((acc: number, item: any) => {
     if (item.is_comped) return acc;
     const modifierExtra = (item.selected_modifiers || []).reduce(
-      (mAcc, mod) => mAcc + (mod.price_extra || 0),
+      (mAcc: number, mod: any) => mAcc + (mod.price_extra || 0),
       0
     );
-    return acc + (item.unit_price_usd + modifierExtra) * item.quantity;
+    return acc + (Number(item.unit_price_usd) + modifierExtra) * item.quantity;
   }, 0);
 
-  const totalDiscountsUsd = allDiscounts.reduce((acc, d) => {
+  const totalDiscountsUsd = allDiscounts.reduce((acc: number, d: any) => {
     if (d.type === 'fixed') return acc + Number(d.value);
     if (d.type === 'percentage') return acc + totalGrossSalesUsd * (Number(d.value) / 100);
     return acc;
@@ -69,34 +71,34 @@ function ZReportContent() {
 
   // Payments breakdown
   const usdCashCollected = allPayments
-    .filter((p) => p.payment_method === 'cash' && p.currency === 'USD')
-    .reduce((acc, p) => acc + Number(p.amount_usd), 0);
+    .filter((p: any) => p.payment_method === 'cash' && p.currency === 'USD')
+    .reduce((acc: number, p: any) => acc + Number(p.amount_usd), 0);
 
   const lbpCashCollectedUsd = allPayments
-    .filter((p) => p.payment_method === 'cash' && p.currency === 'LBP')
-    .reduce((acc, p) => acc + Number(p.amount_usd), 0);
+    .filter((p: any) => p.payment_method === 'cash' && p.currency === 'LBP')
+    .reduce((acc: number, p: any) => acc + Number(p.amount_usd), 0);
 
   const cardCollectedUsd = allPayments
-    .filter((p) => p.payment_method === 'card')
-    .reduce((acc, p) => acc + Number(p.amount_usd), 0);
+    .filter((p: any) => p.payment_method === 'card')
+    .reduce((acc: number, p: any) => acc + Number(p.amount_usd), 0);
 
   // Station Volume Breakdown
   const stationVolume = {
     cold_mezza: allOrderItems
-      .filter((i) => i.station === 'cold_mezza')
-      .reduce((acc, i) => acc + i.quantity, 0),
+      .filter((i: any) => i.station === 'cold_mezza')
+      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
     hot_mezza: allOrderItems
-      .filter((i) => i.station === 'hot_mezza')
-      .reduce((acc, i) => acc + i.quantity, 0),
+      .filter((i: any) => i.station === 'hot_mezza')
+      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
     grill: allOrderItems
-      .filter((i) => i.station === 'grill')
-      .reduce((acc, i) => acc + i.quantity, 0),
+      .filter((i: any) => i.station === 'grill')
+      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
     bar: allOrderItems
-      .filter((i) => i.station === 'bar')
-      .reduce((acc, i) => acc + i.quantity, 0),
+      .filter((i: any) => i.station === 'bar')
+      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
     shisha: allOrderItems
-      .filter((i) => i.station === 'shisha')
-      .reduce((acc, i) => acc + i.quantity, 0),
+      .filter((i: any) => i.station === 'shisha')
+      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
   };
 
   const handlePrintReport = () => {
@@ -141,7 +143,7 @@ function ZReportContent() {
             </span>
             <div className="text-3xl font-black text-slate-100 mb-1">{formatUsd(totalGrossSalesUsd)}</div>
             <div className="text-xs text-amber-400 font-semibold">
-              {formatLbp(totalGrossSalesUsd, dbStore.exchangeRate)}
+              {formatLbp(totalGrossSalesUsd, 89500)}
             </div>
           </div>
 
@@ -161,7 +163,7 @@ function ZReportContent() {
             </span>
             <div className="text-3xl font-black text-amber-400 mb-1">{formatUsd(totalNetSalesUsd)}</div>
             <div className="text-xs text-amber-300 font-semibold">
-              {formatLbp(totalNetSalesUsd, dbStore.exchangeRate)}
+              {formatLbp(totalNetSalesUsd, 89500)}
             </div>
           </div>
         </div>
@@ -183,7 +185,7 @@ function ZReportContent() {
               <span className="text-xs text-slate-400 font-semibold block mb-1">LBP Cash Collected</span>
               <div className="text-xl font-bold text-amber-400">{formatUsd(lbpCashCollectedUsd)}</div>
               <div className="text-[10px] text-slate-500 mt-0.5">
-                {formatLbp(lbpCashCollectedUsd, dbStore.exchangeRate)}
+                {formatLbp(lbpCashCollectedUsd, 89500)}
               </div>
             </div>
 

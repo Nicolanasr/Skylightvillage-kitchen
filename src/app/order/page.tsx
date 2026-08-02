@@ -28,6 +28,7 @@ import {
     Utensils,
     X,
     AlertCircle,
+    Star,
     Lock,
     ChevronRight,
     Image as ImageIcon,
@@ -288,6 +289,18 @@ function CustomerOrderContent() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Google Review Button */}
+                    <a
+                        href="https://g.page/r/CVjTZaAHNiz0EAI/review"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 hover:border-amber-500/60 text-amber-300 text-xs px-3 py-2 rounded-xl font-bold transition-all"
+                        title="Leave us a Google Review!"
+                    >
+                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                        <span className="hidden sm:inline">Review Us</span>
+                    </a>
+
                     {/* Running Bill Button */}
                     <button
                         onClick={() => setIsBillOpen(true)}

@@ -33,6 +33,11 @@ class SkylightStore {
   async syncFromNeon() {
     if (!pool) return;
     try {
+      try {
+        await pool.query('CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, staff_name TEXT, staff_role TEXT, action_type TEXT, table_number INT, details TEXT, created_at TIMESTAMPTZ DEFAULT NOW())');
+        await pool.query('ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()');
+      } catch (e) {}
+
       const tablesRes = await pool.query('SELECT * FROM tables ORDER BY table_number ASC');
       if (tablesRes.rows.length > 0) this.tables = tablesRes.rows;
 

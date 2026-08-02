@@ -122,6 +122,7 @@ function AdminContent() {
     const [newItemPrice, setNewItemPrice] = useState('5.00');
     const [newItemStation, setNewItemStation] = useState<StationType>('cold_mezza');
     const [newItemImage, setNewItemImage] = useState('');
+    const [newItemIsStaffOnly, setNewItemIsStaffOnly] = useState(false);
 
     // Full Item Edit Modal State
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -131,6 +132,7 @@ function AdminContent() {
     const [editPrice, setEditPrice] = useState('');
     const [editStation, setEditStation] = useState<StationType>('cold_mezza');
     const [editImageUrl, setEditImageUrl] = useState('');
+    const [editIsStaffOnly, setEditIsStaffOnly] = useState(false);
 
     // New Staff State
     const [newStaffName, setNewStaffName] = useState('');
@@ -166,6 +168,7 @@ function AdminContent() {
             priceUsd: parseFloat(newItemPrice) || 0,
             station: newItemStation,
             imageUrl: finalImage,
+            isStaffOnly: newItemIsStaffOnly,
         });
 
         if (res.success) {
@@ -173,6 +176,7 @@ function AdminContent() {
             setNewItemDesc('');
             setNewItemPrice('5.00');
             setNewItemImage('');
+            setNewItemIsStaffOnly(false);
             setIsAddItemModalOpen(false);
             refreshPOSData();
         }
@@ -186,6 +190,7 @@ function AdminContent() {
         setEditPrice(item.price_usd.toString());
         setEditStation(item.station);
         setEditImageUrl(item.image_url || '');
+        setEditIsStaffOnly(!!item.is_staff_only);
     };
 
     const handleSaveFullEditSubmit = async (e: React.FormEvent) => {
@@ -200,6 +205,7 @@ function AdminContent() {
             priceUsd: parseFloat(editPrice) || 0,
             station: editStation,
             imageUrl: finalImage,
+            isStaffOnly: editIsStaffOnly,
         });
 
         setEditingItem(null);
@@ -245,7 +251,7 @@ function AdminContent() {
             try {
                 const res = await wipeAllDatabaseTestDataAction();
                 if (res.success) {
-                    setSeedStatus(res.message);
+                    setSeedStatus(res.message || 'Wiped test data successfully!');
                     refreshPOSData();
                 }
             } finally {
@@ -536,9 +542,16 @@ function AdminContent() {
 
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-start">
-                                                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/30">
-                                                        {catName}
-                                                    </span>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                                                            {catName}
+                                                        </span>
+                                                        {item.is_staff_only && (
+                                                            <span className="text-[9px] font-black text-purple-300 uppercase tracking-wider bg-purple-500/10 px-1.5 py-0.5 rounded-lg border border-purple-500/30">
+                                                                🔒 Staff-Only
+                                                            </span>
+                                                        )}
+                                                    </div>
 
                                                     <button
                                                         onClick={async () => {
@@ -1204,6 +1217,19 @@ function AdminContent() {
                                 />
                             </div>
 
+                            <div className="flex items-center gap-2 pt-1">
+                                <input
+                                    type="checkbox"
+                                    id="editIsStaffOnly"
+                                    checked={editIsStaffOnly}
+                                    onChange={(e) => setEditIsStaffOnly(e.target.checked)}
+                                    className="h-4 w-4 rounded accent-amber-500 bg-slate-950 border-slate-800"
+                                />
+                                <label htmlFor="editIsStaffOnly" className="text-xs font-bold text-amber-300 cursor-pointer">
+                                    🔒 Waiter / Staff-Only Item (Hidden from Customer QR menu - e.g. Event Charge)
+                                </label>
+                            </div>
+
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
@@ -1257,7 +1283,7 @@ function AdminContent() {
                                     type="text"
                                     value={newItemName}
                                     onChange={(e) => setNewItemName(e.target.value)}
-                                    placeholder="e.g. Labneh b Toum"
+                                    placeholder="e.g. Labneh b Toum or Event Charge"
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
                                     required
                                 />
@@ -1312,6 +1338,19 @@ function AdminContent() {
                                     placeholder="https://drive.google.com/... or https://..."
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
                                 />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                                <input
+                                    type="checkbox"
+                                    id="newItemIsStaffOnly"
+                                    checked={newItemIsStaffOnly}
+                                    onChange={(e) => setNewItemIsStaffOnly(e.target.checked)}
+                                    className="h-4 w-4 rounded accent-amber-500 bg-slate-950 border-slate-800"
+                                />
+                                <label htmlFor="newItemIsStaffOnly" className="text-xs font-bold text-amber-300 cursor-pointer">
+                                    🔒 Waiter / Staff-Only Item (Hidden from Customer QR menu - e.g. Event Charge)
+                                </label>
                             </div>
 
                             <button
