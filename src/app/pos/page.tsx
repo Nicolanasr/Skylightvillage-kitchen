@@ -493,7 +493,7 @@ function POSContent() {
                     <img
                         src="/images/Skylight-logo-icon.png"
                         alt="Skylight Village Logo"
-                        className="h-10 w-auto object-contain"
+                        className="h-10 w-auto object-contain filter invert"
                     />
                     <div>
                         <h1 className="text-xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">

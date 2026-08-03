@@ -372,7 +372,7 @@ function CustomerOrderContent() {
                 </div>
             )}
             {/* Category Navigation Bar */}
-            <div className="sticky top-[60px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex gap-2">
+            <div className="sticky top-[75px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex gap-2">
                 <button
                     onClick={() => handleCategoryClick('all')}
                     className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === 'all'
