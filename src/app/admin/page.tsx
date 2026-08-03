@@ -120,7 +120,7 @@ function AdminContent() {
     const [newItemName, setNewItemName] = useState('');
     const [newItemDesc, setNewItemDesc] = useState('');
     const [newItemPrice, setNewItemPrice] = useState('5.00');
-    const [newItemStation, setNewItemStation] = useState<StationType>('cold_mezza');
+    const [newItemStation, setNewItemStation] = useState<StationType>('mezza');
     const [newItemImage, setNewItemImage] = useState('');
     const [newItemIsStaffOnly, setNewItemIsStaffOnly] = useState(false);
 
@@ -130,7 +130,7 @@ function AdminContent() {
     const [editDesc, setEditDesc] = useState('');
     const [editCatId, setEditCatId] = useState('');
     const [editPrice, setEditPrice] = useState('');
-    const [editStation, setEditStation] = useState<StationType>('cold_mezza');
+    const [editStation, setEditStation] = useState<StationType>('mezza');
     const [editImageUrl, setEditImageUrl] = useState('');
     const [editIsStaffOnly, setEditIsStaffOnly] = useState(false);
 
@@ -1173,9 +1173,10 @@ function AdminContent() {
                                     onChange={(e: any) => setEditStation(e.target.value)}
                                     className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                 >
-                                    <option value="cold_mezza">Cold Mezza Station</option>
-                                    <option value="hot_mezza">Hot Mezza Station</option>
-                                    <option value="grill">Grill & Charcoal Station</option>
+                                    <option value="mezza">Mezza (Hot/Cold & Salads)</option>
+                                    <option value="sajj">Sajj Station</option>
+                                    <option value="grill">BBQ (Grill)</option>
+                                    <option value="subs_sandwiches">Subs, Sandwiches & Kids Meals</option>
                                     <option value="bar">Bar & Refreshments</option>
                                     <option value="shisha">Shisha Lounge</option>
                                 </select>
@@ -1239,22 +1240,22 @@ function AdminContent() {
 
             {/* CREATE NEW MENU ITEM MODAL */}
             {isAddItemModalOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                            <h3 className="text-lg font-black text-slate-100">Add New Skylight Menu Item</h3>
-                            <button onClick={() => setIsAddItemModalOpen(false)} className="text-slate-400">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-lg rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1c3a1e]/15">
+                            <h3 className="text-lg font-black text-[#1c3a1e]">Add New Skylight Menu Item</h3>
+                            <button onClick={() => setIsAddItemModalOpen(false)} className="text-gray-500 hover:text-black font-bold">
                                 ✕
                             </button>
                         </div>
 
                         <form onSubmit={handleCreateMenuItemSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1">Category</label>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
                                 <select
                                     value={newItemCatId}
                                     onChange={(e) => setNewItemCatId(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
+                                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                 >
                                     {categories.map((c) => (
                                         <option key={c.id} value={c.id}>
@@ -1265,40 +1266,41 @@ function AdminContent() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1">Item Name</label>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Item Name</label>
                                 <input
                                     type="text"
                                     value={newItemName}
                                     onChange={(e) => setNewItemName(e.target.value)}
                                     placeholder="e.g. Labneh b Toum or Event Charge"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
+                                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                     required
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 mb-1">Price USD ($)</label>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Price USD ($)</label>
                                     <input
                                         type="number"
                                         step="0.5"
                                         value={newItemPrice}
                                         onChange={(e) => setNewItemPrice(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                                         required
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 mb-1">Kitchen Station</label>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Kitchen Station</label>
                                     <select
                                         value={newItemStation}
                                         onChange={(e: any) => setNewItemStation(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                     >
-                                        <option value="cold_mezza">Cold Mezza</option>
-                                        <option value="hot_mezza">Hot Mezza</option>
-                                        <option value="grill">Grill & Charcoal</option>
+                                        <option value="mezza">Mezza (Hot/Cold & Salads)</option>
+                                        <option value="sajj">Sajj Station</option>
+                                        <option value="grill">BBQ (Grill)</option>
+                                        <option value="subs_sandwiches">Subs, Sandwiches & Kids Meals</option>
                                         <option value="bar">Bar & Refreshments</option>
                                         <option value="shisha">Shisha Lounge</option>
                                     </select>

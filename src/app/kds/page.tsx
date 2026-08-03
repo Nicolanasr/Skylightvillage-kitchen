@@ -113,6 +113,15 @@ function KDSContent() {
 
     const activeKitchenItems = localItems.filter((i) => i.status !== 'cancelled' && i.status !== 'delivered');
 
+    const readyItemsByTable = activeKitchenItems
+        .filter((i) => i.status === 'ready')
+        .reduce<Record<number, OrderItem[]>>((acc, item) => {
+            const tblNum = item.table_number || 1;
+            if (!acc[tblNum]) acc[tblNum] = [];
+            acc[tblNum].push(item);
+            return acc;
+        }, {});
+
     const sortedItems = [...activeKitchenItems].sort((a, b) => {
         if (sortBy === 'received' || sortBy === 'time') {
             // Default: Oldest received orders first (FIFO). Strict deterministic tie-breaker so card position NEVER changes when status is updated!
@@ -157,28 +166,21 @@ function KDSContent() {
             ? sortedItems
             : sortedItems.filter((item) => item.station === stationFilter);
 
-    const readyItemsByTable = items.reduce<Record<number, OrderItem[]>>((acc, item) => {
-        if (item.status === 'ready') {
-            const tbl = item.table_number || 1;
-            if (!acc[tbl]) acc[tbl] = [];
-            acc[tbl].push(item);
-        }
-        return acc;
-    }, {});
-
     const stationDisplayNames: Record<string, string> = {
-        cold_mezza: 'Cold Mezza Station',
-        hot_mezza: 'Hot Mezza Station',
-        grill: 'Grill & Charcoal Station',
+        mezza: 'Mezza Station (Hot/Cold & Salads)',
+        cold_mezza: 'Mezza Station (Hot/Cold & Salads)',
+        hot_mezza: 'Mezza Station (Hot/Cold & Salads)',
+        sajj: 'Sajj Station',
+        grill: 'BBQ Station',
+        subs_sandwiches: 'Subs, Sandwiches & Kids Meals',
         bar: 'Bar & Refreshments',
         shisha: 'Shisha Lounge',
     };
 
-    // Group items for KDS printing: EACH TABLE + EACH CATEGORY GETS ITS OWN SEPARATE PAGE TICKET
-    // DEDUPLICATION: Exclude items where is_printed is true OR printedItemIds includes item.id!
     const itemsToPrint = items.filter((item) => {
         if (item.status === 'cancelled' || item.status === 'delivered') return false;
         if (!showPrintedItems && (item.is_printed || printedItemIds.includes(item.id))) return false;
+        if (stationFilter !== 'all' && item.station !== stationFilter) return false;
         return true;
     });
 
@@ -189,7 +191,8 @@ function KDSContent() {
         ticketItems: OrderItem[];
     }>>((acc, item) => {
         const tblNum = item.table_number || 1;
-        const st = item.station || 'cold_mezza';
+        let st: string = item.station || 'mezza';
+        if (st === 'cold_mezza' || st === 'hot_mezza') st = 'mezza';
         const stName = stationDisplayNames[st] || st.replace('_', ' ').toUpperCase();
 
         let existing = acc.find((g) => g.tableNumber === tblNum && g.station === st);
@@ -207,93 +210,103 @@ function KDSContent() {
     }, []);
 
     const handlePrintKDSChits = async () => {
-        if (isPrinting || itemsToPrint.length === 0) return;
+        if (itemsToPrint.length === 0) return;
         setIsPrinting(true);
-        const unprintedIds = itemsToPrint.map((i) => i.id);
 
-        // 1. Fire print dialog immediately while tickets are fully rendered in DOM
+        const printedIds = itemsToPrint.map((i) => i.id);
+
+        // Optimistically update local state: mark items printed & switch pending -> preparing ("Start Cooking")
+        setLocalItems((prev) =>
+            prev.map((item) => {
+                if (printedIds.includes(item.id)) {
+                    return {
+                        ...item,
+                        is_printed: true,
+                        status: item.status === 'pending' ? 'preparing' : item.status,
+                    };
+                }
+                return item;
+            })
+        );
+        setPrintedItemIds((prev) => [...new Set([...prev, ...printedIds])]);
+
         window.print();
 
-        // 2. Mark items as printed AFTER print dialog opens
-        setPrintedItemIds((prev) => Array.from(new Set([...prev, ...unprintedIds])));
-
-        if (unprintedIds.length > 0) {
-            await markKDSItemsPrinted(unprintedIds);
-            refreshKDSData();
+        try {
+            await markKDSItemsPrinted(printedIds);
+            await refreshKDSData();
+        } finally {
+            setIsPrinting(false);
         }
-        setTimeout(() => setIsPrinting(false), 500);
     };
 
     return (
-        <div className="min-h-screen bg-[#fafbfa] text-[#1c271c] p-4 md:p-6">
-            {/* 80mm ESC/POS THERMAL KITCHEN CHIT PRINT CONTAINER */}
-            <div className="print-kds-container hidden print:block text-black bg-white font-sans text-xs w-[2.8in] p-2">
-                {groupedKDSPrintTickets.length === 0 ? (
-                    <div className="text-center font-bold py-4 text-black">NO UNPRINTED KITCHEN TICKETS</div>
-                ) : (
-                    groupedKDSPrintTickets.map((ticket, tIdx) => {
-                        const now = new Date();
-                        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                        return (
-                            <div key={tIdx} className="kds-chit-ticket text-black font-sans">
-                                <div className="text-center font-black text-sm uppercase tracking-wider border-b border-black pb-1 mb-1">
-                                    *** KITCHEN ORDER TICKET ***
-                                </div>
-                                <div className="flex justify-between text-xs font-bold my-1">
-                                    <span>TABLE #{ticket.tableNumber}</span>
-                                    <span>{timeStr}</span>
-                                </div>
-                                <div className="text-[11px] font-bold text-gray-800 uppercase mb-1">
-                                    STATION: {ticket.stationName}
-                                </div>
-
-                                <div className="space-y-2 my-2">
-                                    {ticket.ticketItems.map((item, iIdx) => (
-                                        <div key={iIdx} className="border-b border-gray-300 pb-1.5">
-                                            <div className="font-black text-sm">
-                                                {item.quantity}x {item.item_name}
-                                            </div>
-
-                                            {/* Variants / Modifiers */}
-                                            {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                                <div className="text-xs pl-2 font-bold text-gray-800">
-                                                    {item.selected_modifiers.map((m: any, mIdx: number) => (
-                                                        <div key={mIdx}>• {m.group}: {m.option}</div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Special Notes */}
-                                            {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
-                                                <div className="text-xs pl-2 font-extrabold italic text-red-900 mt-0.5">
-                                                    NOTE: {item.special_notes}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="text-center text-[10px] font-bold mt-2 pt-1 border-t border-black uppercase">
-                                    End of Ticket - Chit #{tIdx + 1}/{groupedKDSPrintTickets.length}
-                                </div>
+        <div className="min-h-screen bg-[#fafbfa] text-[#1c3a1e] p-4 md:p-6 print:p-0 print:bg-white">
+            {/* ESC/POS THERMAL STATION CHIT PRINT CONTAINER */}
+            <div className="print-kds-container hidden print:block print:w-full print:m-0 print:p-0 font-mono text-black text-xs">
+                {groupedKDSPrintTickets.map((ticket, tIdx) => (
+                    <div key={tIdx} className="kds-chit-ticket mb-6 pb-6 border-b-2 border-dashed border-black print:p-2">
+                        <div className="text-center mb-3">
+                            <h1 className="text-xl font-black uppercase tracking-wider">{ticket.stationName}</h1>
+                            <div className="text-2xl font-black my-1 border-2 border-black py-1">
+                                TABLE #{ticket.tableNumber}
                             </div>
-                        );
-                    })
-                )}
-            </div>            {/* Top Header Bar with Skylight White Logo & Navigation Link to POS */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-6 border-b border-[#1c3a1e]/15 gap-4 print:hidden">
-                <div className="flex items-center gap-4">
-                    <img
-                        src="/images/Skylight-logo-icon.png"
-                        alt="Skylight Village Logo"
-                        className="h-10 w-auto object-contain filter invert"
-                    />
+                            <div className="text-[10px]">
+                                {new Date().toLocaleTimeString()} - CHIT #{tIdx + 1}
+                            </div>
+                        </div>
+
+                        <div className="border-t border-b border-black py-2 my-2 space-y-3">
+                            {ticket.ticketItems.map((item, iIdx) => (
+                                <div key={iIdx} className="text-sm">
+                                    <div className="flex justify-between font-black text-base">
+                                        <span>{item.quantity}x {item.item_name}</span>
+                                    </div>
+
+                                    {item.special_notes && (
+                                        <div className="text-xs font-bold pl-3 mt-0.5 uppercase">
+                                            *** NOTE: {item.special_notes} ***
+                                        </div>
+                                    )}
+
+                                    {Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
+                                        <div className="text-xs pl-3 mt-0.5">
+                                            {item.selected_modifiers.map((m: any, mIdx: number) => (
+                                                <div key={mIdx}>+ {m.option || m.name}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="text-center text-[10px] font-bold mt-4">
+                            --- END OF STATION CHIT ---
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Header Bar */}
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-[#1c3a1e]/15 print:hidden">
+                <div className="flex items-center gap-3">
+                    <div className="bg-[#1c3a1e] p-2.5 rounded-2xl shadow-sm">
+                        <img
+                            src="/images/Skylight-logo-white.png"
+                            alt="Skylight Village Logo"
+                            className="h-8 w-auto object-contain filter invert"
+                        />
+                    </div>
                     <div>
-                        <h1 className="text-xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
-                            <ChefHat className="h-5 w-5 text-[#d4af37]" />
-                            <span>Kitchen Display System & Waiter Pass</span>
+                        <h1 className="text-2xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
+                            <span>Skylight Kitchen KDS</span>
+                            <span className="text-xs bg-[#eaf2eb] text-[#1c3a1e] font-extrabold px-2.5 py-0.5 rounded-full border border-[#1c3a1e]/15">
+                                Realtime Feed
+                            </span>
                         </h1>
-                        <p className="text-xs text-gray-600 font-medium">Independent Dish Status Bumping & Realtime Kitchen Expediter</p>
+                        <p className="text-xs text-gray-600 font-semibold mt-0.5">
+                            Kitchen Display System & Station Pass Management
+                        </p>
                     </div>
                 </div>
 
@@ -367,11 +380,12 @@ function KDSContent() {
                     </button>
 
                     {[
-                        { id: 'cold_mezza', name: 'Cold Mezza', icon: Utensils },
-                        { id: 'hot_mezza', name: 'Hot Mezza', icon: Flame },
-                        { id: 'grill', name: 'Grill & Charcoal', icon: Flame },
-                        { id: 'bar', name: 'Bar & Refreshments', icon: Wine },
-                        { id: 'shisha', name: 'Shisha Lounge', icon: Sparkles },
+                        { id: 'mezza', name: 'Mezza', icon: Utensils },
+                        { id: 'sajj', name: 'Sajj', icon: Flame },
+                        { id: 'grill', name: 'BBQ', icon: Flame },
+                        { id: 'subs_sandwiches', name: 'Subs & Sandwiches', icon: Utensils },
+                        { id: 'bar', name: 'Bar & Drinks', icon: Wine },
+                        { id: 'shisha', name: 'Shisha', icon: Sparkles },
                     ].map((st) => {
                         const Icon = st.icon;
                         const count = activeKitchenItems.filter((i) => i.station === st.id).length;
@@ -580,7 +594,7 @@ function KDSContent() {
                                                         <span>{item.quantity}x {item.item_name}</span>
                                                     </h3>
                                                     <span className="text-[10px] text-gray-600 font-bold block uppercase tracking-wider">
-                                                        STATION: {item.station.replace('_', ' ')}
+                                                        STATION: {(stationDisplayNames[item.station] || item.station).replace(' Station', '').replace(' (Hot/Cold & Salads)', '')}
                                                     </span>
                                                 </div>
                                             </div>

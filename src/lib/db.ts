@@ -95,7 +95,7 @@ class SkylightStore {
       { id: catHot, name: 'Hot Mezza', sort_order: 2 },
       { id: catSalads, name: 'Salads', sort_order: 3 },
       { id: catSajj, name: 'Fresh From The Sajj', sort_order: 4 },
-      { id: catBbq, name: 'BBQ Platters', sort_order: 5 },
+      { id: catBbq, name: 'BBQ', sort_order: 5 },
       { id: catSubs, name: 'Subs & Sandwiches', sort_order: 6 },
       { id: catKids, name: 'Kids Meals', sort_order: 7 },
       { id: catColdBev, name: 'Cold Refreshments', sort_order: 8 },
@@ -106,38 +106,38 @@ class SkylightStore {
 
     this.menuItems = [
       // COLD MEZZA
-      { id: 'm-labneh', category_id: catCold, name: 'Labneh', price_usd: 4.00, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-labneh-toum', category_id: catCold, name: 'Labneh b Toum', price_usd: 4.50, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-hummus', category_id: catCold, name: 'Hummus', description: 'Chickpea puree with tahini, lemon & olive oil', price_usd: 5.00, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-moutabal', category_id: catCold, name: 'Moutabal', description: 'Smoked eggplant dip with tahini', price_usd: 5.50, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-shanklish', category_id: catCold, name: 'Shanklish', description: 'Aged cheese with diced tomato, onion & olive oil', price_usd: 6.00, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-kabiss', category_id: catCold, name: 'Kabiss Platter', description: 'Assorted Lebanese pickles & olives', price_usd: 4.00, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-veg-platter', category_id: catCold, name: 'Vegetable Platter', description: 'Fresh mint, cucumber, tomato & radish', price_usd: 5.00, station: 'cold_mezza', available: true, modifier_groups: [] },
+      { id: 'm-labneh', category_id: catCold, name: 'Labneh', price_usd: 4.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-labneh-toum', category_id: catCold, name: 'Labneh b Toum', price_usd: 4.50, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-hummus', category_id: catCold, name: 'Hummus', description: 'Chickpea puree with tahini, lemon & olive oil', price_usd: 5.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-moutabal', category_id: catCold, name: 'Moutabal', description: 'Smoked eggplant dip with tahini', price_usd: 5.50, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-shanklish', category_id: catCold, name: 'Shanklish', description: 'Aged cheese with diced tomato, onion & olive oil', price_usd: 6.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-kabiss', category_id: catCold, name: 'Kabiss Platter', description: 'Assorted Lebanese pickles & olives', price_usd: 4.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-veg-platter', category_id: catCold, name: 'Vegetable Platter', description: 'Fresh mint, cucumber, tomato & radish', price_usd: 5.00, station: 'mezza', available: true, modifier_groups: [] },
 
       // HOT MEZZA
-      { id: 'm-fries', category_id: catHot, name: 'French Fries', price_usd: 4.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-batata-harra', category_id: catHot, name: 'Batata Harra', description: 'Spicy fried potato cubes with coriander & garlic', price_usd: 6.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-mouajjanet', category_id: catHot, name: 'Mixed Mouajjanet', description: '2 Kebbeh, 2 Sambousik, 2 Rkakat Cheese', price_usd: 9.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-makanek', category_id: catHot, name: 'Makanek', description: 'Sauteed mini sausages with pomegranate molasses', price_usd: 8.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-soujouk', category_id: catHot, name: 'Soujouk', description: 'Spicy Armenian sausages cooked with tomato & garlic', price_usd: 8.00, station: 'hot_mezza', available: true, modifier_groups: [] },
+      { id: 'm-fries', category_id: catHot, name: 'French Fries', price_usd: 4.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-batata-harra', category_id: catHot, name: 'Batata Harra', description: 'Spicy fried potato cubes with coriander & garlic', price_usd: 6.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-mouajjanet', category_id: catHot, name: 'Mixed Mouajjanet', description: '2 Kebbeh, 2 Sambousik, 2 Rkakat Cheese', price_usd: 9.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-makanek', category_id: catHot, name: 'Makanek', description: 'Sauteed mini sausages with pomegranate molasses', price_usd: 8.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-soujouk', category_id: catHot, name: 'Soujouk', description: 'Spicy Armenian sausages cooked with tomato & garlic', price_usd: 8.00, station: 'mezza', available: true, modifier_groups: [] },
 
       // SALADS
-      { id: 'm-fattoush', category_id: catSalads, name: 'Fattoush', description: 'Garden greens, radish, sumac dressing & pita chips', price_usd: 7.00, station: 'cold_mezza', available: true, modifier_groups: [] },
-      { id: 'm-tabbouleh', category_id: catSalads, name: 'Tabbouleh', description: 'Finely chopped parsley, mint, tomato & bulgur', price_usd: 7.00, station: 'cold_mezza', available: true, modifier_groups: [] },
+      { id: 'm-fattoush', category_id: catSalads, name: 'Fattoush', description: 'Garden greens, radish, sumac dressing & pita chips', price_usd: 7.00, station: 'mezza', available: true, modifier_groups: [] },
+      { id: 'm-tabbouleh', category_id: catSalads, name: 'Tabbouleh', description: 'Finely chopped parsley, mint, tomato & bulgur', price_usd: 7.00, station: 'mezza', available: true, modifier_groups: [] },
 
       // FRESH FROM THE SAJJ
-      { id: 'm-sajj-zaatar', category_id: catSajj, name: 'Zaatar Sajj', price_usd: 2.50, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-jebneh', category_id: catSajj, name: 'Jebneh Sajj', price_usd: 4.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-labneh', category_id: catSajj, name: 'Labneh Sajj', price_usd: 3.50, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-zl', category_id: catSajj, name: 'Zaatar & Labneh Sajj', price_usd: 4.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-cocktail', category_id: catSajj, name: 'Cocktail Sajj', price_usd: 5.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-jebne-jambon', category_id: catSajj, name: 'Jebne w Jambon Sajj', price_usd: 6.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-jebne-soujouk', category_id: catSajj, name: 'Jebne w Soujouk Sajj', price_usd: 6.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-jebne-kafta', category_id: catSajj, name: 'Jebne w Kafta Sajj', price_usd: 7.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-lahm', category_id: catSajj, name: 'Lahm Bi Ajeen Sajj', price_usd: 7.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-pizza', category_id: catSajj, name: 'Lebanese Pizza Sajj', price_usd: 8.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-chocobas', category_id: catSajj, name: 'Chocobas Sweet Sajj', price_usd: 6.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sajj-zebde', category_id: catSajj, name: 'Zebde & Sekkar Sajj', price_usd: 4.00, station: 'hot_mezza', available: true, modifier_groups: [] },
+      { id: 'm-sajj-zaatar', category_id: catSajj, name: 'Zaatar Sajj', price_usd: 2.50, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-jebneh', category_id: catSajj, name: 'Jebneh Sajj', price_usd: 4.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-labneh', category_id: catSajj, name: 'Labneh Sajj', price_usd: 3.50, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-zl', category_id: catSajj, name: 'Zaatar & Labneh Sajj', price_usd: 4.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-cocktail', category_id: catSajj, name: 'Cocktail Sajj', price_usd: 5.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-jebne-jambon', category_id: catSajj, name: 'Jebne w Jambon Sajj', price_usd: 6.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-jebne-soujouk', category_id: catSajj, name: 'Jebne w Soujouk Sajj', price_usd: 6.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-jebne-kafta', category_id: catSajj, name: 'Jebne w Kafta Sajj', price_usd: 7.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-lahm', category_id: catSajj, name: 'Lahm Bi Ajeen Sajj', price_usd: 7.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-pizza', category_id: catSajj, name: 'Lebanese Pizza Sajj', price_usd: 8.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-chocobas', category_id: catSajj, name: 'Chocobas Sweet Sajj', price_usd: 6.00, station: 'sajj', available: true, modifier_groups: [] },
+      { id: 'm-sajj-zebde', category_id: catSajj, name: 'Zebde & Sekkar Sajj', price_usd: 4.00, station: 'sajj', available: true, modifier_groups: [] },
 
       // BBQ PLATTERS
       {
@@ -200,13 +200,13 @@ class SkylightStore {
       },
 
       // SUBS & SANDWICHES
-      { id: 'm-sub-chicken', category_id: catSubs, name: 'Chicken Sub', description: 'Served with French Fries', price_usd: 9.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sub-submarine', category_id: catSubs, name: 'Submarine Sub', description: 'Served with French Fries', price_usd: 9.00, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-sub-fajita', category_id: catSubs, name: 'Chicken Fajita Sub', description: 'Served with French Fries', price_usd: 10.00, station: 'hot_mezza', available: true, modifier_groups: [] },
+      { id: 'm-sub-chicken', category_id: catSubs, name: 'Chicken Sub', description: 'Served with French Fries', price_usd: 9.00, station: 'subs_sandwiches', available: true, modifier_groups: [] },
+      { id: 'm-sub-submarine', category_id: catSubs, name: 'Submarine Sub', description: 'Served with French Fries', price_usd: 9.00, station: 'subs_sandwiches', available: true, modifier_groups: [] },
+      { id: 'm-sub-fajita', category_id: catSubs, name: 'Chicken Fajita Sub', description: 'Served with French Fries', price_usd: 10.00, station: 'subs_sandwiches', available: true, modifier_groups: [] },
 
       // KIDS MEALS
-      { id: 'm-kids-burger', category_id: catKids, name: 'Classic Kids Burger', description: 'Served with French Fries & Juice', price_usd: 7.50, station: 'hot_mezza', available: true, modifier_groups: [] },
-      { id: 'm-kids-nuggets', category_id: catKids, name: 'Chicken Nuggets', description: 'Served with French Fries & Juice', price_usd: 7.50, station: 'hot_mezza', available: true, modifier_groups: [] },
+      { id: 'm-kids-burger', category_id: catKids, name: 'Classic Kids Burger', description: 'Served with French Fries & Juice', price_usd: 7.50, station: 'subs_sandwiches', available: true, modifier_groups: [] },
+      { id: 'm-kids-nuggets', category_id: catKids, name: 'Chicken Nuggets', description: 'Served with French Fries & Juice', price_usd: 7.50, station: 'subs_sandwiches', available: true, modifier_groups: [] },
 
       // COLD REFRESHMENTS
       { id: 'm-bev-water-sm', category_id: catColdBev, name: 'Small Mineral Water', price_usd: 1.00, station: 'bar', available: true, modifier_groups: [] },

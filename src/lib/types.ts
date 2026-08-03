@@ -1,4 +1,4 @@
-export type StationType = 'cold_mezza' | 'hot_mezza' | 'grill' | 'bar' | 'shisha';
+export type StationType = 'mezza' | 'sajj' | 'grill' | 'subs_sandwiches' | 'bar' | 'shisha';
 export type TableStatus = 'available' | 'occupied' | 'merged' | 'bill_requested';
 export type SessionStatus = 'active' | 'closed';
 export type ItemStatus = 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';

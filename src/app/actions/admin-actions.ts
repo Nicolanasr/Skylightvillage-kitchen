@@ -228,7 +228,7 @@ export async function seedDatabaseMenu() {
         name TEXT NOT NULL,
         description TEXT DEFAULT '',
         price_usd NUMERIC(10, 2) NOT NULL DEFAULT 0,
-        station TEXT NOT NULL DEFAULT 'cold_mezza',
+        station TEXT NOT NULL DEFAULT 'mezza',
         available BOOLEAN DEFAULT true,
         image_url TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW()

@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
     name TEXT NOT NULL,
     description TEXT,
     price_usd DECIMAL(10,2) NOT NULL,
-    station VARCHAR(30) NOT NULL CHECK (station IN ('cold_mezza', 'hot_mezza', 'grill', 'bar', 'shisha')),
+    station VARCHAR(30) NOT NULL CHECK (station IN ('mezza', 'sajj', 'grill', 'subs_sandwiches', 'bar', 'shisha')),
     available BOOLEAN DEFAULT true,
     modifier_groups JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     item_name TEXT NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
     unit_price_usd DECIMAL(10,2) NOT NULL,
-    station VARCHAR(30) NOT NULL CHECK (station IN ('cold_mezza', 'hot_mezza', 'grill', 'bar', 'shisha')),
+    station VARCHAR(30) NOT NULL CHECK (station IN ('mezza', 'sajj', 'grill', 'subs_sandwiches', 'bar', 'shisha')),
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'preparing', 'ready', 'delivered', 'cancelled')),
     selected_modifiers JSONB DEFAULT '[]'::jsonb,
     special_notes TEXT,

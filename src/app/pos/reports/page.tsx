@@ -84,14 +84,17 @@ function ZReportContent() {
 
   // Station Volume Breakdown
   const stationVolume = {
-    cold_mezza: allOrderItems
-      .filter((i: any) => i.station === 'cold_mezza')
+    mezza: allOrderItems
+      .filter((i: any) => i.station === 'mezza')
       .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
-    hot_mezza: allOrderItems
-      .filter((i: any) => i.station === 'hot_mezza')
+    sajj: allOrderItems
+      .filter((i: any) => i.station === 'sajj')
       .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
     grill: allOrderItems
       .filter((i: any) => i.station === 'grill')
+      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
+    subs_sandwiches: allOrderItems
+      .filter((i: any) => i.station === 'subs_sandwiches')
       .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
     bar: allOrderItems
       .filter((i: any) => i.station === 'bar')
@@ -182,56 +185,56 @@ function ZReportContent() {
             </div>
 
             <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10">
-              <span className="text-xs text-gray-500 font-semibold block mb-1">LBP Cash Collected</span>
-              <div className="text-xl font-bold text-[#1c3a1e]">{formatUsd(lbpCashCollectedUsd)}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">
-                {formatLbp(lbpCashCollectedUsd, 89500)}
-              </div>
-            </div>
-
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10">
               <span className="text-xs text-gray-500 font-semibold block mb-1">Credit Card Payments</span>
               <div className="text-xl font-bold text-blue-700">{formatUsd(cardCollectedUsd)}</div>
             </div>
           </div>
         </div>
 
-        {/* Station Sales Volume */}
+
+
+        {/* KITCHEN STATIONS VOLUME BREAKDOWN */}
         <div className="bg-white rounded-3xl p-6 border border-[#1c3a1e]/15 shadow-sm">
           <h3 className="text-lg font-bold text-[#1c3a1e] mb-4 flex items-center gap-2">
             <ChefHat className="h-5 w-5 text-[#d4af37]" />
             <span>Station Sales Volume</span>
           </h3>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
               <Utensils className="h-5 w-5 mx-auto mb-2 text-[#1c3a1e]" />
-              <span className="text-xs text-gray-500 font-medium block">Cold Mezza</span>
-              <span className="text-lg font-bold text-[#1c3a1e]">{stationVolume.cold_mezza} items</span>
+              <span className="text-xs text-gray-500 font-medium block">Mezza</span>
+              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.mezza} items</span>
             </div>
 
             <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Flame className="h-5 w-5 mx-auto mb-2 text-orange-600" />
-              <span className="text-xs text-gray-500 font-medium block">Hot Mezza</span>
-              <span className="text-lg font-bold text-[#1c3a1e]">{stationVolume.hot_mezza} items</span>
+              <Flame className="h-5 w-5 mx-auto mb-2 text-amber-600" />
+              <span className="text-xs text-gray-500 font-medium block">Sajj</span>
+              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.sajj} items</span>
             </div>
 
             <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
               <Flame className="h-5 w-5 mx-auto mb-2 text-red-600" />
-              <span className="text-xs text-gray-500 font-medium block">Grill</span>
-              <span className="text-lg font-bold text-[#1c3a1e]">{stationVolume.grill} items</span>
+              <span className="text-xs text-gray-500 font-medium block">BBQ</span>
+              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.grill} items</span>
+            </div>
+
+            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
+              <Utensils className="h-5 w-5 mx-auto mb-2 text-emerald-600" />
+              <span className="text-xs text-gray-500 font-medium block">Subs & Sandwiches</span>
+              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.subs_sandwiches} items</span>
             </div>
 
             <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
               <Wine className="h-5 w-5 mx-auto mb-2 text-blue-600" />
-              <span className="text-xs text-gray-500 font-medium block">Bar</span>
-              <span className="text-lg font-bold text-[#1c3a1e]">{stationVolume.bar} items</span>
+              <span className="text-xs text-gray-500 font-medium block">Bar & Drinks</span>
+              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.bar} items</span>
             </div>
 
             <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
               <Flame className="h-5 w-5 mx-auto mb-2 text-purple-600" />
               <span className="text-xs text-gray-500 font-medium block">Shisha</span>
-              <span className="text-lg font-bold text-[#1c3a1e]">{stationVolume.shisha} items</span>
+              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.shisha} items</span>
             </div>
           </div>
         </div>

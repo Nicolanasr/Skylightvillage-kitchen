@@ -298,31 +298,29 @@ export async function triggerServiceCall(sessionId: string, tableNumber: number,
 }
 
 // Data Fetch Action for KDS (Strictly filters for ACTIVE table sessions only)
-export async function getKDSData(stationFilter: string) {
+export async function getKDSData(stationFilter?: string) {
   if (!pool) return { items: [], menuItems: [] };
 
   let items: any[] = [];
   let menuItems: any[] = [];
 
   try {
-    let query = `
-      SELECT oi.* 
+    // DB Normalization: update legacy cold_mezza / hot_mezza DB values
+    await pool.query("UPDATE order_items SET station = 'mezza' WHERE station IN ('cold_mezza', 'hot_mezza')").catch(() => {});
+    await pool.query("UPDATE menu_items SET station = 'mezza' WHERE station IN ('cold_mezza', 'hot_mezza')").catch(() => {});
+
+    const query = `
+      SELECT oi.*, COALESCE(mi.station, oi.station) AS station 
       FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN table_sessions ts ON oi.session_id = ts.id
       WHERE ts.status = 'active'
       AND oi.status NOT IN ('delivered', 'cancelled')
+      ORDER BY oi.created_at ASC
     `;
-    const queryParams: any[] = [];
-
-    if (stationFilter !== 'all') {
-      query += ' AND oi.station = $1';
-      queryParams.push(stationFilter);
-    }
-
-    query += ' ORDER BY oi.created_at ASC';
 
     const [res, menuRes] = await Promise.all([
-      pool.query(query, queryParams),
+      pool.query(query),
       pool.query('SELECT * FROM menu_items ORDER BY name ASC'),
     ]);
 
@@ -332,8 +330,19 @@ export async function getKDSData(stationFilter: string) {
       menuRes.rows.filter((m: any) => m.is_staff_only).map((m: any) => m.id)
     );
 
-    // Strictly filter out any items that belong to staff-only menu items (e.g. Event Charge, Staff Fee)
-    items = res.rows.filter((item: any) => !staffOnlyItemIds.has(item.menu_item_id));
+    const normalizeStation = (st: string) => {
+      if (!st || st === 'cold_mezza' || st === 'hot_mezza') return 'mezza';
+      if (st === 'bbq') return 'grill';
+      if (st === 'subs' || st === 'sandwiches' || st === 'kids') return 'subs_sandwiches';
+      return st;
+    };
+
+    items = res.rows
+      .filter((item: any) => !staffOnlyItemIds.has(item.menu_item_id))
+      .map((item: any) => ({
+        ...item,
+        station: normalizeStation(item.station),
+      }));
   } catch (e) {
     console.error('Neon KDS fetch error:', e);
   }
@@ -423,7 +432,17 @@ export async function markKDSItemsPrinted(itemIds: string[]) {
   if (!itemIds || itemIds.length === 0 || !pool) return { success: true };
 
   try {
-    await pool.query('UPDATE order_items SET is_printed = true WHERE id::text = ANY($1::text[])', [itemIds]);
+    await pool.query(
+      `UPDATE order_items 
+       SET is_printed = true, 
+           status = CASE WHEN status = 'pending' THEN 'preparing' ELSE status END 
+       WHERE id::text = ANY($1::text[])`,
+      [itemIds]
+    );
+
+    revalidatePath('/kds');
+    revalidatePath('/pos');
+    revalidatePath('/order');
   } catch (e) {
     console.error('Neon markKDSItemsPrinted error:', e);
   }
