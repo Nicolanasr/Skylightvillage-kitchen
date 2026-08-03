@@ -472,20 +472,21 @@ function POSContent() {
     });
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6">
-            {/* 80mm ESC/POS Thermal Receipt Printer Container */}
+        <div className="min-h-screen bg-[#fafbfa] text-[#1c271c] p-4 md:p-6">
+            {/* ESC/POS 80mm THERMAL RECEIPT PRINT CONTAINER */}
             {receiptToPrint && (
                 <ThermalReceipt
                     tableNumber={receiptToPrint.tableNumber}
                     items={receiptToPrint.items}
                     totals={receiptToPrint.totals}
                     isFinal={receiptToPrint.isFinal}
-                    guestName={receiptToPrint.guestName}
+                    guestName={targetPaymentGuestName || undefined}
+                    sessionId={activeSession?.id}
                 />
             )}
 
-            {/* POS Top Header Bar */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-6 border-b border-slate-800 gap-4">
+            {/* Top Header Bar with Skylight White Logo & Link to Admin */}
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-6 border-b border-[#1c3a1e]/15 gap-4">
                 <div className="flex items-center gap-4">
                     <img
                         src="/images/Skylight-logo-icon.png"
@@ -493,8 +494,11 @@ function POSContent() {
                         className="h-10 w-auto object-contain"
                     />
                     <div>
-                        <h1 className="text-xl font-black text-slate-100 tracking-tight">Waiter & Cashier POS Terminal</h1>
-                        <p className="text-xs text-slate-400 font-medium">Dynamic Multi-Guest Billing & Individual Thermal Receipts</p>
+                        <h1 className="text-xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-[#d4af37]" />
+                            <span>Waiter & Cashier POS Terminal</span>
+                        </h1>
+                        <p className="text-xs text-gray-600 font-medium">Dynamic Multi-Guest Billing & Individual Thermal Receipts</p>
                     </div>
                 </div>
 
@@ -502,19 +506,19 @@ function POSContent() {
                 <div className="flex items-center gap-3">
                     <a
                         href="/admin"
-                        className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md"
+                        className="bg-[#faf5e6] hover:bg-[#f3eacb] border border-[#d4af37]/40 text-[#997a15] font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"
                     >
-                        <Shield className="h-4 w-4 text-amber-400" />
+                        <Shield className="h-4 w-4 text-[#d4af37]" />
                         <span>Admin Manager Portal</span>
                     </a>
                     <a
                         href="/kds"
-                        className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"
                     >
-                        <ChefHat className="h-4 w-4 text-amber-400" />
+                        <ChefHat className="h-4 w-4 text-[#1c3a1e]" />
                         <span>Kitchen KDS Terminal</span>
                     </a>
-                    <div className="bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-400 flex items-center gap-2">
+                    <div className="bg-[#eaf2eb] border border-[#1c3a1e]/15 px-3.5 py-2 rounded-xl text-xs font-bold text-[#1c3a1e] flex items-center gap-2">
                         <span>Rate: 89,500 LBP / $1</span>
                     </div>
                 </div>
@@ -522,13 +526,13 @@ function POSContent() {
 
             {/* READY FOR TABLE DELIVERY EXPEDITER TRAY */}
             {readyForDeliveryItems.length > 0 && (
-                <div className="mb-6 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-4 animate-in fade-in shadow-xl">
+                <div className="mb-6 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-4 animate-in fade-in shadow-md">
                     <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-emerald-400 font-black text-sm">
-                            <Truck className="h-5 w-5 animate-bounce" />
+                        <div className="flex items-center gap-2 text-emerald-800 font-black text-sm">
+                            <Truck className="h-5 w-5 animate-bounce text-emerald-600" />
                             <span>READY FOR TABLE DELIVERY ({readyForDeliveryItems.length} ITEMS READY)</span>
                         </div>
-                        <span className="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-1 rounded-lg">
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-500/20 px-2.5 py-1 rounded-lg">
                             Deliver to Tables Now
                         </span>
                     </div>
@@ -544,14 +548,14 @@ function POSContent() {
                         ).map(([tblNum, tableItems]) => (
                             <div
                                 key={tblNum}
-                                className="bg-slate-900 border-2 border-emerald-500/50 rounded-2xl p-4 flex flex-col justify-between shadow-xl"
+                                className="bg-white border-2 border-emerald-500/50 rounded-2xl p-4 flex flex-col justify-between shadow-md"
                             >
                                 <div>
-                                    <div className="flex justify-between items-center pb-2 border-b border-slate-800 mb-3">
-                                        <span className="font-black text-amber-400 text-base">
+                                    <div className="flex justify-between items-center pb-2 border-b border-[#1c3a1e]/10 mb-3">
+                                        <span className="font-black text-[#1c3a1e] text-base">
                                             TABLE #{tblNum} TRAY
                                         </span>
-                                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-emerald-500/30">
+                                        <span className="bg-emerald-500/20 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-emerald-500/30">
                                             {tableItems.length} ITEM(S) READY
                                         </span>
                                     </div>
@@ -560,25 +564,25 @@ function POSContent() {
                                         {tableItems.map((item) => (
                                             <div
                                                 key={item.id}
-                                                className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex justify-between items-center"
+                                                className="bg-[#fafbfa] border border-[#1c3a1e]/10 rounded-xl p-2.5 flex justify-between items-center"
                                             >
                                                 <div>
-                                                    <span className="font-extrabold text-xs text-slate-100 block">
+                                                    <span className="font-extrabold text-xs text-[#1c3a1e] block">
                                                         {item.quantity > 1 ? `${item.quantity}x ` : '1x '}{item.item_name}
                                                     </span>
                                                     {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                                        <div className="text-[10px] text-amber-300 font-semibold pl-1.5 mt-0.5 space-y-0.5">
+                                                        <div className="text-[10px] text-gray-600 font-semibold pl-1.5 mt-0.5 space-y-0.5">
                                                             {item.selected_modifiers.map((m: any, idx: number) => (
                                                                 <div key={idx}>• {m.group}: {m.option}</div>
                                                             ))}
                                                         </div>
                                                     )}
                                                     {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
-                                                        <div className="text-[10px] text-emerald-300 font-medium italic pl-1.5 mt-0.5">
+                                                        <div className="text-[10px] text-emerald-800 font-medium italic pl-1.5 mt-0.5">
                                                             Note: {item.special_notes}
                                                         </div>
                                                     )}
-                                                    <span className="text-[9px] text-slate-400 font-bold uppercase block mt-1">
+                                                    <span className="text-[9px] text-gray-500 font-bold uppercase block mt-1">
                                                         Station: {item.station.replace('_', ' ')}
                                                     </span>
                                                 </div>
@@ -586,11 +590,11 @@ function POSContent() {
                                                 <button
                                                     disabled={deliveringItemIds.has(item.id)}
                                                     onClick={() => handleMarkItemDelivered(item.id)}
-                                                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-emerald-400 font-extrabold px-3 py-1.5 rounded-xl text-[10px] transition-all border border-emerald-500/30 shrink-0 ml-2 flex items-center gap-1.5 shadow-sm"
+                                                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-extrabold px-3 py-1.5 rounded-xl text-[10px] transition-all shrink-0 ml-2 flex items-center gap-1.5 shadow-sm"
                                                 >
                                                     {deliveringItemIds.has(item.id) ? (
                                                         <>
-                                                            <span className="h-3 w-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></span>
+                                                            <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                                                             <span>Delivering...</span>
                                                         </>
                                                     ) : (
@@ -625,11 +629,11 @@ function POSContent() {
                                             });
                                         }
                                     }}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-slate-950 font-black py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
                                 >
                                     {tableItems.some((i) => deliveringItemIds.has(i.id)) ? (
                                         <>
-                                            <span className="h-3.5 w-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+                                            <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                                             <span>Delivering Tray...</span>
                                         </>
                                     ) : (
@@ -649,8 +653,8 @@ function POSContent() {
             {pendingServiceCalls.length > 0 && (
                 <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 animate-in fade-in">
                     <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-amber-400 font-extrabold text-sm">
-                            <Bell className="h-5 w-5 animate-bounce" />
+                        <div className="flex items-center gap-2 text-amber-800 font-extrabold text-sm">
+                            <Bell className="h-5 w-5 animate-bounce text-amber-600" />
                             <span>Active Service Alerts ({pendingServiceCalls.length})</span>
                         </div>
                     </div>
@@ -659,16 +663,16 @@ function POSContent() {
                         {pendingServiceCalls.map((call) => (
                             <div
                                 key={call.id}
-                                className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between"
+                                className="bg-white border border-[#1c3a1e]/15 rounded-xl p-3 flex items-center justify-between shadow-sm"
                             >
                                 <div>
-                                    <span className="font-extrabold text-amber-400 text-sm">
+                                    <span className="font-extrabold text-[#1c3a1e] text-sm">
                                         Table #{call.table_number}
                                     </span>
-                                    <div className="text-xs text-slate-300 font-bold capitalize flex items-center gap-1.5 mt-0.5">
-                                        {call.type === 'waiter' && <Bell className="h-3.5 w-3.5 text-amber-400" />}
-                                        {call.type === 'charcoal' && <Flame className="h-3.5 w-3.5 text-orange-500" />}
-                                        {call.type === 'bill' && <Receipt className="h-3.5 w-3.5 text-emerald-400" />}
+                                    <div className="text-xs text-gray-700 font-bold capitalize flex items-center gap-1.5 mt-0.5">
+                                        {call.type === 'waiter' && <Bell className="h-3.5 w-3.5 text-[#1c3a1e]" />}
+                                        {call.type === 'charcoal' && <Flame className="h-3.5 w-3.5 text-orange-600" />}
+                                        {call.type === 'bill' && <Receipt className="h-3.5 w-3.5 text-emerald-700" />}
                                         <span>{call.type.toUpperCase()} REQUESTED</span>
                                     </div>
                                 </div>
@@ -678,7 +682,7 @@ function POSContent() {
                                         await resolveServiceCall(call.id);
                                         refreshPOSData();
                                     }}
-                                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
+                                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm"
                                 >
                                     Resolve
                                 </button>
@@ -694,7 +698,7 @@ function POSContent() {
                 <div className="lg:col-span-7">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3">
-                            <h2 className="text-base font-extrabold text-slate-100">Floor Layout & Table Matrix</h2>
+                            <h2 className="text-base font-extrabold text-[#1c3a1e]">Floor Layout & Table Matrix</h2>
                             <button
                                 onClick={() => {
                                     if (!selectedTable) {
@@ -703,23 +707,23 @@ function POSContent() {
                                     }
                                     setIsMergeModalOpen(true);
                                 }}
-                                className="bg-purple-500 hover:bg-purple-600 text-slate-950 font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-purple-500/20 transition-all"
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
                             >
                                 <Layers className="h-4 w-4" />
                                 <span>Merge Tables</span>
                             </button>
                         </div>
                         <div className="flex items-center gap-4 text-xs font-semibold flex-wrap">
-                            <span className="flex items-center gap-1.5 text-emerald-400">
-                                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Available
+                            <span className="flex items-center gap-1.5 text-emerald-700">
+                                <span className="h-2.5 w-2.5 rounded-full bg-emerald-600"></span> Available
                             </span>
-                            <span className="flex items-center gap-1.5 text-blue-400">
-                                <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span> Occupied
+                            <span className="flex items-center gap-1.5 text-blue-700">
+                                <span className="h-2.5 w-2.5 rounded-full bg-blue-600"></span> Occupied
                             </span>
-                            <span className="flex items-center gap-1.5 text-purple-400">
-                                <span className="h-2.5 w-2.5 rounded-full bg-purple-500"></span> Merged (1 Card)
+                            <span className="flex items-center gap-1.5 text-purple-700">
+                                <span className="h-2.5 w-2.5 rounded-full bg-purple-600"></span> Merged (1 Card)
                             </span>
-                            <span className="flex items-center gap-1.5 text-amber-400">
+                            <span className="flex items-center gap-1.5 text-amber-700">
                                 <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span> Bill Requested
                             </span>
                         </div>
@@ -745,21 +749,21 @@ function POSContent() {
                                 : [];
 
                             const statusColorClasses = isMergedMaster
-                                ? 'border-purple-500/50 bg-purple-500/10 hover:border-purple-400'
+                                ? 'border-purple-500/50 bg-purple-500/10 hover:border-purple-600'
                                 : {
-                                    available: 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500',
-                                    occupied: 'border-blue-500/40 bg-blue-500/5 hover:border-blue-500',
-                                    merged: 'border-purple-500/50 bg-purple-500/10 hover:border-purple-400',
-                                    bill_requested: 'border-amber-500/40 bg-amber-500/10 hover:border-amber-500 animate-pulse',
+                                    available: 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-600',
+                                    occupied: 'border-blue-500/30 bg-blue-500/5 hover:border-blue-600',
+                                    merged: 'border-purple-500/50 bg-purple-500/10 hover:border-purple-600',
+                                    bill_requested: 'border-amber-500/40 bg-amber-500/10 hover:border-amber-600 animate-pulse',
                                 }[tbl.status];
 
                             const badgeColors = isMergedMaster
-                                ? 'bg-purple-500 text-slate-950 font-black'
+                                ? 'bg-purple-600 text-white font-black'
                                 : {
-                                    available: 'bg-emerald-500/20 text-emerald-300',
-                                    occupied: 'bg-blue-500/20 text-blue-300',
-                                    merged: 'bg-purple-500 text-slate-950 font-black',
-                                    bill_requested: 'bg-amber-500/20 text-amber-300',
+                                    available: 'bg-emerald-500/20 text-emerald-800',
+                                    occupied: 'bg-blue-500/20 text-blue-800',
+                                    merged: 'bg-purple-600 text-white font-black',
+                                    bill_requested: 'bg-amber-500/20 text-amber-800',
                                 }[tbl.status];
 
                             const tblItems = sess ? orderItems.filter((i) => i.session_id === sess.id) : [];
@@ -775,12 +779,12 @@ function POSContent() {
                                 <div
                                     key={tbl.id}
                                     onClick={() => setSelectedTable(tbl)}
-                                    className={`glass-card rounded-2xl p-4 flex flex-col justify-between cursor-pointer border-2 transition-all min-h-[140px] relative ${statusColorClasses} ${isSelected ? 'ring-2 ring-amber-400 scale-[1.02]' : ''
+                                    className={`bg-white rounded-2xl p-4 flex flex-col justify-between cursor-pointer border-2 transition-all min-h-[140px] relative shadow-sm hover:shadow-md ${statusColorClasses} ${isSelected ? 'ring-2 ring-[#1c3a1e] border-[#1c3a1e] scale-[1.02]' : ''
                                         }`}
                                 >
                                     <div>
                                         <div className="flex justify-between items-start">
-                                            <span className="text-base font-black text-slate-100 leading-tight">
+                                            <span className="text-base font-black text-[#1c3a1e] leading-tight">
                                                 {tableLabel}
                                             </span>
                                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ml-1 ${badgeColors}`}>
@@ -789,24 +793,22 @@ function POSContent() {
                                         </div>
 
                                         {isMergedMaster && (
-                                            <div className="mt-2 bg-purple-500/20 border border-purple-500/40 rounded-lg p-1.5 text-[10px] font-bold text-purple-300 flex items-center gap-1">
-                                                <Layers className="h-3 w-3 text-purple-400" />
+                                            <div className="mt-2 bg-purple-500/10 border border-purple-500/30 rounded-lg p-1.5 text-[10px] font-bold text-purple-800 flex items-center gap-1">
+                                                <Layers className="h-3 w-3 text-purple-600" />
                                                 <span>COMBINED SESSION</span>
                                             </div>
                                         )}
 
                                         {hasReadyFood && (
-                                            <span className="mt-2 text-[10px] font-black bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-md flex items-center gap-1 w-max shadow-md animate-bounce">
+                                            <span className="mt-2 text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-md flex items-center gap-1 w-max shadow-sm animate-bounce">
                                                 <Truck className="h-3 w-3" /> FOOD READY
                                             </span>
                                         )}
                                     </div>
 
-                                    <div className="mt-4 pt-2 border-t border-slate-800/80 flex justify-between items-end">
-                                        <span className="text-[11px] text-slate-400 font-medium">Running Total:</span>
-                                        <span className="text-xs font-bold text-amber-400">
-                                            {sess ? formatUsd(tblBill.finalTotalUsd) : '$0.00'}
-                                        </span>
+                                    <div className="mt-3 pt-2 border-t border-[#1c3a1e]/10 flex justify-between items-center text-xs">
+                                        <span className="text-gray-500 font-bold">Running Total:</span>
+                                        <span className="font-black text-[#1c3a1e]">{formatUsd(tblBill.remainingUsd)}</span>
                                     </div>
                                 </div>
                             );
@@ -814,24 +816,24 @@ function POSContent() {
                     </div>
                 </div>
 
-                {/* Right Column: Selected Table Detail Panel (5 Cols) */}
+                {/* Right Column: Selected Table Check & Dynamic Guest Items (5 Cols) */}
                 <div className="lg:col-span-5">
                     {!selectedTable ? (
-                        <div className="glass-panel rounded-3xl p-12 text-center border border-slate-800">
-                            <Utensils className="h-12 w-12 mx-auto mb-4 text-slate-600 opacity-40" />
-                            <h3 className="text-lg font-bold text-slate-300">Select a Table to Manage</h3>
-                            <p className="text-xs text-slate-500 mt-1">
+                        <div className="bg-white rounded-3xl p-12 text-center border border-[#1c3a1e]/15 shadow-sm">
+                            <Utensils className="h-12 w-12 mx-auto mb-4 text-[#1c3a1e] opacity-30" />
+                            <h3 className="text-lg font-bold text-[#1c3a1e]">Select a Table to Manage</h3>
+                            <p className="text-xs text-gray-500 mt-1">
                                 Click any table on the floor layout to inspect orders, assign items to dynamic guests, print individual guest bills, or process payments.
                             </p>
                         </div>
                     ) : (
-                        <div className="glass-card rounded-3xl p-6 border border-slate-800 flex flex-col justify-between h-full">
+                        <div className="bg-white rounded-3xl p-6 border border-[#1c3a1e]/15 flex flex-col justify-between h-full shadow-sm text-[#1c3a1e]">
                             <div>
                                 {/* Table Header & Action Buttons */}
-                                <div className="pb-4 border-b border-slate-800 mb-4 space-y-2">
+                                <div className="pb-4 border-b border-[#1c3a1e]/15 mb-4 space-y-2">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <h2 className="text-2xl font-black text-slate-100">
+                                            <h2 className="text-2xl font-black text-[#1c3a1e]">
                                                 {activeSession && activeSession.primary_table_id === selectedTable.id && activeSession.merged_table_ids?.length > 0
                                                     ? `Table #${selectedTable.table_number} + #${activeSession.merged_table_ids
                                                         .map((id) => tables.find((t) => t.id === id)?.table_number)
@@ -840,7 +842,7 @@ function POSContent() {
                                                     : `Table #${selectedTable.table_number}`}
                                             </h2>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[11px] font-bold text-slate-400">Status:</span>
+                                                <span className="text-[11px] font-bold text-gray-600">Status:</span>
                                                 <select
                                                     value={selectedTable.status}
                                                     onChange={async (e) => {
@@ -848,7 +850,7 @@ function POSContent() {
                                                         await updateTableStatusAction(selectedTable.id, newStatus);
                                                         refreshPOSData();
                                                     }}
-                                                    className="bg-slate-900 border border-slate-700 text-amber-400 text-xs font-black px-2.5 py-1 rounded-xl focus:outline-none focus:border-amber-500 transition-all cursor-pointer"
+                                                    className="bg-[#fafbfa] border border-[#1c3a1e]/20 text-[#1c3a1e] text-xs font-extrabold px-2.5 py-1 rounded-xl focus:outline-none focus:border-[#1c3a1e] transition-all cursor-pointer"
                                                 >
                                                     <option value="available">🟢 AVAILABLE</option>
                                                     <option value="occupied">🔴 OCCUPIED</option>
@@ -858,7 +860,7 @@ function POSContent() {
                                             </div>
                                             {activeSession && activeSession.merged_table_ids?.length > 0 && (
                                                 <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-[10px] text-purple-300 font-bold uppercase">Merged Tables:</span>
+                                                    <span className="text-[10px] text-purple-800 font-bold uppercase">Merged Tables:</span>
                                                     {activeSession.merged_table_ids.map((mId) => {
                                                         const mTable = tables.find((t) => t.id === mId);
                                                         if (!mTable) return null;
@@ -866,7 +868,7 @@ function POSContent() {
                                                             <button
                                                                 key={mId}
                                                                 onClick={() => handleUnmergeTable(mId)}
-                                                                className="bg-purple-500/20 hover:bg-red-500/20 border border-purple-500/40 hover:border-red-500/40 text-purple-300 hover:text-red-400 text-[10px] font-extrabold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all"
+                                                                className="bg-purple-500/10 hover:bg-red-500/10 border border-purple-500/30 hover:border-red-500/30 text-purple-900 hover:text-red-700 text-[10px] font-extrabold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all"
                                                                 title="Click to unmerge this table"
                                                             >
                                                                 <Unlink className="h-3 w-3" />
@@ -881,7 +883,7 @@ function POSContent() {
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <button
                                                 onClick={() => setIsAddItemModalOpen(true)}
-                                                className="bg-amber-500 hover:bg-amber-600 text-slate-950 p-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                                                className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white p-2 px-3 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                                             >
                                                 <PlusCircle className="h-4 w-4" />
                                                 <span>Add Items</span>
@@ -889,7 +891,7 @@ function POSContent() {
 
                                             <button
                                                 onClick={() => setIsMergeModalOpen(true)}
-                                                className="bg-purple-500 hover:bg-purple-600 text-slate-950 p-2 px-3 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-purple-500/20"
+                                                className="bg-purple-600 hover:bg-purple-700 text-white p-2 px-3 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                                                 title="Merge other tables into this table session"
                                             >
                                                 <Layers className="h-4 w-4" />
@@ -898,7 +900,7 @@ function POSContent() {
 
                                             <button
                                                 onClick={() => setIsAssignGuestModalOpen(true)}
-                                                className="bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 p-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                                                className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] p-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                                             >
                                                 <UserPlus className="h-4 w-4" />
                                                 <span>Assign Guest</span>
@@ -910,7 +912,7 @@ function POSContent() {
                                 {/* DYNAMIC GUESTS CARDS SUMMARY SECTION */}
                                 {dynamicGuestNames.length > 0 && (
                                     <div className="mb-4 space-y-2">
-                                        <h3 className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">
+                                        <h3 className="text-xs font-extrabold text-[#1c3a1e] uppercase tracking-wider">
                                             Dynamic Guests ({dynamicGuestNames.length}):
                                         </h3>
                                         <div className="grid grid-cols-1 gap-2">
@@ -930,26 +932,26 @@ function POSContent() {
                                                         key={gName}
                                                         className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${isAllPaid
                                                             ? 'bg-emerald-500/10 border-emerald-500/40'
-                                                            : 'bg-slate-950 border-purple-500/40'
+                                                            : 'bg-[#fafbfa] border-[#1c3a1e]/15'
                                                             }`}
                                                     >
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-extrabold text-xs text-purple-300 flex items-center gap-1">
-                                                                    <User className="h-3.5 w-3.5 text-purple-400" /> {gName}
+                                                                <span className="font-extrabold text-xs text-[#1c3a1e] flex items-center gap-1">
+                                                                    <User className="h-3.5 w-3.5 text-[#1c3a1e]" /> {gName}
                                                                 </span>
                                                                 {isAllPaid ? (
-                                                                    <span className="bg-emerald-500 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full">
+                                                                    <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
                                                                         ALL PAID
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="bg-amber-500/20 text-amber-300 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                                                                    <span className="bg-amber-500/20 text-amber-800 text-[9px] font-bold px-2 py-0.5 rounded-full">
                                                                         {gUnpaid.length} UNPAID ITEM(S)
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-slate-400 font-semibold block mt-0.5">
-                                                                Subtotal: <strong className="text-amber-400">${gTotalUsd.toFixed(2)}</strong>
+                                                            <span className="text-[11px] text-gray-600 font-semibold block mt-0.5">
+                                                                Subtotal: <strong className="text-[#1c3a1e]">${gTotalUsd.toFixed(2)}</strong>
                                                             </span>
                                                         </div>
 
@@ -957,7 +959,7 @@ function POSContent() {
                                                             {/* SEPARATE ACTION 1: PRINT GUEST BILL (PRE-BILL WITHOUT CLOSING) */}
                                                             <button
                                                                 onClick={() => handlePrintGuestBill(gName)}
-                                                                className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                                                                className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
                                                                 title="Print Pre-Bill for Guest"
                                                             >
                                                                 <Printer className="h-3.5 w-3.5" />
@@ -968,7 +970,7 @@ function POSContent() {
                                                             {!isAllPaid && (
                                                                 <button
                                                                     onClick={() => handleOpenPayGuestModal(gName)}
-                                                                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black p-2 px-3 rounded-xl text-xs transition-all flex items-center gap-1 shadow-md"
+                                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black p-2 px-3 rounded-xl text-xs transition-all flex items-center gap-1 shadow-sm"
                                                                 >
                                                                     <CreditCard className="h-3.5 w-3.5" />
                                                                     <span>Pay & Close</span>
@@ -986,10 +988,10 @@ function POSContent() {
                                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                                     {sessionItems.length === 0 ? (
                                         <div className="text-center py-8">
-                                            <p className="text-slate-500 text-xs mb-3">No order items submitted yet for Table #{selectedTable.table_number}.</p>
+                                            <p className="text-gray-500 text-xs mb-3">No order items submitted yet for Table #{selectedTable.table_number}.</p>
                                             <button
                                                 onClick={() => setIsAddItemModalOpen(true)}
-                                                className="bg-slate-900 border border-slate-800 hover:border-amber-500 text-amber-400 text-xs font-bold px-4 py-2 rounded-xl transition-all"
+                                                className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm"
                                             >
                                                 + Add First Order Item as Waiter
                                             </button>
@@ -998,13 +1000,13 @@ function POSContent() {
                                         sessionItems.map((item) => (
                                             <div
                                                 key={item.id}
-                                                className={`bg-slate-950 border rounded-xl p-3 ${item.is_paid
+                                                className={`bg-[#fafbfa] border rounded-xl p-3 ${item.is_paid
                                                     ? 'border-emerald-500/40 bg-emerald-500/10'
                                                     : item.status === 'cancelled'
                                                         ? 'border-red-500/20 opacity-50'
                                                         : item.status === 'ready'
-                                                            ? 'border-emerald-500/50 bg-emerald-500/5'
-                                                            : 'border-slate-800'
+                                                            ? 'border-emerald-500/50 bg-emerald-500/10'
+                                                            : 'border-[#1c3a1e]/15'
                                                     }`}
                                             >
                                                 <div className="flex justify-between items-start">
@@ -1012,79 +1014,79 @@ function POSContent() {
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             {/* Dynamic Guest Tag */}
                                                             {item.guest_name && (
-                                                                <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                                                <span className="bg-purple-500/10 text-purple-900 border border-purple-500/30 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
                                                                     <User className="h-3 w-3" /> {item.guest_name}
                                                                 </span>
                                                             )}
 
                                                             {/* Quantity Editor Controls (+ / -) */}
                                                             {!item.is_paid && item.status !== 'cancelled' ? (
-                                                                <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg">
+                                                                <div className="flex items-center bg-white border border-[#1c3a1e]/20 rounded-lg shadow-sm">
                                                                     <button
                                                                         onClick={() => handleQuantityEdit(item.id, -1)}
-                                                                        className="h-6 w-6 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold"
+                                                                        className="h-6 w-6 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black"
                                                                     >
                                                                         -
                                                                     </button>
-                                                                    <span className="px-2 text-xs font-black text-amber-400">{item.quantity}</span>
+                                                                    <span className="px-2 text-xs font-black text-[#1c3a1e]">{item.quantity}</span>
                                                                     <button
                                                                         onClick={() => handleQuantityEdit(item.id, 1)}
-                                                                        className="h-6 w-6 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold"
+                                                                        className="h-6 w-6 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black"
                                                                     >
                                                                         +
                                                                     </button>
                                                                 </div>
                                                             ) : (
-                                                                <span className={`font-bold text-xs ${item.status === 'cancelled' ? 'line-through text-red-400' : 'text-emerald-400'}`}>
+                                                                <span className={`font-black text-xs ${item.status === 'cancelled' ? 'line-through text-red-500' : 'text-emerald-700'}`}>
                                                                     {item.quantity}x
                                                                 </span>
                                                             )}
 
-                                                            <span className={`font-bold text-xs ${item.is_paid ? 'text-emerald-300' : item.status === 'cancelled' ? 'line-through text-red-400' : 'text-slate-100'}`}>
+                                                            <span className={`font-black text-xs ${item.is_paid ? 'text-emerald-800' : item.status === 'cancelled' ? 'line-through text-red-500' : 'text-[#1c3a1e]'}`}>
                                                                 {item.item_name}
                                                             </span>
 
                                                             {item.is_paid && (
-                                                                <span className="bg-emerald-500 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                                                <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                                                                     <UserCheck className="h-3 w-3" /> PAID
                                                                 </span>
                                                             )}
                                                         </div>
 
                                                         {item.is_comped && (
-                                                            <span className="mt-1 text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold inline-block">
+                                                            <span className="mt-1 text-[10px] bg-purple-500/20 text-purple-900 px-1.5 py-0.5 rounded font-bold inline-block">
                                                                 COMPED (FREE)
                                                             </span>
                                                         )}
                                                     </div>
 
-                                                    <span className={`text-xs font-bold ${item.is_paid ? 'text-emerald-400' : item.status === 'cancelled' ? 'line-through text-red-400' : 'text-amber-400'}`}>
+                                                    <span className={`text-xs font-black ${item.is_paid ? 'text-emerald-800' : item.status === 'cancelled' ? 'line-through text-red-500' : 'text-[#1c3a1e]'}`}>
                                                         {item.is_comped || item.status === 'cancelled' ? '$0.00' : formatUsd(Number(item.unit_price_usd) * item.quantity)}
                                                     </span>
                                                 </div>
 
                                                 {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                                    <div className="text-[10px] text-amber-300 font-semibold mt-1">
+                                                    <div className="text-[10px] text-gray-700 font-extrabold mt-1">
                                                         {item.selected_modifiers.map((m) => `${m.group}: ${m.option}`).join(', ')}
                                                     </div>
                                                 )}
 
                                                 {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
-                                                    <div className="text-[10px] text-emerald-300 font-medium italic mt-0.5">
+                                                    <div className="text-[10px] text-emerald-800 font-bold italic mt-0.5">
                                                         Note: {item.special_notes}
                                                     </div>
                                                 )}
 
                                                 {/* Card Action Footer */}
-                                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-900">
+                                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#1c3a1e]/10">
                                                     <span
-                                                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${item.is_paid
-                                                            ? 'bg-emerald-500/20 text-emerald-300'
+                                                        className={`text-[10px] font-black px-2 py-0.5 rounded ${item.is_paid
+                                                            ? 'bg-emerald-500/20 text-emerald-900'
                                                             : item.status === 'cancelled'
-                                                                ? 'bg-red-500/20 text-red-400'
+                                                                ? 'bg-red-500/20 text-red-700'
                                                                 : item.status === 'ready'
-                                                                    ? 'bg-emerald-500 text-slate-950 font-black'
-                                                                    : 'bg-slate-800 text-slate-300'
+                                                                    ? 'bg-emerald-600 text-white'
+                                                                    : 'bg-[#eaf2eb] text-[#1c3a1e] border border-[#1c3a1e]/15'
                                                             }`}
                                                     >
                                                         STATUS: {item.is_paid ? 'PAID / CHECKOUT' : item.status.toUpperCase()}
@@ -1093,7 +1095,7 @@ function POSContent() {
                                                     {!item.is_paid && item.status === 'ready' && (
                                                         <button
                                                             onClick={() => handleMarkItemDelivered(item.id)}
-                                                            className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-[10px] px-2.5 py-1 rounded"
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] px-2.5 py-1 rounded shadow-sm"
                                                         >
                                                             Deliver to Table
                                                         </button>
@@ -1103,7 +1105,7 @@ function POSContent() {
                                                         item.status === 'cancelled' ? (
                                                             <button
                                                                 onClick={() => handleRestoreCancelledItem(item.id)}
-                                                                className="text-[10px] text-amber-400 hover:underline font-bold flex items-center gap-1"
+                                                                className="text-[10px] text-[#1c3a1e] hover:underline font-bold flex items-center gap-1"
                                                             >
                                                                 <RotateCcw className="h-3 w-3" />
                                                                 <span>Undo Cancel</span>
@@ -1112,13 +1114,13 @@ function POSContent() {
                                                             <div className="flex items-center gap-3">
                                                                 <button
                                                                     onClick={() => compOrderItem(item.id)}
-                                                                    className="text-[10px] text-purple-400 hover:underline font-bold"
+                                                                    className="text-[10px] text-purple-800 hover:underline font-bold"
                                                                 >
                                                                     {item.is_comped ? 'Undo Comp' : 'Comp Item'}
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleCancelItem(item)}
-                                                                    className="text-[10px] text-red-400 hover:underline font-bold"
+                                                                    className="text-[10px] text-red-600 hover:underline font-bold"
                                                                 >
                                                                     Cancel Item
                                                                 </button>
@@ -1133,20 +1135,20 @@ function POSContent() {
                             </div>
 
                             {/* Bill Totals & Main Action Buttons */}
-                            <div className="pt-4 border-t border-slate-800 mt-6 space-y-3">
+                            <div className="pt-4 border-t border-[#1c3a1e]/15 mt-6 space-y-3">
                                 <div className="space-y-1.5">
-                                    <div className="flex justify-between text-xs text-slate-400">
+                                    <div className="flex justify-between text-xs text-gray-600 font-bold">
                                         <span>Subtotal:</span>
                                         <span>{formatUsd(billTotals.subtotalUsd)}</span>
                                     </div>
 
                                     {sessionDiscounts.map((disc) => (
-                                        <div key={disc.id} className="flex justify-between items-center text-xs text-emerald-400 font-semibold">
+                                        <div key={disc.id} className="flex justify-between items-center text-xs text-emerald-800 font-bold">
                                             <div className="flex items-center gap-1.5">
                                                 <span>Discount ({disc.type === 'percentage' ? `${disc.value}%` : `$${disc.value}`}):</span>
                                                 <button
                                                     onClick={() => handleRemoveDiscount(disc.id)}
-                                                    className="text-red-400 hover:text-red-300 font-extrabold ml-1 text-[10px]"
+                                                    className="text-red-600 hover:text-red-700 font-extrabold ml-1 text-[10px]"
                                                 >
                                                     ✕ Remove
                                                 </button>
@@ -1155,11 +1157,11 @@ function POSContent() {
                                         </div>
                                     ))}
 
-                                    <div className="flex justify-between text-base font-black text-slate-100 pt-1 border-t border-slate-800">
+                                    <div className="flex justify-between text-base font-black text-[#1c3a1e] pt-1 border-t border-[#1c3a1e]/15">
                                         <span>REMAINING UNPAID TOTAL USD:</span>
-                                        <span className="text-emerald-400">{formatUsd(billTotals.remainingUsd)}</span>
+                                        <span className="text-emerald-700 font-black">{formatUsd(billTotals.remainingUsd)}</span>
                                     </div>
-                                    <div className="flex justify-between text-xs font-bold text-amber-400">
+                                    <div className="flex justify-between text-xs font-black text-[#d4af37]">
                                         <span>REMAINING UNPAID LBP:</span>
                                         <span>{billTotals.remainingLbp}</span>
                                     </div>
@@ -1168,28 +1170,28 @@ function POSContent() {
                                     <div className="grid grid-cols-3 gap-2 pt-2">
                                         <button
                                             onClick={() => setIsDiscountModalOpen(true)}
-                                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
                                             title="Apply Session Discount"
                                         >
-                                            <Percent className="h-4 w-4 text-emerald-400" />
+                                            <Percent className="h-4 w-4 text-emerald-700" />
                                             <span>Discount</span>
                                         </button>
 
                                         <button
                                             onClick={() => setIsPreviewReceiptModalOpen(true)}
-                                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
                                             title="Preview Thermal Receipt On-Screen"
                                         >
-                                            <Eye className="h-4 w-4 text-blue-400" />
+                                            <Eye className="h-4 w-4 text-blue-700" />
                                             <span>Preview</span>
                                         </button>
 
                                         <button
                                             onClick={handlePrintPreBill}
-                                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-2.5 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
                                             title="Print Table Bill"
                                         >
-                                            <Printer className="h-4 w-4 text-amber-400" />
+                                            <Printer className="h-4 w-4 text-[#1c3a1e]" />
                                             <span>Print</span>
                                         </button>
                                     </div>
@@ -1251,21 +1253,21 @@ function POSContent() {
 
             {/* DYNAMIC GUEST ASSIGNMENT MODAL */}
             {isAssignGuestModalOpen && selectedTable && activeSession && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                            <div className="flex items-center gap-2 text-purple-400 font-extrabold text-base">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-lg rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1c3a1e]/15">
+                            <div className="flex items-center gap-2 text-purple-900 font-extrabold text-base">
                                 <UserPlus className="h-5 w-5" />
                                 <span>Assign Items to Dynamic Guest</span>
                             </div>
-                            <button onClick={() => setIsAssignGuestModalOpen(false)} className="text-slate-400">
+                            <button onClick={() => setIsAssignGuestModalOpen(false)} className="text-gray-500 hover:text-black">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
 
                         {/* Guest Name Input / Selector */}
                         <div className="space-y-3 mb-6">
-                            <label className="block text-xs font-bold text-slate-300">
+                            <label className="block text-xs font-extrabold text-[#1c3a1e]">
                                 Guest Name / Person Label:
                             </label>
                             <input
@@ -1273,17 +1275,17 @@ function POSContent() {
                                 value={newGuestInputName}
                                 onChange={(e) => setNewGuestInputName(e.target.value)}
                                 placeholder="Type name (e.g. John, Sarah, Seat 1, Mike)..."
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                                className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                             />
 
                             {dynamicGuestNames.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5 pt-1">
-                                    <span className="text-[10px] text-slate-500 font-bold self-center">Existing:</span>
+                                    <span className="text-[10px] text-gray-600 font-bold self-center">Existing:</span>
                                     {dynamicGuestNames.map((g) => (
                                         <button
                                             key={g}
                                             onClick={() => setNewGuestInputName(g)}
-                                            className="bg-slate-950 border border-purple-500/40 text-purple-300 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-purple-500/10 transition-all"
+                                            className="bg-[#fafbfa] border border-purple-500/40 text-purple-900 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-purple-500/10 transition-all"
                                         >
                                             {g}
                                         </button>
@@ -1293,9 +1295,9 @@ function POSContent() {
                         </div>
 
                         {/* Select Unpaid Items and Quantities to Assign */}
-                        <div className="mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2.5 max-h-60 overflow-y-auto">
-                            <div className="flex justify-between items-center mb-2 pb-1 border-b border-slate-900">
-                                <span className="text-xs font-bold text-slate-300">
+                        <div className="mb-6 bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/15 space-y-2.5 max-h-60 overflow-y-auto">
+                            <div className="flex justify-between items-center mb-2 pb-1 border-b border-[#1c3a1e]/10">
+                                <span className="text-xs font-extrabold text-[#1c3a1e]">
                                     Select Quantities to Assign to {newGuestInputName || 'Guest'}:
                                 </span>
                                 <button
@@ -1307,7 +1309,7 @@ function POSContent() {
                                         });
                                         setItemAssignQuantities(allMap);
                                     }}
-                                    className="text-[10px] text-amber-400 font-bold hover:underline"
+                                    className="text-[10px] text-purple-800 font-extrabold hover:underline"
                                 >
                                     Assign All Quantities
                                 </button>
@@ -1321,27 +1323,27 @@ function POSContent() {
                                         <div
                                             key={item.id}
                                             className={`p-3 rounded-xl border flex justify-between items-center transition-all ${currentAssignQty > 0
-                                                ? 'bg-purple-500/10 border-purple-500 text-purple-300'
-                                                : 'bg-slate-900 border-slate-800 text-slate-300'
+                                                ? 'bg-purple-500/10 border-purple-500 text-purple-900'
+                                                : 'bg-white border-[#1c3a1e]/15 text-[#1c3a1e]'
                                                 }`}
                                         >
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-extrabold text-xs text-slate-100">{item.item_name}</span>
+                                                    <span className="font-extrabold text-xs text-[#1c3a1e]">{item.item_name}</span>
                                                     {item.guest_name && (
-                                                        <span className="text-[9px] text-purple-400 bg-purple-500/20 px-1.5 py-0.5 rounded">
+                                                        <span className="text-[9px] text-purple-900 bg-purple-500/20 px-1.5 py-0.5 rounded font-bold">
                                                             Current: {item.guest_name}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] text-slate-400 block mt-0.5">
+                                                <span className="text-[10px] text-gray-600 font-bold block mt-0.5">
                                                     Available: {item.quantity}x @ ${Number(item.unit_price_usd).toFixed(2)}/ea
                                                 </span>
                                             </div>
 
                                             {/* Quantity Picker for Assignment */}
                                             <div className="flex items-center gap-2">
-                                                <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg">
+                                                <div className="flex items-center bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-lg">
                                                     <button
                                                         onClick={() => {
                                                             setItemAssignQuantities({
@@ -1349,11 +1351,11 @@ function POSContent() {
                                                                 [item.id]: Math.max(0, currentAssignQty - 1),
                                                             });
                                                         }}
-                                                        className="h-7 w-7 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold"
+                                                        className="h-7 w-7 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black"
                                                     >
                                                         -
                                                     </button>
-                                                    <span className="px-2.5 text-xs font-black text-amber-400">{currentAssignQty}</span>
+                                                    <span className="px-2.5 text-xs font-black text-[#1c3a1e]">{currentAssignQty}</span>
                                                     <button
                                                         onClick={() => {
                                                             setItemAssignQuantities({
@@ -1361,7 +1363,7 @@ function POSContent() {
                                                                 [item.id]: Math.min(item.quantity, currentAssignQty + 1),
                                                             });
                                                         }}
-                                                        className="h-7 w-7 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold"
+                                                        className="h-7 w-7 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black"
                                                     >
                                                         +
                                                     </button>
@@ -1375,7 +1377,7 @@ function POSContent() {
                         <button
                             onClick={() => handleAssignItemsSubmit(newGuestInputName || 'Guest')}
                             disabled={!newGuestInputName || Object.values(itemAssignQuantities).every((q) => q <= 0)}
-                            className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-slate-950 font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 transition-all"
+                            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                         >
                             <UserCheck className="h-4 w-4" />
                             <span>Assign Selected Quantities to {newGuestInputName || 'Guest'}</span>
@@ -1386,16 +1388,16 @@ function POSContent() {
 
             {/* PAY & CLOSE GUEST ITEMS / ENTIRE BILL PAYMENT MODAL */}
             {isPaymentModalOpen && activeSession && (targetPaymentGuestName || isPayingEntireBill) && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1c3a1e]/15">
                             <div>
-                                <h3 className="text-lg font-bold text-slate-100">
+                                <h3 className="text-lg font-black text-[#1c3a1e]">
                                     {isPayingEntireBill
                                         ? `Pay Entire Table #${selectedTable?.table_number} Bill`
                                         : `Pay & Close Items for ${targetPaymentGuestName}`}
                                 </h3>
-                                <p className="text-xs text-amber-400 font-semibold mt-0.5">
+                                <p className="text-xs text-emerald-700 font-black mt-0.5">
                                     Total Due:{' '}
                                     {formatUsd(
                                         isPayingEntireBill
@@ -1406,7 +1408,7 @@ function POSContent() {
                                     )}
                                 </p>
                             </div>
-                            <button onClick={() => { setIsPaymentModalOpen(false); setIsPayingEntireBill(false); }} className="text-slate-400">
+                            <button onClick={() => { setIsPaymentModalOpen(false); setIsPayingEntireBill(false); }} className="text-gray-500 hover:text-black">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -1414,22 +1416,22 @@ function POSContent() {
                         {/* Currency & Payment Method Selection */}
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1.5">Tender Currency</label>
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5">Tender Currency</label>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setPaymentCurrency('USD')}
-                                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentCurrency === 'USD'
-                                            ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                            : 'bg-slate-950 text-slate-400 border-slate-800'
+                                        className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${paymentCurrency === 'USD'
+                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                            : 'bg-[#fafbfa] text-gray-700 border-[#1c3a1e]/15'
                                             }`}
                                     >
                                         USD ($)
                                     </button>
                                     <button
                                         onClick={() => setPaymentCurrency('LBP')}
-                                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentCurrency === 'LBP'
-                                            ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                            : 'bg-slate-950 text-slate-400 border-slate-800'
+                                        className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${paymentCurrency === 'LBP'
+                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                            : 'bg-[#fafbfa] text-gray-700 border-[#1c3a1e]/15'
                                             }`}
                                     >
                                         LBP (LL)
@@ -1438,22 +1440,22 @@ function POSContent() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1.5">Method</label>
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5">Method</label>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setPaymentMethod('cash')}
-                                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentMethod === 'cash'
-                                            ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                            : 'bg-slate-950 text-slate-400 border-slate-800'
+                                        className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${paymentMethod === 'cash'
+                                            ? 'bg-emerald-600 text-white border-emerald-600'
+                                            : 'bg-[#fafbfa] text-gray-700 border-[#1c3a1e]/15'
                                             }`}
                                     >
                                         Cash
                                     </button>
                                     <button
                                         onClick={() => setPaymentMethod('card')}
-                                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${paymentMethod === 'card'
-                                            ? 'bg-blue-500 text-slate-950 border-blue-400'
-                                            : 'bg-slate-950 text-slate-400 border-slate-800'
+                                        className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${paymentMethod === 'card'
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'bg-[#fafbfa] text-gray-700 border-[#1c3a1e]/15'
                                             }`}
                                     >
                                         Card
@@ -1465,11 +1467,11 @@ function POSContent() {
                         <button
                             onClick={handleCompleteGuestPayment}
                             disabled={isProcessingPayment}
-                            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-extrabold py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                         >
                             {isProcessingPayment ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
+                                    <Loader2 className="h-4 w-4 animate-spin text-white" />
                                     <span>Processing Payment & Printing...</span>
                                 </>
                             ) : (
@@ -1489,19 +1491,19 @@ function POSContent() {
 
             {/* WAITER MANUAL ITEM & STAFF FEE ADDITION MODAL */}
             {isAddItemModalOpen && selectedTable && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-3xl p-6 shadow-2xl max-h-[90vh] flex flex-col justify-between overflow-hidden">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-xl rounded-3xl p-6 shadow-2xl max-h-[90vh] flex flex-col justify-between overflow-hidden text-[#1c3a1e]">
                         <div>
-                            <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-4">
+                            <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15 mb-4">
                                 <div>
-                                    <h3 className="text-lg font-black text-slate-100">
+                                    <h3 className="text-lg font-black text-[#1c3a1e]">
                                         Add Item / Staff Fee to Table #{selectedTable.table_number}
                                     </h3>
-                                    <p className="text-xs text-amber-400 font-medium">
+                                    <p className="text-xs text-gray-600 font-semibold">
                                         Waiter Manual Order Addition Entry
                                     </p>
                                 </div>
-                                <button onClick={() => setIsAddItemModalOpen(false)} className="text-slate-400">
+                                <button onClick={() => setIsAddItemModalOpen(false)} className="text-gray-500 hover:text-black">
                                     <X className="h-5 w-5" />
                                 </button>
                             </div>
@@ -1509,13 +1511,13 @@ function POSContent() {
                             {/* Search & Category Filter */}
                             <div className="space-y-3 mb-4">
                                 <div className="relative">
-                                    <Search className="h-4 w-4 text-slate-500 absolute left-3 top-3" />
+                                    <Search className="h-4 w-4 text-gray-500 absolute left-3 top-3" />
                                     <input
                                         type="text"
                                         value={waiterSearchTerm}
                                         onChange={(e) => setWaiterSearchTerm(e.target.value)}
                                         placeholder="Search menu items or staff fees (e.g. Event fee, Tawook, Shisha)..."
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl pl-9 pr-3 py-2.5 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                     />
                                 </div>
 
@@ -1523,8 +1525,8 @@ function POSContent() {
                                     <button
                                         onClick={() => setSelectedCategoryFilter('all')}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border ${selectedCategoryFilter === 'all'
-                                            ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                            : 'bg-slate-950 text-slate-400 border-slate-800'
+                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15'
                                             }`}
                                     >
                                         All Items
@@ -1534,8 +1536,8 @@ function POSContent() {
                                             key={cat.id}
                                             onClick={() => setSelectedCategoryFilter(cat.id)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border ${selectedCategoryFilter === cat.id
-                                                ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                                : 'bg-slate-950 text-slate-400 border-slate-800'
+                                                ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                                : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15'
                                                 }`}
                                         >
                                             {cat.name}
@@ -1553,24 +1555,24 @@ function POSContent() {
                                             key={item.id}
                                             onClick={() => setSelectedMenuItemForWaiter(item)}
                                             className={`p-3 rounded-xl border text-left transition-all flex justify-between items-start ${isSelected
-                                                ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-400'
-                                                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                                                ? 'bg-[#eaf2eb] border-[#1c3a1e] ring-2 ring-[#1c3a1e]'
+                                                : 'bg-[#fafbfa] border-[#1c3a1e]/15 hover:border-[#1c3a1e]'
                                                 }`}
                                         >
                                             <div>
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold text-xs text-slate-100">{item.name}</span>
+                                                    <span className="font-extrabold text-xs text-[#1c3a1e]">{item.name}</span>
                                                     {item.is_staff_only && (
-                                                        <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9px] font-extrabold px-1.5 py-0.5 rounded">
+                                                        <span className="bg-purple-500/10 text-purple-900 border border-purple-500/30 text-[9px] font-extrabold px-1.5 py-0.5 rounded">
                                                             STAFF FEE
                                                         </span>
                                                     )}
                                                 </div>
                                                 {item.description && (
-                                                    <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">{item.description}</p>
+                                                    <p className="text-[10px] text-gray-600 line-clamp-1 mt-0.5 font-medium">{item.description}</p>
                                                 )}
                                             </div>
-                                            <span className="text-xs font-black text-amber-400 whitespace-nowrap ml-2">
+                                            <span className="text-xs font-black text-[#1c3a1e] whitespace-nowrap ml-2">
                                                 {formatUsd(Number(item.price_usd))}
                                             </span>
                                         </button>
@@ -1580,29 +1582,29 @@ function POSContent() {
 
                             {/* Selected Item Quantity & Special Notes */}
                             {selectedMenuItemForWaiter && (
-                                <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3 mb-4">
+                                <div className="bg-[#fafbfa] border border-[#1c3a1e]/15 p-4 rounded-2xl space-y-3 mb-4">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold text-slate-200">
+                                        <span className="text-xs font-black text-[#1c3a1e]">
                                             Selected: {selectedMenuItemForWaiter.name}
                                         </span>
-                                        <span className="text-xs font-black text-amber-400">
+                                        <span className="text-xs font-black text-emerald-800">
                                             {formatUsd(Number(selectedMenuItemForWaiter.price_usd) * waiterQuantity)}
                                         </span>
                                     </div>
 
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs text-slate-400 font-semibold">Quantity:</span>
+                                        <span className="text-xs text-gray-700 font-bold">Quantity:</span>
                                         <div className="flex items-center gap-3">
                                             <button
                                                 onClick={() => setWaiterQuantity(Math.max(1, waiterQuantity - 1))}
-                                                className="h-8 w-8 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg flex items-center justify-center text-sm font-bold"
+                                                className="h-8 w-8 bg-white text-[#1c3a1e] border border-[#1c3a1e]/20 rounded-lg flex items-center justify-center text-sm font-black shadow-sm"
                                             >
                                                 -
                                             </button>
-                                            <span className="text-sm font-black text-slate-100">{waiterQuantity}</span>
+                                            <span className="text-sm font-black text-[#1c3a1e]">{waiterQuantity}</span>
                                             <button
                                                 onClick={() => setWaiterQuantity(waiterQuantity + 1)}
-                                                className="h-8 w-8 bg-slate-900 text-slate-300 border border-slate-800 rounded-lg flex items-center justify-center text-sm font-bold"
+                                                className="h-8 w-8 bg-white text-[#1c3a1e] border border-[#1c3a1e]/20 rounded-lg flex items-center justify-center text-sm font-black shadow-sm"
                                             >
                                                 +
                                             </button>
@@ -1610,7 +1612,7 @@ function POSContent() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                                        <label className="block text-[11px] font-extrabold text-gray-700 mb-1">
                                             Note / Custom Instructions
                                         </label>
                                         <input
@@ -1618,19 +1620,19 @@ function POSContent() {
                                             value={waiterNotes}
                                             onChange={(e) => setWaiterNotes(e.target.value)}
                                             placeholder="e.g. Requested by guest, extra sauce, well done..."
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                                            className="w-full bg-white border border-[#1c3a1e]/20 rounded-xl p-2.5 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                         />
                                     </div>
 
                                     {/* TOUCHSCREEN VARIANT & MODIFIER SELECTOR */}
                                     {selectedMenuItemForWaiter.modifier_groups && selectedMenuItemForWaiter.modifier_groups.length > 0 && (
-                                        <div className="space-y-2 border-t border-slate-800 pt-3">
-                                            <label className="block text-xs font-black text-amber-400 uppercase tracking-wider">
+                                        <div className="space-y-2 border-t border-[#1c3a1e]/15 pt-3">
+                                            <label className="block text-xs font-black text-[#1c3a1e] uppercase tracking-wider">
                                                 Select Touch Variants & Modifiers:
                                             </label>
                                             {selectedMenuItemForWaiter.modifier_groups.map((group, gIdx) => (
-                                                <div key={gIdx} className="bg-slate-900 border border-slate-800 rounded-xl p-2.5">
-                                                    <span className="text-[11px] font-bold text-slate-300 block mb-1.5">{group.group_name}:</span>
+                                                <div key={gIdx} className="bg-white border border-[#1c3a1e]/15 rounded-xl p-2.5">
+                                                    <span className="text-[11px] font-extrabold text-[#1c3a1e] block mb-1.5">{group.group_name}:</span>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {group.options.map((opt, oIdx) => {
                                                             const isSelected = selectedWaiterModifiers.some(
@@ -1656,8 +1658,8 @@ function POSContent() {
                                                                         }
                                                                     }}
                                                                     className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all border ${isSelected
-                                                                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
-                                                                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 active:scale-95'
+                                                                        ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-sm'
+                                                                        : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/15 hover:border-[#1c3a1e] active:scale-95'
                                                                         }`}
                                                                 >
                                                                     {opt.name} {opt.price_extra_usd ? `(+$${opt.price_extra_usd})` : ''}
@@ -1676,11 +1678,11 @@ function POSContent() {
                         <button
                             onClick={handleAddWaiterItemSubmit}
                             disabled={!selectedMenuItemForWaiter || isAddingItem}
-                            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                            className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] disabled:opacity-40 text-white font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                         >
                             {isAddingItem ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
+                                    <Loader2 className="h-4 w-4 animate-spin text-white" />
                                     <span>Adding Item to Check...</span>
                                 </>
                             ) : (
@@ -1696,18 +1698,18 @@ function POSContent() {
 
             {/* Table Merge Modal */}
             {isMergeModalOpen && selectedTable && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-slate-100">
+                            <h3 className="text-lg font-black text-[#1c3a1e]">
                                 Merge Tables into Table #{selectedTable.table_number}
                             </h3>
-                            <button onClick={() => setIsMergeModalOpen(false)} className="text-slate-400">
+                            <button onClick={() => setIsMergeModalOpen(false)} className="text-gray-500 hover:text-black">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
 
-                        <p className="text-xs text-slate-400 mb-4">
+                        <p className="text-xs text-gray-600 font-medium mb-4">
                             Select available tables to merge into Table #{selectedTable.table_number}&apos;s active session.
                         </p>
 
@@ -1729,8 +1731,8 @@ function POSContent() {
                                                 }
                                             }}
                                             className={`w-full p-3 rounded-xl border text-xs font-bold flex justify-between items-center transition-all ${isChecked
-                                                ? 'bg-purple-500/10 border-purple-500 text-purple-300'
-                                                : 'bg-slate-950 border-slate-800 text-slate-300'
+                                                ? 'bg-purple-500/10 border-purple-500 text-purple-900 font-extrabold'
+                                                : 'bg-[#fafbfa] border-[#1c3a1e]/15 text-[#1c3a1e]'
                                                 }`}
                                         >
                                             <span>Table #{t.table_number}</span>
@@ -1742,7 +1744,7 @@ function POSContent() {
 
                         <button
                             onClick={handleMergeSubmit}
-                            className="w-full bg-purple-500 hover:bg-purple-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition-all"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-xl text-xs transition-all shadow-md cursor-pointer"
                         >
                             Confirm Merge Tables
                         </button>
@@ -1752,11 +1754,11 @@ function POSContent() {
 
             {/* Apply Discount Modal */}
             {isDiscountModalOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-slate-100">Apply Discount</h3>
-                            <button onClick={() => setIsDiscountModalOpen(false)} className="text-slate-400">
+                            <h3 className="text-lg font-black text-[#1c3a1e]">Apply Discount</h3>
+                            <button onClick={() => setIsDiscountModalOpen(false)} className="text-gray-500 hover:text-black">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -1764,18 +1766,18 @@ function POSContent() {
                         <div className="flex gap-2 mb-4">
                             <button
                                 onClick={() => setDiscountType('percentage')}
-                                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${discountType === 'percentage'
-                                    ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                    : 'bg-slate-950 text-slate-400 border-slate-800'
+                                className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${discountType === 'percentage'
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-[#fafbfa] text-gray-700 border-[#1c3a1e]/15'
                                     }`}
                             >
                                 Percentage (%)
                             </button>
                             <button
                                 onClick={() => setDiscountType('fixed')}
-                                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${discountType === 'fixed'
-                                    ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                    : 'bg-slate-950 text-slate-400 border-slate-800'
+                                className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${discountType === 'fixed'
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-[#fafbfa] text-gray-700 border-[#1c3a1e]/15'
                                     }`}
                             >
                                 Fixed Cash ($ USD)
@@ -1784,32 +1786,32 @@ function POSContent() {
 
                         <div className="space-y-4 mb-6">
                             <div>
-                                <label className="block text-xs text-slate-400 font-bold mb-1">
+                                <label className="block text-xs text-gray-700 font-extrabold mb-1">
                                     Discount Value {discountType === 'percentage' ? '(%)' : '($ USD)'}
                                 </label>
                                 <input
                                     type="number"
                                     value={discountValue}
                                     onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-slate-100 focus:outline-none focus:border-amber-500"
+                                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-sm font-extrabold text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e]"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs text-slate-400 font-bold mb-1">Reason / Note</label>
+                                <label className="block text-xs text-gray-700 font-extrabold mb-1">Reason / Note</label>
                                 <input
                                     type="text"
                                     value={discountReason}
                                     onChange={(e) => setDiscountReason(e.target.value)}
                                     placeholder="e.g. VIP guest, Manager courtesy..."
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
                                 />
                             </div>
                         </div>
 
                         <button
                             onClick={handleApplyDiscountSubmit}
-                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition-all"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl text-xs transition-all shadow-md cursor-pointer"
                         >
                             Apply Discount to Session
                         </button>
@@ -1819,20 +1821,20 @@ function POSContent() {
 
             {/* ON-SCREEN THERMAL RECEIPT PREVIEW MODAL */}
             {isPreviewReceiptModalOpen && selectedTable && activeSession && (
-                <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col items-center max-h-[90vh]">
-                        <div className="flex justify-between items-center w-full mb-3 pb-2 border-b border-slate-800">
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/50 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col items-center max-h-[90vh]">
+                        <div className="flex justify-between items-center w-full mb-3 pb-2 border-b border-[#1c3a1e]/15">
                             <div className="flex items-center gap-2">
-                                <Eye className="h-5 w-5 text-blue-400" />
-                                <span className="font-extrabold text-sm text-slate-100">80mm Thermal Receipt Preview</span>
+                                <Eye className="h-5 w-5 text-blue-700" />
+                                <span className="font-black text-sm text-[#1c3a1e]">80mm Thermal Receipt Preview</span>
                             </div>
-                            <button onClick={() => setIsPreviewReceiptModalOpen(false)} className="text-slate-400 hover:text-white">
+                            <button onClick={() => setIsPreviewReceiptModalOpen(false)} className="text-gray-500 hover:text-black">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
 
                         {/* Simulated 80mm Thermal Paper Roll */}
-                        <div className="w-full overflow-y-auto bg-white p-4 rounded-2xl shadow-2xl text-black border border-slate-300 max-h-[65vh]">
+                        <div className="w-full overflow-y-auto bg-white p-4 rounded-2xl shadow-2xl text-black border border-gray-200 max-h-[65vh]">
                             <ThermalReceipt
                                 tableNumber={selectedTable.table_number}
                                 items={sessionItems}
@@ -1849,14 +1851,14 @@ function POSContent() {
                                     setIsPreviewReceiptModalOpen(false);
                                     handlePrintPreBill();
                                 }}
-                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                                className="flex-1 bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                             >
                                 <Printer className="h-4 w-4" />
                                 <span>Print Now</span>
                             </button>
                             <button
                                 onClick={() => setIsPreviewReceiptModalOpen(false)}
-                                className="px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-xs transition-all cursor-pointer"
+                                className="px-4 bg-[#eaf2eb] hover:bg-[#d8e6da] text-[#1c3a1e] font-bold py-3 rounded-xl text-xs transition-all cursor-pointer border border-[#1c3a1e]/15"
                             >
                                 Close
                             </button>

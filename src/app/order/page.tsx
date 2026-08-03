@@ -372,7 +372,7 @@ function CustomerOrderContent() {
                 </div>
             )}
             {/* Category Navigation Bar */}
-            <div className="sticky top-[60px] md:top-[61px] z-20 bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex gap-2">
+            <div className="sticky top-[60px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex gap-2">
                 <button
                     onClick={() => handleCategoryClick('all')}
                     className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === 'all'
@@ -405,7 +405,7 @@ function CustomerOrderContent() {
                     return (
                         <section key={cat.id} id={`category-${cat.id}`} className="scroll-mt-36">
                             {/* Sticky Category Title Header */}
-                            <div className="sticky top-[115px] z-20 bg-[#fafbfa]/95 backdrop-blur-md px-4 py-1.5 mb-2 border-b border-[#1c3a1e]/15 flex items-center justify-between shadow-sm">
+                            <div className="sticky top-[120px] z-20 bg-[#fafbfa]/95 backdrop-blur-md px-4 py-1.5 mb-2 border-b border-[#1c3a1e]/15 flex items-center justify-between shadow-sm">
                                 <h2 className="text-base font-black text-[#1c3a1e] flex items-center gap-2 tracking-wide">
                                     <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
                                     <span>{cat.name}</span>

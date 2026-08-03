@@ -94,27 +94,27 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
 
     if (!activeStaff) {
         return (
-            <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-                <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center relative overflow-hidden">
+            <div className="min-h-screen bg-[#fafbfa] text-[#1c271c] flex items-center justify-center p-4">
+                <div className="w-full max-w-md bg-white border border-[#1c3a1e]/15 rounded-3xl p-6 sm:p-8 shadow-2xl text-center relative overflow-hidden">
                     {/* Top Brand Decorative Gradient */}
-                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-emerald-500 to-amber-500" />
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#d4af37] via-[#1c3a1e] to-[#d4af37]" />
 
                     {/* Logo */}
                     <div className="flex justify-center mb-4">
                         <img
-                            src="/images/Skylight-logo-white.png"
+                            src="/images/Skylight-logo-icon.png"
                             alt="Skylight Village Logo"
                             className="h-12 w-auto object-contain mb-2"
                         />
                     </div>
 
-                    <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                    <div className="h-14 w-14 rounded-2xl bg-[#eaf2eb] border border-[#1c3a1e]/20 text-[#1c3a1e] flex items-center justify-center mx-auto mb-3 shadow-inner">
                         <Lock className="h-7 w-7" />
                     </div>
 
-                    <h2 className="text-xl font-black text-slate-100 tracking-tight">Staff PIN Access</h2>
-                    <p className="text-xs text-slate-400 mt-1 mb-6 font-medium">
-                        Enter your personal PIN code for <strong className="text-slate-200">{pageTitle}</strong>
+                    <h2 className="text-xl font-black text-[#1c3a1e] tracking-tight">Staff PIN Access</h2>
+                    <p className="text-xs text-gray-600 mt-1 mb-6 font-medium">
+                        Enter your personal PIN code for <strong className="text-[#1c3a1e]">{pageTitle}</strong>
                     </p>
 
                     {/* PIN Input Form */}
@@ -128,13 +128,13 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                                     setErrorMsg(null);
                                 }}
                                 placeholder="Enter 4-Digit Staff PIN"
-                                className="w-full bg-slate-950 border border-slate-800 focus:border-amber-400 rounded-2xl px-4 py-3.5 text-center text-2xl font-mono tracking-widest text-amber-300 focus:outline-none transition-colors"
+                                className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 focus:border-[#1c3a1e] rounded-2xl px-4 py-3.5 text-center text-2xl font-mono tracking-widest text-[#1c3a1e] focus:outline-none transition-colors"
                                 autoFocus
                             />
                         </div>
 
                         {errorMsg && (
-                            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold px-3 py-2 rounded-xl mb-4 flex items-center justify-center gap-1.5">
+                            <div className="bg-red-500/10 border border-red-500/30 text-red-700 text-xs font-semibold px-3 py-2 rounded-xl mb-4 flex items-center justify-center gap-1.5">
                                 <ShieldAlert className="h-4 w-4" />
                                 <span>{errorMsg}</span>
                             </div>
@@ -147,7 +147,7 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                                     key={num}
                                     type="button"
                                     onClick={() => handleKeyClick(num)}
-                                    className="bg-slate-950 hover:bg-slate-800 active:bg-amber-500/20 text-slate-100 font-extrabold text-xl py-3.5 rounded-2xl border border-slate-800/80 transition-all active:scale-95"
+                                    className="bg-[#fafbfa] hover:bg-[#eaf2eb] text-[#1c3a1e] font-extrabold text-xl py-3.5 rounded-2xl border border-[#1c3a1e]/15 transition-all active:scale-95 shadow-sm"
                                 >
                                     {num}
                                 </button>
@@ -155,20 +155,20 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                             <button
                                 type="button"
                                 onClick={handleClear}
-                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-extrabold text-xs py-3.5 rounded-2xl border border-red-500/20 transition-all uppercase tracking-wider"
+                                className="bg-red-500/10 hover:bg-red-500/20 text-red-700 font-extrabold text-xs py-3.5 rounded-2xl border border-red-500/20 transition-all uppercase tracking-wider"
                             >
                                 Clear
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleKeyClick('0')}
-                                className="bg-slate-950 hover:bg-slate-800 active:bg-amber-500/20 text-slate-100 font-extrabold text-xl py-3.5 rounded-2xl border border-slate-800/80 transition-all active:scale-95"
+                                className="bg-[#fafbfa] hover:bg-[#eaf2eb] text-[#1c3a1e] font-extrabold text-xl py-3.5 rounded-2xl border border-[#1c3a1e]/15 transition-all active:scale-95 shadow-sm"
                             >
                                 0
                             </button>
                             <button
                                 type="submit"
-                                className="bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-black text-xs py-3.5 rounded-2xl shadow-lg shadow-amber-500/20 transition-all uppercase tracking-wider"
+                                className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black text-xs py-3.5 rounded-2xl shadow-lg transition-all uppercase tracking-wider"
                             >
                                 Unlock
                             </button>
@@ -182,20 +182,20 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
     return (
         <div>
             {/* Top Active Staff Member Header Bar */}
-            <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs text-slate-300">
+            <div className="bg-white border-b border-[#1c3a1e]/15 px-4 py-2 flex items-center justify-between text-xs text-[#1c3a1e] shadow-sm">
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-xl">
-                        <UserCheck className="h-4 w-4" />
+                    <div className="flex items-center gap-2 bg-[#eaf2eb] border border-[#1c3a1e]/20 text-[#1c3a1e] px-3 py-1 rounded-xl">
+                        <UserCheck className="h-4 w-4 text-[#1c3a1e]" />
                         <span className="font-bold">
                             {activeStaff.name} ({activeStaff.role})
                         </span>
                     </div>
-                    <span className="text-slate-500 hidden sm:inline">• Logged into {pageTitle}</span>
+                    <span className="text-gray-500 hidden sm:inline">• Logged into {pageTitle}</span>
                 </div>
 
                 <button
                     onClick={handleLogout}
-                    className="text-slate-400 hover:text-amber-400 text-xs font-bold flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 transition-colors"
+                    className="text-[#1c3a1e] hover:text-[#d4af37] text-xs font-bold flex items-center gap-1.5 bg-[#fafbfa] px-3 py-1.5 rounded-xl border border-[#1c3a1e]/15 transition-colors shadow-sm"
                     title="Lock Staff Session"
                 >
                     <LogOut className="h-3.5 w-3.5" />
@@ -206,4 +206,5 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
             {children}
         </div>
     );
+
 }

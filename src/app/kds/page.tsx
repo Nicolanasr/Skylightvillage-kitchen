@@ -225,7 +225,7 @@ function KDSContent() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6">
+        <div className="min-h-screen bg-[#fafbfa] text-[#1c271c] p-4 md:p-6">
             {/* 80mm ESC/POS THERMAL KITCHEN CHIT PRINT CONTAINER */}
             <div className="print-kds-container hidden print:block text-black bg-white font-sans text-xs w-[2.8in] p-2">
                 {groupedKDSPrintTickets.length === 0 ? (
@@ -235,23 +235,23 @@ function KDSContent() {
                         const now = new Date();
                         const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                         return (
-                            <div key={tIdx} className="kds-chit-ticket pb-4 mb-4 border-b-2 border-black border-dashed">
-                                <div className="text-center font-black text-sm uppercase tracking-wider mb-1">
-                                    SKYLIGHT KITCHEN CHIT
+                            <div key={tIdx} className="kds-chit-ticket text-black font-sans">
+                                <div className="text-center font-black text-sm uppercase tracking-wider border-b border-black pb-1 mb-1">
+                                    *** KITCHEN ORDER TICKET ***
                                 </div>
-                                <div className="flex justify-between items-center border-y-2 border-black py-1.5 my-1">
-                                    <span className="font-black text-base">TABLE #{ticket.tableNumber}</span>
-                                    <span className="font-bold text-xs uppercase bg-black text-white px-1.5 py-0.5 rounded">
-                                        {ticket.stationName}
-                                    </span>
+                                <div className="flex justify-between text-xs font-bold my-1">
+                                    <span>TABLE #{ticket.tableNumber}</span>
+                                    <span>{timeStr}</span>
                                 </div>
-                                <div className="text-[10px] text-gray-700 text-right mb-2">Printed: {timeStr}</div>
+                                <div className="text-[11px] font-bold text-gray-800 uppercase mb-1">
+                                    STATION: {ticket.stationName}
+                                </div>
 
                                 <div className="space-y-2 my-2">
                                     {ticket.ticketItems.map((item, iIdx) => (
                                         <div key={iIdx} className="border-b border-gray-300 pb-1.5">
                                             <div className="font-black text-sm">
-                                                1x {item.item_name}
+                                                {item.quantity}x {item.item_name}
                                             </div>
 
                                             {/* Variants / Modifiers */}
@@ -280,39 +280,37 @@ function KDSContent() {
                         );
                     })
                 )}
-            </div>
-
-            {/* Top Header Bar with Skylight White Logo & Navigation Link to POS */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-6 border-b border-slate-800 gap-4 print:hidden">
+            </div>            {/* Top Header Bar with Skylight White Logo & Navigation Link to POS */}
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-6 border-b border-[#1c3a1e]/15 gap-4 print:hidden">
                 <div className="flex items-center gap-4">
                     <img
                         src="/images/Skylight-logo-icon.png"
                         alt="Skylight Village Logo"
-                        className="h-10 w-auto object-contain"
+                        className="h-10 w-auto object-contain filter invert"
                     />
                     <div>
-                        <h1 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
-                            <ChefHat className="h-5 w-5 text-amber-400" />
+                        <h1 className="text-xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
+                            <ChefHat className="h-5 w-5 text-[#d4af37]" />
                             <span>Kitchen Display System & Waiter Pass</span>
                         </h1>
-                        <p className="text-xs text-slate-400 font-medium">Independent Dish Status Bumping & Realtime Kitchen Expediter</p>
+                        <p className="text-xs text-gray-600 font-medium">Independent Dish Status Bumping & Realtime Kitchen Expediter</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <a
                         href="/pos"
-                        className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"
                     >
-                        <Monitor className="h-4 w-4 text-amber-400" />
+                        <Monitor className="h-4 w-4 text-[#1c3a1e]" />
                         <span>POS Waiter Terminal</span>
                     </a>
 
                     <button
                         onClick={() => setShowPrintedItems(!showPrintedItems)}
                         className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${showPrintedItems
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500'
-                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                            ? 'bg-purple-500/10 text-purple-800 border-purple-500/30'
+                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15'
                             }`}
                         title="Toggle re-printing already printed chits"
                     >
@@ -323,9 +321,9 @@ function KDSContent() {
                     <button
                         onClick={handlePrintKDSChits}
                         disabled={isPrinting || itemsToPrint.length === 0}
-                        className={`font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg ${isPrinting || itemsToPrint.length === 0
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                            : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20 active:scale-95'
+                        className={`font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm ${isPrinting || itemsToPrint.length === 0
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white active:scale-95'
                             }`}
                     >
                         <Printer className="h-4 w-4" />
@@ -343,13 +341,13 @@ function KDSContent() {
                             setStationFilter('all');
                         }}
                         className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === 'all'
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
-                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
+                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
                             }`}
                     >
                         <Filter className="h-4 w-4" />
                         <span>All Stations</span>
-                        <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                        <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-[10px] font-black border border-[#1c3a1e]/10">
                             {activeKitchenItems.length}
                         </span>
                     </button>
@@ -357,13 +355,13 @@ function KDSContent() {
                     <button
                         onClick={() => setActiveTab('expediter')}
                         className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'expediter'
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
-                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
+                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
                             }`}
                     >
                         <Truck className="h-4 w-4" />
                         <span>Table Expediter / Pass</span>
-                        <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                        <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-[10px] font-black border border-[#1c3a1e]/10">
                             {Object.keys(readyItemsByTable).length}
                         </span>
                     </button>
@@ -385,14 +383,14 @@ function KDSContent() {
                                     setStationFilter(st.id);
                                 }}
                                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === st.id
-                                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20'
-                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
+                                    : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
                                     }`}
                             >
                                 <Icon className="h-4 w-4" />
                                 <span>{st.name}</span>
                                 {count > 0 && (
-                                    <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                                    <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-[10px] font-black border border-[#1c3a1e]/10">
                                         {count}
                                     </span>
                                 )}
@@ -403,13 +401,13 @@ function KDSContent() {
 
                 {/* Sort Mode Controls */}
                 {activeTab === 'tickets' && (
-                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-2xl shrink-0">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase px-2">Sort By:</span>
+                    <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl shrink-0">
+                        <span className="text-[10px] font-extrabold text-[#1c3a1e] uppercase px-2">Sort By:</span>
                         <button
                             onClick={() => setSortBy('received')}
                             className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'received'
-                                ? 'bg-amber-500 text-slate-950 shadow-md'
-                                : 'text-slate-400 hover:text-slate-200'
+                                ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
                                 }`}
                             title="Cards stay fixed in received order (Changing status does NOT move card position)"
                         >
@@ -418,8 +416,8 @@ function KDSContent() {
                         <button
                             onClick={() => setSortBy('status')}
                             className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'status'
-                                ? 'bg-amber-500 text-slate-950 shadow-md'
-                                : 'text-slate-400 hover:text-slate-200'
+                                ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
                                 }`}
                         >
                             By Status
@@ -427,8 +425,8 @@ function KDSContent() {
                         <button
                             onClick={() => setSortBy('time')}
                             className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'time'
-                                ? 'bg-amber-500 text-slate-950 shadow-md'
-                                : 'text-slate-400 hover:text-slate-200'
+                                ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
                                 }`}
                         >
                             By Time
@@ -436,8 +434,8 @@ function KDSContent() {
                         <button
                             onClick={() => setSortBy('alphabet')}
                             className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'alphabet'
-                                ? 'bg-amber-500 text-slate-950 shadow-md'
-                                : 'text-slate-400 hover:text-slate-200'
+                                ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
                                 }`}
                         >
                             Alphabetical
@@ -449,58 +447,57 @@ function KDSContent() {
             {/* EXPEDITER TABLE PASS VIEW */}
             {activeTab === 'expediter' ? (
                 Object.keys(readyItemsByTable).length === 0 ? (
-                    <div className="text-center py-20 glass-panel rounded-3xl border border-slate-800 print:hidden">
-                        <Truck className="h-12 w-12 mx-auto mb-4 text-slate-600 opacity-40" />
-                        <h3 className="text-lg font-bold text-slate-300">Expediter Tray Clear</h3>
-                        <p className="text-xs text-slate-500 mt-1">No table dishes ready for pickup.</p>
+                    <div className="text-center py-24 bg-white rounded-3xl border border-[#1c3a1e]/15 shadow-sm print:hidden">
+                        <Truck className="h-16 w-16 mx-auto mb-4 text-[#1c3a1e] opacity-30" />
+                        <h3 className="text-lg font-bold text-[#1c3a1e]">No Tables Waiting for Delivery!</h3>
+                        <p className="text-xs text-gray-500 mt-1">Ready dishes will group here by table for waiter delivery.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
                         {Object.entries(readyItemsByTable).map(([tblNum, tableReadyItems]) => (
                             <div
                                 key={tblNum}
-                                className="glass-card rounded-3xl p-5 border-2 border-emerald-500/50 bg-emerald-500/5 shadow-2xl flex flex-col justify-between"
+                                className="bg-white rounded-3xl p-5 border border-[#1c3a1e]/15 shadow-md flex flex-col justify-between"
                             >
                                 <div>
-                                    <div className="flex justify-between items-center pb-3 border-b border-emerald-500/30 mb-4">
+                                    <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15 mb-3">
                                         <div className="flex items-center gap-2">
-                                            <div className="bg-emerald-500 text-slate-950 font-black text-xl px-3 py-1 rounded-xl shadow-lg">
+                                            <div className="bg-[#1c3a1e] text-white font-black text-sm px-3 py-1 rounded-xl">
                                                 TABLE #{tblNum}
                                             </div>
+                                            <span className="text-xs font-bold text-gray-600">
+                                                ({tableReadyItems.length} ready {tableReadyItems.length === 1 ? 'dish' : 'dishes'})
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/40">
-                                            {tableReadyItems.length} ITEM(S) READY
-                                        </span>
                                     </div>
 
-                                    <div className="space-y-2.5 mb-4">
+                                    <div className="space-y-2 mb-4">
                                         {tableReadyItems.map((item) => (
                                             <div
                                                 key={item.id}
-                                                className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex justify-between items-center"
+                                                className="bg-[#fafbfa] border border-[#1c3a1e]/10 p-3 rounded-2xl flex justify-between items-center"
                                             >
                                                 <div>
-                                                    <span className="font-extrabold text-sm text-slate-100">
-                                                        1x {item.item_name}
-                                                    </span>
-                                                    <span className="text-[10px] text-amber-400 font-bold block uppercase mt-0.5">
-                                                        Station: {item.station.replace('_', ' ')}
-                                                    </span>
+                                                    <div className="font-extrabold text-sm text-[#1c3a1e]">
+                                                        {item.quantity}x {item.item_name}
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-500 font-semibold">
+                                                        Guest: {item.guest_name || 'Guest 1'}
+                                                    </div>
                                                 </div>
-
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         disabled={isAnyBumping}
                                                         onClick={() => handleUndoStatus(item.id)}
-                                                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-amber-400 p-2 rounded-lg text-xs font-bold transition-all"
-                                                        title="Undo Status"
+                                                        className="p-1.5 rounded-lg bg-[#eaf2eb] text-[#1c3a1e] hover:bg-gray-200 transition-colors"
+                                                        title="Undo back to Preparing"
                                                     >
                                                         <RotateCcw className="h-3.5 w-3.5" />
                                                     </button>
                                                     <button
                                                         disabled={isAnyBumping}
                                                         onClick={() => handleStatusClick(item.id, 'ready')}
-                                                        className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-extrabold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1"
+                                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1"
                                                     >
                                                         <span>Deliver</span>
                                                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -518,7 +515,7 @@ function KDSContent() {
                                         }
                                         refreshKDSData();
                                     }}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
+                                    className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                                 >
                                     <Truck className="h-4 w-4" />
                                     <span>Mark Entire Table #{tblNum} Tray Delivered</span>
@@ -530,10 +527,10 @@ function KDSContent() {
             ) : (
                 /* INDIVIDUAL DISH TICKET GRID FOR CHEFS */
                 displayedItems.length === 0 ? (
-                    <div className="text-center py-24 glass-panel rounded-3xl border border-slate-800/80 print:hidden">
-                        <ChefHat className="h-16 w-16 mx-auto mb-4 text-slate-600 opacity-40" />
-                        <h3 className="text-lg font-bold text-slate-300">All Kitchen Orders Clear!</h3>
-                        <p className="text-xs text-slate-500 mt-1">No active tickets for station: {stationFilter}</p>
+                    <div className="text-center py-24 bg-white rounded-3xl border border-[#1c3a1e]/15 shadow-sm print:hidden">
+                        <ChefHat className="h-16 w-16 mx-auto mb-4 text-[#1c3a1e] opacity-30" />
+                        <h3 className="text-lg font-bold text-[#1c3a1e]">All Kitchen Orders Clear!</h3>
+                        <p className="text-xs text-gray-500 mt-1">No active tickets for station: {stationFilter}</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 print:hidden">
@@ -542,19 +539,19 @@ function KDSContent() {
                                 (currentTime - new Date(item.created_at).getTime()) / 60000
                             );
 
-                            let timerColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                            let timerColor = 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30';
                             if (elapsedMins >= 10 && elapsedMins < 15) {
-                                timerColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+                                timerColor = 'bg-amber-500/10 text-amber-800 border-amber-500/30';
                             } else if (elapsedMins >= 15) {
-                                timerColor = 'bg-red-500/10 text-red-400 border-red-500/30 animate-pulse';
+                                timerColor = 'bg-red-500/10 text-red-700 border-red-500/30 animate-pulse';
                             }
 
                             const statusButtonStyles = {
-                                pending: 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold',
-                                preparing: 'bg-blue-500 hover:bg-blue-600 text-slate-950 font-extrabold',
-                                ready: 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold',
-                                delivered: 'bg-slate-800 text-slate-400',
-                                cancelled: 'bg-red-500/20 text-red-400',
+                                pending: 'bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-extrabold',
+                                preparing: 'bg-blue-600 hover:bg-blue-700 text-white font-extrabold',
+                                ready: 'bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold',
+                                delivered: 'bg-gray-200 text-gray-600',
+                                cancelled: 'bg-red-500/10 text-red-700',
                             };
 
                             const mItem = menuItems.find((m) => m.id === item.menu_item_id);
@@ -562,35 +559,28 @@ function KDSContent() {
                             return (
                                 <div
                                     key={item.id}
-                                    className="glass-card rounded-2xl p-4 flex flex-col justify-between border-l-4 border-l-amber-500 hover:border-amber-400 transition-all shadow-xl"
+                                    className="bg-white rounded-2xl p-4 flex flex-col justify-between border-l-4 border-l-[#1c3a1e] border border-[#1c3a1e]/15 shadow-sm text-[#1c3a1e] hover:shadow-md transition-all"
                                 >
                                     <div>
                                         {/* Card Header with Table # & Item Title */}
-                                        <div className="flex justify-between items-start pb-3 border-b border-slate-800/80 mb-3">
+                                        <div className="flex justify-between items-start pb-3 border-b border-[#1c3a1e]/15 mb-3">
                                             <div className="flex items-start gap-3">
                                                 {mItem?.image_url && (
                                                     <img
                                                         src={mItem.image_url}
                                                         alt={item.item_name}
-                                                        className="h-11 w-11 rounded-xl object-cover border border-slate-700 flex-shrink-0 shadow-sm"
+                                                        className="h-11 w-11 rounded-xl object-cover border border-[#1c3a1e]/15 flex-shrink-0 shadow-sm"
                                                     />
                                                 )}
                                                 <div>
-                                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                                        <div className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black px-2.5 py-0.5 rounded-lg">
-                                                            DELIVER TO TABLE #{item.table_number || 1}
+                                                    <h3 className="flex items-center gap-1.5 flex-wrap mb-1 text-sm font-extrabold text-[#1c3a1e]">
+                                                        <div className="bg-[#1c3a1e] text-white text-xs font-black px-2.5 py-0.5 rounded-lg">
+                                                            TABLE #{item.table_number || 1}
                                                         </div>
-                                                        {item.is_printed && (
-                                                            <span className="bg-slate-900 text-slate-400 border border-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded">
-                                                                PRINTED
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <h3 className="text-lg font-black text-slate-100 leading-tight">
-                                                        1x {item.item_name}
+                                                        <span>{item.quantity}x {item.item_name}</span>
                                                     </h3>
-                                                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                                                        Station: {item.station.replace('_', ' ')}
+                                                    <span className="text-[10px] text-gray-600 font-bold block uppercase tracking-wider">
+                                                        STATION: {item.station.replace('_', ' ')}
                                                     </span>
                                                 </div>
                                             </div>
