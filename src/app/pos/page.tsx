@@ -58,6 +58,7 @@ import {
     UserPlus,
     User,
     QrCode,
+    ChevronDown,
 } from 'lucide-react';
 
 export default function POSPage() {
@@ -79,6 +80,7 @@ function POSContent() {
     }, [orderItems]);
 
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+    const [showAllFloorTables, setShowAllFloorTables] = useState(false);
 
     // Modals & Triggers
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -729,9 +731,9 @@ function POSContent() {
                         </div>
                     </div>
 
-                    {/* SIMPLIFIED GRID VIEW: Merged tables shown as 1 unified table card */}
+                    {/* SIMPLIFIED GRID VIEW: Merged tables shown as 1 unified table card (First 4 Rows / 16 tables initially) */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {visibleTablesOnMatrix.map((tbl) => {
+                        {(showAllFloorTables ? visibleTablesOnMatrix : visibleTablesOnMatrix.slice(0, 16)).map((tbl) => {
                             const isSelected = selectedTable?.id === tbl.id;
 
                             const sess = sessions.find(
@@ -814,6 +816,23 @@ function POSContent() {
                             );
                         })}
                     </div>
+
+                    {/* SHOW MORE / LOAD REMAINING TABLES BUTTON */}
+                    {visibleTablesOnMatrix.length > 16 && (
+                        <div className="mt-4 text-center">
+                            <button
+                                onClick={() => setShowAllFloorTables(!showAllFloorTables)}
+                                className="w-full py-3 px-4 bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black text-xs rounded-2xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                            >
+                                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAllFloorTables ? 'rotate-180' : ''}`} />
+                                <span>
+                                    {showAllFloorTables
+                                        ? 'Show Less Tables (First 4 Rows)'
+                                        : `Show More Tables (${visibleTablesOnMatrix.length - 16} More Tables Available)`}
+                                </span>
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Column: Selected Table Check & Dynamic Guest Items (5 Cols) */}
