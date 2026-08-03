@@ -9,16 +9,20 @@ module.exports = {
     extend: {
       colors: {
         skylight: {
-          dark: '#0f172a',
-          card: '#1e293b',
-          accent: '#d97706',
-          gold: '#f59e0b',
-          goldHover: '#d97706',
+          bg: '#fafbfa',
+          dark: '#1c3a1e',
+          card: '#ffffff',
+          panel: '#ffffff',
+          accent: '#d4af37',
+          gold: '#e2b842',
+          goldHover: '#b89428',
+          green: '#1c3a1e',
+          greenLight: '#eaf2eb',
           red: '#ef4444',
-          green: '#10b981',
-          blue: '#3b82f6',
+          blue: '#2bb3a7',
           purple: '#8b5cf6',
-          muted: '#94a3b8',
+          muted: '#617563',
+          border: 'rgba(28, 58, 30, 0.12)',
         },
       },
       fontFamily: {
