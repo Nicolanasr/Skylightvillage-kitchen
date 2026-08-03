@@ -405,7 +405,7 @@ function CustomerOrderContent() {
                     return (
                         <section key={cat.id} id={`category-${cat.id}`} className="scroll-mt-36">
                             {/* Sticky Category Title Header */}
-                            <div className="sticky top-[120px] z-20 bg-[#fafbfa]/95 backdrop-blur-md px-4 py-1.5 mb-2 border-b border-[#1c3a1e]/15 flex items-center justify-between shadow-sm">
+                            <div className="sticky top-[130px] z-20 bg-[#fafbfa]/95 backdrop-blur-md px-4 py-1.5 mb-2 border-b border-[#1c3a1e]/15 flex items-center justify-between shadow-sm">
                                 <h2 className="text-base font-black text-[#1c3a1e] flex items-center gap-2 tracking-wide">
                                     <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
                                     <span>{cat.name}</span>
