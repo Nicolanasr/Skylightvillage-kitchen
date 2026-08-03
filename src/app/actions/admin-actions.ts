@@ -54,6 +54,8 @@ export async function createMenuItem(data: {
   station: StationType;
   imageUrl?: string;
   isStaffOnly?: boolean;
+  sortOrder?: number;
+  isBestseller?: boolean;
   modifierGroups?: ModifierGroup[];
 }) {
   if (!data.name || data.priceUsd < 0 || !pool) return { success: false, error: 'Invalid name or price' };
@@ -68,16 +70,20 @@ export async function createMenuItem(data: {
     station: data.station,
     available: true,
     is_staff_only: !!data.isStaffOnly,
+    sort_order: data.sortOrder ?? 0,
+    is_bestseller: !!data.isBestseller,
     modifier_groups: data.modifierGroups || [],
   };
 
   try {
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
 
     await pool.query(
-      `INSERT INTO menu_items (id, category_id, name, description, price_usd, station, available, image_url, is_staff_only, modifier_groups)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO menu_items (id, category_id, name, description, price_usd, station, available, image_url, is_staff_only, sort_order, is_bestseller, modifier_groups)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         newItem.id,
         newItem.category_id,
@@ -88,6 +94,8 @@ export async function createMenuItem(data: {
         newItem.available,
         newItem.image_url,
         newItem.is_staff_only,
+        newItem.sort_order,
+        newItem.is_bestseller,
         JSON.stringify(newItem.modifier_groups),
       ]
     );
@@ -113,6 +121,8 @@ export async function updateMenuItem(
     imageUrl?: string;
     available?: boolean;
     isStaffOnly?: boolean;
+    sortOrder?: number;
+    isBestseller?: boolean;
     modifierGroups?: ModifierGroup[];
   }
 ) {
@@ -120,6 +130,8 @@ export async function updateMenuItem(
 
   try {
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
 
     const itemRes = await pool.query('SELECT * FROM menu_items WHERE id = $1', [menuItemId]);
@@ -133,11 +145,13 @@ export async function updateMenuItem(
     const image_url = data.imageUrl !== undefined ? data.imageUrl : item.image_url;
     const available = data.available !== undefined ? data.available : item.available;
     const is_staff_only = data.isStaffOnly !== undefined ? !!data.isStaffOnly : !!item.is_staff_only;
+    const sort_order = data.sortOrder !== undefined ? Number(data.sortOrder) : Number(item.sort_order || 0);
+    const is_bestseller = data.isBestseller !== undefined ? !!data.isBestseller : !!item.is_bestseller;
     const modifier_groups = data.modifierGroups !== undefined ? data.modifierGroups : (item.modifier_groups || []);
 
     await pool.query(
-      `UPDATE menu_items SET name = $1, description = $2, price_usd = $3, station = $4, image_url = $5, available = $6, is_staff_only = $7, modifier_groups = $8 WHERE id = $9`,
-      [name, description, price_usd, station, image_url, available, is_staff_only, JSON.stringify(modifier_groups), menuItemId]
+      `UPDATE menu_items SET name = $1, description = $2, price_usd = $3, station = $4, image_url = $5, available = $6, is_staff_only = $7, sort_order = $8, is_bestseller = $9, modifier_groups = $10 WHERE id = $11`,
+      [name, description, price_usd, station, image_url, available, is_staff_only, sort_order, is_bestseller, JSON.stringify(modifier_groups), menuItemId]
     );
   } catch (e: any) {
     console.error('Neon updateMenuItem error:', e);

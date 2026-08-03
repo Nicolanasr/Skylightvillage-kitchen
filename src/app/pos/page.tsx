@@ -456,14 +456,21 @@ function POSContent() {
         }
     };
 
-    const filteredMenuItemsForWaiter = menuItems.filter((item) => {
-        const matchesCategory =
-            selectedCategoryFilter === 'all' || item.category_id === selectedCategoryFilter;
-        const matchesSearch =
-            item.name.toLowerCase().includes(waiterSearchTerm.toLowerCase()) ||
-            (item.description && item.description.toLowerCase().includes(waiterSearchTerm.toLowerCase()));
-        return matchesCategory && matchesSearch;
-    });
+    const filteredMenuItemsForWaiter = menuItems
+        .filter((item) => {
+            const matchesCategory =
+                selectedCategoryFilter === 'all' || item.category_id === selectedCategoryFilter;
+            const matchesSearch =
+                item.name.toLowerCase().includes(waiterSearchTerm.toLowerCase()) ||
+                (item.description && item.description.toLowerCase().includes(waiterSearchTerm.toLowerCase()));
+            return matchesCategory && matchesSearch;
+        })
+        .sort((a, b) => {
+            const orderA = a.sort_order ?? 0;
+            const orderB = b.sort_order ?? 0;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.name.localeCompare(b.name);
+        });
 
     // SIMPLIFIED FLOOR MATRIX: Show only 1 unified card per merged table group (hides all secondary merged tables)
     const visibleTablesOnMatrix = tables.filter((t) => {

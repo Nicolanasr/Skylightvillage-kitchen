@@ -611,9 +611,9 @@ function KDSContent() {
                                                 {item.selected_modifiers.map((mod, idx) => (
                                                     <div
                                                         key={idx}
-                                                        className="bg-slate-950/80 border border-slate-800/80 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-semibold"
+                                                        className="bg-[#eaf2eb] border border-[#1c3a1e]/20 rounded-lg px-2.5 py-1 text-xs text-[#1c3a1e] font-semibold"
                                                     >
-                                                        {mod.group}: <span className="text-white font-bold">{mod.option}</span>
+                                                        {mod.group}: <span className="font-black text-[#1c3a1e]">{mod.option}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -621,8 +621,8 @@ function KDSContent() {
 
                                         {/* Special Notes */}
                                         {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
-                                            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-300 font-semibold mb-3">
-                                                <span className="font-extrabold uppercase block text-[10px] text-red-400">
+                                            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-800 font-semibold mb-3">
+                                                <span className="font-extrabold uppercase block text-[10px] text-red-700">
                                                     Special Instructions:
                                                 </span>
                                                 {item.special_notes}
@@ -631,9 +631,15 @@ function KDSContent() {
                                     </div>
 
                                     {/* Card Action Footer with Individual Dish Bump Control */}
-                                    <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between mt-3">
-                                        <span className="text-[11px] text-slate-500 font-medium">
-                                            Status: <strong className="text-slate-200">{item.status.toUpperCase()}</strong>
+                                    <div className="pt-3 border-t border-[#1c3a1e]/15 flex items-center justify-between mt-3">
+                                        <span className="text-xs font-bold text-gray-500">
+                                            Status: <strong className={`uppercase px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                                item.status === 'pending'
+                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                    : item.status === 'preparing'
+                                                    ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                            }`}>{item.status}</strong>
                                         </span>
 
                                         <div className="flex items-center gap-1.5">
@@ -641,7 +647,7 @@ function KDSContent() {
                                                 <button
                                                     disabled={isAnyBumping}
                                                     onClick={() => handleUndoStatus(item.id)}
-                                                    className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="bg-[#eaf2eb] hover:bg-gray-200 border border-[#1c3a1e]/20 text-[#1c3a1e] p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Undo / Step Back Status"
                                                 >
                                                     <RotateCcw className="h-3.5 w-3.5" />

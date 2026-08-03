@@ -55,6 +55,8 @@ export interface MenuItem {
   station: StationType;
   available: boolean;
   is_staff_only?: boolean;
+  sort_order?: number;
+  is_bestseller?: boolean;
   modifier_groups: ModifierGroup[];
 }
 

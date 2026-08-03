@@ -123,6 +123,8 @@ function AdminContent() {
     const [newItemStation, setNewItemStation] = useState<StationType>('mezza');
     const [newItemImage, setNewItemImage] = useState('');
     const [newItemIsStaffOnly, setNewItemIsStaffOnly] = useState(false);
+    const [newItemSortOrder, setNewItemSortOrder] = useState('0');
+    const [newItemIsBestseller, setNewItemIsBestseller] = useState(false);
 
     // Full Item Edit Modal State
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -133,6 +135,8 @@ function AdminContent() {
     const [editStation, setEditStation] = useState<StationType>('mezza');
     const [editImageUrl, setEditImageUrl] = useState('');
     const [editIsStaffOnly, setEditIsStaffOnly] = useState(false);
+    const [editSortOrder, setEditSortOrder] = useState('0');
+    const [editIsBestseller, setEditIsBestseller] = useState(false);
 
     // New Staff State
     const [newStaffName, setNewStaffName] = useState('');
@@ -169,6 +173,8 @@ function AdminContent() {
             station: newItemStation,
             imageUrl: finalImage,
             isStaffOnly: newItemIsStaffOnly,
+            sortOrder: parseInt(newItemSortOrder) || 0,
+            isBestseller: newItemIsBestseller,
         });
 
         if (res.success) {
@@ -177,6 +183,8 @@ function AdminContent() {
             setNewItemPrice('5.00');
             setNewItemImage('');
             setNewItemIsStaffOnly(false);
+            setNewItemSortOrder('0');
+            setNewItemIsBestseller(false);
             setIsAddItemModalOpen(false);
             refreshPOSData();
         }
@@ -191,6 +199,8 @@ function AdminContent() {
         setEditStation(item.station);
         setEditImageUrl(item.image_url || '');
         setEditIsStaffOnly(!!item.is_staff_only);
+        setEditSortOrder(String(item.sort_order ?? 0));
+        setEditIsBestseller(!!item.is_bestseller);
     };
 
     const handleSaveFullEditSubmit = async (e: React.FormEvent) => {
@@ -206,6 +216,8 @@ function AdminContent() {
             station: editStation,
             imageUrl: finalImage,
             isStaffOnly: editIsStaffOnly,
+            sortOrder: parseInt(editSortOrder) || 0,
+            isBestseller: editIsBestseller,
         });
 
         setEditingItem(null);
@@ -489,116 +501,271 @@ function AdminContent() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {menuItems
-                            .filter((item) => {
+                    <div className="space-y-6">
+                        {categories.map((cat) => {
+                            const catItems = menuItems.filter((item) => {
+                                if (item.category_id !== cat.id) return false;
                                 const term = menuSearchTerm.toLowerCase().trim();
                                 if (!term) return true;
-                                const catName = categories.find((c) => c.id === item.category_id)?.name || '';
                                 return (
                                     item.name.toLowerCase().includes(term) ||
                                     (item.description && item.description.toLowerCase().includes(term)) ||
-                                    catName.toLowerCase().includes(term)
+                                    cat.name.toLowerCase().includes(term)
                                 );
-                            })
-                            .map((item) => {
-                                const catName = categories.find((c) => c.id === item.category_id)?.name || 'Unassigned';
-                                const displayImage = transformGoogleDriveUrl(item.image_url || '');
+                            });
 
-                                return (
-                                    <div
-                                        key={item.id}
-                                        className="bg-white border border-[#1c3a1e]/15 rounded-3xl p-5 flex flex-col justify-between shadow-sm hover:shadow-md transition-all text-[#1c3a1e]"
-                                    >
-                                        <div>
-                                            <div className="flex gap-3 mb-3">
-                                                {displayImage ? (
-                                                    <img
-                                                        src={displayImage}
-                                                        alt={item.name}
-                                                        className="h-14 w-14 rounded-2xl object-cover border border-[#1c3a1e]/15 flex-shrink-0"
-                                                        onError={(e) => {
-                                                            (e.target as HTMLElement).style.display = 'none';
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div className="h-14 w-14 rounded-2xl bg-[#fafbfa] border border-[#1c3a1e]/15 flex items-center justify-center flex-shrink-0">
-                                                        <ImageIcon className="h-6 w-6 text-[#1c3a1e]/40" />
-                                                    </div>
-                                                )}
+                            if (catItems.length === 0 && menuSearchTerm) return null;
 
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <span className="text-[10px] font-black text-[#1c3a1e] uppercase tracking-widest bg-[#eaf2eb] px-2 py-0.5 rounded-lg border border-[#1c3a1e]/15">
-                                                                {catName}
-                                                            </span>
-                                                            {item.is_staff_only && (
-                                                                <span className="text-[9px] font-black text-purple-800 uppercase tracking-wider bg-purple-500/10 px-1.5 py-0.5 rounded-lg border border-purple-500/30">
-                                                                    🔒 Staff-Only
-                                                                </span>
+                            return (
+                                <div key={cat.id} className="bg-white border border-[#1c3a1e]/15 rounded-3xl p-5 shadow-sm">
+                                    {/* Category Section Header */}
+                                    <div className="flex items-center justify-between border-b border-[#1c3a1e]/15 pb-3 mb-4">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="h-3 w-3 rounded-full bg-[#d4af37] animate-pulse" />
+                                            <h2 className="text-base font-black text-[#1c3a1e] tracking-tight">{cat.name}</h2>
+                                        </div>
+                                        <span className="text-xs font-extrabold text-[#1c3a1e] bg-[#eaf2eb] px-3 py-1 rounded-full border border-[#1c3a1e]/10">
+                                            {catItems.length} {catItems.length === 1 ? 'dish' : 'dishes'}
+                                        </span>
+                                    </div>
+
+                                    {/* Category Items Grid */}
+                                    {catItems.length > 0 ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {catItems.map((item) => {
+                                                const catName = cat.name;
+                                                const displayImage = transformGoogleDriveUrl(item.image_url || '');
+
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        className="bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition-all text-[#1c3a1e]"
+                                                    >
+                                                        <div>
+                                                            <div className="flex gap-3 mb-3">
+                                                                {displayImage ? (
+                                                                    <img
+                                                                        src={displayImage}
+                                                                        alt={item.name}
+                                                                        className="h-14 w-14 rounded-2xl object-cover border border-[#1c3a1e]/15 flex-shrink-0"
+                                                                        onError={(e) => {
+                                                                            (e.target as HTMLElement).style.display = 'none';
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="h-14 w-14 rounded-2xl bg-white border border-[#1c3a1e]/15 flex items-center justify-center flex-shrink-0">
+                                                                        <ImageIcon className="h-6 w-6 text-[#1c3a1e]/40" />
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="flex-1">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                                            <span className="text-[10px] font-black text-[#1c3a1e] uppercase tracking-widest bg-[#eaf2eb] px-2 py-0.5 rounded-lg border border-[#1c3a1e]/15">
+                                                                                {catName}
+                                                                            </span>
+                                                                            {item.is_bestseller && (
+                                                                                <span className="text-[9px] font-black text-amber-900 uppercase tracking-wider bg-amber-400/20 px-1.5 py-0.5 rounded-lg border border-amber-400/40">
+                                                                                    ⭐ Bestseller
+                                                                                </span>
+                                                                            )}
+                                                                            {item.is_staff_only && (
+                                                                                <span className="text-[9px] font-black text-purple-800 uppercase tracking-wider bg-purple-500/10 px-1.5 py-0.5 rounded-lg border border-purple-500/30">
+                                                                                    🔒 Staff-Only
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                await updateMenuItem(item.id, { available: !item.available });
+                                                                                refreshPOSData();
+                                                                            }}
+                                                                            className={`text-[9px] font-extrabold px-2 py-0.5 rounded-lg flex items-center gap-1 border ${item.available
+                                                                                ? 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30'
+                                                                                : 'bg-red-500/10 text-red-800 border-red-500/30'
+                                                                                }`}
+                                                                        >
+                                                                            {item.available ? 'AVAILABLE' : 'SOLD OUT'}
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <h3 className="text-base font-black text-[#1c3a1e] mt-1 leading-tight">{item.name}</h3>
+                                                                </div>
+                                                            </div>
+
+                                                            {item.description && (
+                                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2">{item.description}</p>
                                                             )}
+
+                                                            <div className="text-[11px] text-gray-500 font-semibold mb-2 flex items-center gap-3">
+                                                                <span>Station: <strong className="text-[#1c3a1e] uppercase">{item.station.replace('_', ' ')}</strong></span>
+                                                                <span>Sort #: <strong className="text-[#1c3a1e]">{item.sort_order ?? 0}</strong></span>
+                                                            </div>
                                                         </div>
 
-                                                        <button
-                                                            onClick={async () => {
-                                                                await updateMenuItem(item.id, { available: !item.available });
-                                                                refreshPOSData();
-                                                            }}
-                                                            className={`text-[9px] font-extrabold px-2 py-0.5 rounded-lg flex items-center gap-1 border ${item.available
-                                                                ? 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30'
-                                                                : 'bg-red-500/10 text-red-800 border-red-500/30'
-                                                                }`}
-                                                        >
-                                                            {item.available ? 'AVAILABLE' : 'SOLD OUT'}
-                                                        </button>
+                                                        {/* Card Actions Footer */}
+                                                        <div className="pt-3 border-t border-[#1c3a1e]/10 flex items-center justify-between mt-2">
+                                                            <span className="text-base font-black text-[#1c3a1e]">
+                                                                ${Number(item.price_usd).toFixed(2)}
+                                                            </span>
+
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => handleOpenFullEdit(item)}
+                                                                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all"
+                                                                >
+                                                                    <Edit3 className="h-3.5 w-3.5" />
+                                                                    <span>Edit Dish</span>
+                                                                </button>
+
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (confirm(`Delete "${item.name}" from menu?`)) {
+                                                                            await deleteMenuItem(item.id);
+                                                                            refreshPOSData();
+                                                                        }
+                                                                    }}
+                                                                    className="text-gray-400 hover:text-red-600 p-2 rounded-xl text-xs transition-colors"
+                                                                    title="Delete Item"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs font-bold text-gray-400 italic py-2">No items in this category yet.</p>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* Unassigned Category Section */}
+                        {(() => {
+                            const unassignedItems = menuItems.filter((item) => {
+                                const hasCat = categories.some((c) => c.id === item.category_id);
+                                if (hasCat) return false;
+                                const term = menuSearchTerm.toLowerCase().trim();
+                                if (!term) return true;
+                                return (
+                                    item.name.toLowerCase().includes(term) ||
+                                    (item.description && item.description.toLowerCase().includes(term))
+                                );
+                            });
+
+                            if (unassignedItems.length === 0) return null;
+
+                            return (
+                                <div className="bg-white border border-[#1c3a1e]/15 rounded-3xl p-5 shadow-sm">
+                                    <div className="flex items-center justify-between border-b border-[#1c3a1e]/15 pb-3 mb-4">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="h-3 w-3 rounded-full bg-gray-400" />
+                                            <h2 className="text-base font-black text-[#1c3a1e] tracking-tight">Unassigned Category</h2>
+                                        </div>
+                                        <span className="text-xs font-extrabold text-[#1c3a1e] bg-[#eaf2eb] px-3 py-1 rounded-full border border-[#1c3a1e]/10">
+                                            {unassignedItems.length} {unassignedItems.length === 1 ? 'dish' : 'dishes'}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {unassignedItems.map((item) => {
+                                            const displayImage = transformGoogleDriveUrl(item.image_url || '');
+
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    className="bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition-all text-[#1c3a1e]"
+                                                >
+                                                    <div>
+                                                        <div className="flex gap-3 mb-3">
+                                                            {displayImage ? (
+                                                                <img
+                                                                    src={displayImage}
+                                                                    alt={item.name}
+                                                                    className="h-14 w-14 rounded-2xl object-cover border border-[#1c3a1e]/15 flex-shrink-0"
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLElement).style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <div className="h-14 w-14 rounded-2xl bg-white border border-[#1c3a1e]/15 flex items-center justify-center flex-shrink-0">
+                                                                    <ImageIcon className="h-6 w-6 text-[#1c3a1e]/40" />
+                                                                </div>
+                                                            )}
+
+                                                            <div className="flex-1">
+                                                                <div className="flex justify-between items-start">
+                                                                    <span className="text-[10px] font-black text-[#1c3a1e] uppercase tracking-widest bg-[#eaf2eb] px-2 py-0.5 rounded-lg border border-[#1c3a1e]/15">
+                                                                        Unassigned
+                                                                    </span>
+
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            await updateMenuItem(item.id, { available: !item.available });
+                                                                            refreshPOSData();
+                                                                        }}
+                                                                        className={`text-[9px] font-extrabold px-2 py-0.5 rounded-lg flex items-center gap-1 border ${item.available
+                                                                            ? 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30'
+                                                                            : 'bg-red-500/10 text-red-800 border-red-500/30'
+                                                                            }`}
+                                                                    >
+                                                                        {item.available ? 'AVAILABLE' : 'SOLD OUT'}
+                                                                    </button>
+                                                                </div>
+
+                                                                <h3 className="text-base font-black text-[#1c3a1e] mt-1 leading-tight">{item.name}</h3>
+                                                            </div>
+                                                        </div>
+
+                                                        {item.description && (
+                                                            <p className="text-xs text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+                                                        )}
+
+                                                        <div className="text-[11px] text-gray-500 font-semibold mb-2 flex items-center gap-3">
+                                                            <span>Station: <strong className="text-[#1c3a1e] uppercase">{item.station.replace('_', ' ')}</strong></span>
+                                                            <span>Sort #: <strong className="text-[#1c3a1e]">{item.sort_order ?? 0}</strong></span>
+                                                        </div>
                                                     </div>
 
-                                                    <h3 className="text-base font-black text-[#1c3a1e] mt-1 leading-tight">{item.name}</h3>
+                                                    <div className="pt-3 border-t border-[#1c3a1e]/10 flex items-center justify-between mt-2">
+                                                        <span className="text-base font-black text-[#1c3a1e]">
+                                                            ${Number(item.price_usd).toFixed(2)}
+                                                        </span>
+
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => handleOpenFullEdit(item)}
+                                                                className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all"
+                                                            >
+                                                                <Edit3 className="h-3.5 w-3.5" />
+                                                                <span>Edit Dish</span>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (confirm(`Delete "${item.name}" from menu?`)) {
+                                                                        await deleteMenuItem(item.id);
+                                                                        refreshPOSData();
+                                                                    }
+                                                                }}
+                                                                className="text-gray-400 hover:text-red-600 p-2 rounded-xl text-xs transition-colors"
+                                                                title="Delete Item"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            {item.description && (
-                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2">{item.description}</p>
-                                            )}
-
-                                            <div className="text-[11px] text-gray-500 font-semibold mb-2">
-                                                Station: <strong className="text-[#1c3a1e] uppercase">{item.station.replace('_', ' ')}</strong>
-                                            </div>
-                                        </div>
-
-                                        {/* Card Actions Footer */}
-                                        <div className="pt-3 border-t border-[#1c3a1e]/10 flex items-center justify-between mt-2">
-                                            <span className="text-base font-black text-[#1c3a1e]">
-                                                ${Number(item.price_usd).toFixed(2)}
-                                            </span>
-
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleOpenFullEdit(item)}
-                                                    className="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all"
-                                                >
-                                                    <Edit3 className="h-3.5 w-3.5" />
-                                                    <span>Edit Dish</span>
-                                                </button>
-
-                                                <button
-                                                    onClick={async () => {
-                                                        if (confirm(`Delete "${item.name}" from menu?`)) {
-                                                            await deleteMenuItem(item.id);
-                                                            refreshPOSData();
-                                                        }
-                                                    }}
-                                                    className="text-slate-500 hover:text-red-400 p-2 rounded-xl text-xs transition-colors"
-                                                    title="Delete Item"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </div>
+                                            );
+                                        })}
                                     </div>
-                                );
-                            })}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
@@ -1137,7 +1304,7 @@ function AdminContent() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
                                     <select
@@ -1162,6 +1329,18 @@ function AdminContent() {
                                         onChange={(e) => setEditPrice(e.target.value)}
                                         className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                                         required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Sort Order #</label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        value={editSortOrder}
+                                        onChange={(e) => setEditSortOrder(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                                     />
                                 </div>
                             </div>
@@ -1205,17 +1384,32 @@ function AdminContent() {
                                 />
                             </div>
 
-                            <div className="flex items-center gap-2 pt-1">
-                                <input
-                                    type="checkbox"
-                                    id="editIsStaffOnly"
-                                    checked={editIsStaffOnly}
-                                    onChange={(e) => setEditIsStaffOnly(e.target.checked)}
-                                    className="h-4 w-4 rounded accent-[#1c3a1e] bg-[#fafbfa] border-[#1c3a1e]/20"
-                                />
-                                <label htmlFor="editIsStaffOnly" className="text-xs font-extrabold text-purple-900 cursor-pointer">
-                                    🔒 Waiter / Staff-Only Item (Hidden from Customer QR menu - e.g. Event Charge)
-                                </label>
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="editIsBestseller"
+                                        checked={editIsBestseller}
+                                        onChange={(e) => setEditIsBestseller(e.target.checked)}
+                                        className="h-4 w-4 rounded accent-[#d4af37] bg-[#fafbfa] border-[#1c3a1e]/20"
+                                    />
+                                    <label htmlFor="editIsBestseller" className="text-xs font-black text-[#1c3a1e] cursor-pointer flex items-center gap-1">
+                                        ⭐ Mark as Bestseller / Chef's Special (Displays gold badge on menu)
+                                    </label>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="editIsStaffOnly"
+                                        checked={editIsStaffOnly}
+                                        onChange={(e) => setEditIsStaffOnly(e.target.checked)}
+                                        className="h-4 w-4 rounded accent-[#1c3a1e] bg-[#fafbfa] border-[#1c3a1e]/20"
+                                    />
+                                    <label htmlFor="editIsStaffOnly" className="text-xs font-extrabold text-purple-900 cursor-pointer">
+                                        🔒 Waiter / Staff-Only Item (Hidden from Customer QR menu)
+                                    </label>
+                                </div>
                             </div>
 
                             <div className="flex gap-3 pt-2">
@@ -1277,7 +1471,7 @@ function AdminContent() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Price USD ($)</label>
                                     <input
@@ -1287,6 +1481,18 @@ function AdminContent() {
                                         onChange={(e) => setNewItemPrice(e.target.value)}
                                         className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                                         required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Sort Order #</label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        value={newItemSortOrder}
+                                        onChange={(e) => setNewItemSortOrder(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                                     />
                                 </div>
 
@@ -1329,17 +1535,32 @@ function AdminContent() {
                                 />
                             </div>
 
-                            <div className="flex items-center gap-2 pt-1">
-                                <input
-                                    type="checkbox"
-                                    id="newItemIsStaffOnly"
-                                    checked={newItemIsStaffOnly}
-                                    onChange={(e) => setNewItemIsStaffOnly(e.target.checked)}
-                                    className="h-4 w-4 rounded accent-amber-500 bg-slate-950 border-slate-800"
-                                />
-                                <label htmlFor="newItemIsStaffOnly" className="text-xs font-bold text-amber-300 cursor-pointer">
-                                    🔒 Waiter / Staff-Only Item (Hidden from Customer QR menu - e.g. Event Charge)
-                                </label>
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="newItemIsBestseller"
+                                        checked={newItemIsBestseller}
+                                        onChange={(e) => setNewItemIsBestseller(e.target.checked)}
+                                        className="h-4 w-4 rounded accent-amber-500 bg-slate-950 border-slate-800"
+                                    />
+                                    <label htmlFor="newItemIsBestseller" className="text-xs font-black text-amber-400 cursor-pointer flex items-center gap-1">
+                                        ⭐ Mark as Bestseller / Chef's Special (Displays gold badge on menu)
+                                    </label>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="newItemIsStaffOnly"
+                                        checked={newItemIsStaffOnly}
+                                        onChange={(e) => setNewItemIsStaffOnly(e.target.checked)}
+                                        className="h-4 w-4 rounded accent-amber-500 bg-slate-950 border-slate-800"
+                                    />
+                                    <label htmlFor="newItemIsStaffOnly" className="text-xs font-bold text-amber-300 cursor-pointer">
+                                        🔒 Waiter / Staff-Only Item (Hidden from Customer QR menu)
+                                    </label>
+                                </div>
                             </div>
 
                             <button

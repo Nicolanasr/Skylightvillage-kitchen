@@ -31,7 +31,10 @@ import {
     Star,
     Lock,
     ChevronRight,
+    ChevronLeft,
+    HelpCircle,
     Image as ImageIcon,
+    Search,
 } from 'lucide-react';
 
 export default function CustomerOrderPage() {
@@ -59,6 +62,7 @@ function CustomerOrderContent() {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
     const [activeCategory, setActiveCategory] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedItemForModifier, setSelectedItemForModifier] = useState<MenuItem | null>(null);
 
     // Modifier state for active modal
@@ -84,6 +88,28 @@ function CustomerOrderContent() {
     const [orderSubmitting, setOrderSubmitting] = useState(false);
     const [orderSuccessMsg, setOrderSuccessMsg] = useState<string | null>(null);
     const [addedToastMsg, setAddedToastMsg] = useState<string | null>(null);
+
+    // First-Time Customer Guide State
+    const [isGuideOpen, setIsGuideOpen] = useState(false);
+    const [guideStep, setGuideStep] = useState(0);
+    const [guideLang, setGuideLang] = useState<'en' | 'ar'>('en');
+
+    // Auto-open guide for first-time QR scan customers
+    useEffect(() => {
+        try {
+            const hasSeen = localStorage.getItem('skylight_has_seen_guide');
+            if (!hasSeen) {
+                setIsGuideOpen(true);
+            }
+        } catch (e) {}
+    }, []);
+
+    const handleCloseGuide = () => {
+        setIsGuideOpen(false);
+        try {
+            localStorage.setItem('skylight_has_seen_guide', 'true');
+        } catch (e) {}
+    };
 
     // Live order items for active session
     const [liveOrderItems, setLiveOrderItems] = useState<OrderItem[]>([]);
@@ -149,10 +175,12 @@ function CustomerOrderContent() {
         }
     }, [cart, tableParam]);
 
-    const filteredMenuItems =
-        activeCategory === 'all'
-            ? menuItems
-            : menuItems.filter((item) => item.category_id === activeCategory);
+    const filteredMenuItems = menuItems.filter((item) => {
+        const matchesCategory = activeCategory === 'all' || item.category_id === activeCategory;
+        const term = searchQuery.toLowerCase().trim();
+        const matchesSearch = !term || item.name.toLowerCase().includes(term) || (item.description && item.description.toLowerCase().includes(term));
+        return matchesCategory && matchesSearch;
+    });
 
     // Open Modifier Drawer for Item
     const handleItemClick = (item: MenuItem) => {
@@ -321,6 +349,19 @@ function CustomerOrderContent() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Interactive Ordering Guide Button */}
+                    <button
+                        onClick={() => {
+                            setGuideStep(0);
+                            setIsGuideOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 bg-[#eaf2eb] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/30 text-[#1c3a1e] text-xs px-2.5 py-2 rounded-xl font-bold transition-all"
+                        title="View Ordering Guide"
+                    >
+                        <HelpCircle className="h-4 w-4 text-[#1c3a1e]" />
+                        <span className="hidden sm:inline">Guide</span>
+                    </button>
+
                     {/* Google Review Button */}
                     <a
                         href="https://g.page/r/CVjTZaAHNiz0EAI/review"
@@ -357,6 +398,45 @@ function CustomerOrderContent() {
                 </div>
             </header>
 
+            {/* Live Order Status Tracker Banner */}
+            {(() => {
+                const activeOrderItems = liveOrderItems.filter((i) => i.status !== 'cancelled');
+                if (activeOrderItems.length === 0) return null;
+
+                const hasPending = activeOrderItems.some((i) => i.status === 'pending');
+                const hasPreparing = activeOrderItems.some((i) => i.status === 'preparing');
+                const allReady = activeOrderItems.every((i) => i.status === 'ready' || i.status === 'delivered');
+
+                let bgStyle = 'bg-amber-500/10 border-amber-500/30 text-amber-900';
+                let iconColor = 'text-amber-600 animate-pulse';
+                let statusMsg = 'Order Received by Kitchen — Preparing ticket...';
+
+                if (hasPreparing) {
+                    bgStyle = 'bg-blue-500/10 border-blue-500/30 text-blue-900';
+                    iconColor = 'text-blue-600 animate-spin';
+                    statusMsg = 'Kitchen is Preparing Your Meal — Chef is cooking your dishes!';
+                } else if (allReady) {
+                    bgStyle = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900';
+                    iconColor = 'text-emerald-600';
+                    statusMsg = 'Order Ready! — Servings are being delivered to your table.';
+                }
+
+                return (
+                    <div className={`${bgStyle} border-b px-4 py-2.5 text-xs font-bold flex items-center justify-between shadow-xs`}>
+                        <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${hasPreparing ? 'bg-blue-600' : hasPending ? 'bg-amber-500' : 'bg-emerald-600'} ${iconColor}`} />
+                            <span>{statusMsg}</span>
+                        </div>
+                        <button
+                            onClick={() => setIsBillOpen(true)}
+                            className="underline text-[11px] font-black uppercase tracking-wider hover:opacity-80"
+                        >
+                            View Items ({activeOrderItems.length})
+                        </button>
+                    </div>
+                );
+            })()}
+
             {/* Success / Notification Banner */}
             {orderSuccessMsg && (
                 <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-3 text-emerald-800 text-xs font-semibold flex items-center gap-2">
@@ -372,34 +452,63 @@ function CustomerOrderContent() {
                 </div>
             )}
             {/* Category Navigation Bar */}
-            <div className="sticky top-[75px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex gap-2">
-                <button
-                    onClick={() => handleCategoryClick('all')}
-                    className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === 'all'
-                        ? 'bg-[#1c3a1e] text-white shadow-md'
-                        : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
-                        }`}
-                >
-                    All Items
-                </button>
-                {categories.map((cat) => (
+            <div className="sticky top-[75px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex flex-col gap-2.5">
+                {/* Search Input Bar */}
+                {/* <div className="relative max-w-3xl w-full mx-auto">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search menu items, drinks, or shisha..."
+                        className="w-full bg-white border border-[#1c3a1e]/15 rounded-2xl pl-10 pr-8 py-2 text-xs text-[#1c3a1e] placeholder-gray-400 focus:outline-none focus:border-[#1c3a1e] transition-all shadow-xs"
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-gray-600 p-1"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div> */}
+
+                <div className="flex gap-2 overflow-x-auto scrollbar-none">
                     <button
-                        key={cat.id}
-                        onClick={() => handleCategoryClick(cat.id)}
-                        className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === cat.id
+                        onClick={() => handleCategoryClick('all')}
+                        className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === 'all'
                             ? 'bg-[#1c3a1e] text-white shadow-md'
                             : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
                             }`}
                     >
-                        {cat.name}
+                        All Items
                     </button>
-                ))}
+                    {categories.map((cat) => (
+                        <button
+                            key={cat.id}
+                            onClick={() => handleCategoryClick(cat.id)}
+                            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeCategory === cat.id
+                                ? 'bg-[#1c3a1e] text-white shadow-md'
+                                : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                }`}
+                        >
+                            {cat.name}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Menu Item Grid with Category Titles & Sticky Section Headers */}
             <main className="px-4 py-6 max-w-3xl mx-auto space-y-8">
                 {categories.map((cat) => {
-                    const catItems = filteredMenuItems.filter((item) => item.category_id === cat.id);
+                    const catItems = filteredMenuItems
+                        .filter((item) => item.category_id === cat.id)
+                        .sort((a, b) => {
+                            const orderA = a.sort_order ?? 0;
+                            const orderB = b.sort_order ?? 0;
+                            if (orderA !== orderB) return orderA - orderB;
+                            return a.name.localeCompare(b.name);
+                        });
                     if (catItems.length === 0) return null;
 
                     return (
@@ -441,6 +550,11 @@ function CustomerOrderContent() {
                                                         (e.target as HTMLImageElement).className = 'w-full h-full object-contain p-4 opacity-50';
                                                     }}
                                                 />
+                                                {item.is_bestseller && (
+                                                    <div className="absolute top-1 left-1 bg-[#d4af37] text-[#1c3a1e] font-black text-[9px] px-1.5 py-0.5 rounded-md shadow-sm z-10 flex items-center gap-0.5">
+                                                        ⭐ Bestseller
+                                                    </div>
+                                                )}
                                                 {isOutOfStock && (
                                                     <div className="absolute inset-0 bg-[#fafbfa]/80 flex items-center justify-center text-[10px] font-black text-red-600">
                                                         OUT OF STOCK
@@ -452,8 +566,13 @@ function CustomerOrderContent() {
                                             <div className="flex-1 flex flex-col justify-between min-h-[96px] py-0.5">
                                                 <div>
                                                     <div className="flex justify-between items-start gap-2 mb-1">
-                                                        <h3 className="font-extrabold text-sm text-[#1c3a1e] leading-snug group-hover:text-[#d4af37] transition-colors">
-                                                            {item.name}
+                                                        <h3 className="font-extrabold text-sm text-[#1c3a1e] leading-snug group-hover:text-[#d4af37] transition-colors flex items-center gap-1.5 flex-wrap">
+                                                            <span>{item.name}</span>
+                                                            {item.is_bestseller && (
+                                                                <span className="bg-[#d4af37]/20 text-[#1c3a1e] font-black text-[9px] px-1.5 py-0.5 rounded-md border border-[#d4af37]/40">
+                                                                    ⭐ Bestseller
+                                                                </span>
+                                                            )}
                                                         </h3>
                                                     </div>
                                                     {item.description && (
@@ -852,6 +971,290 @@ function CustomerOrderContent() {
                         <span>{addedToastMsg}</span>
                     </div>
                 )}
+            {/* FIRST-TIME CUSTOMER INTERACTIVE ONBOARDING GUIDE MODAL */}
+            {isGuideOpen && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div
+                        dir={guideLang === 'ar' ? 'rtl' : 'ltr'}
+                        className="bg-white border border-[#1c3a1e]/20 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e] relative overflow-hidden flex flex-col justify-between min-h-[490px]"
+                    >
+                        {/* Top Decorative Gold Header Bar */}
+                        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#1c3a1e] via-[#d4af37] to-[#1c3a1e]" />
+
+                        <div>
+                            {/* Modal Header Controls */}
+                            <div className="flex justify-between items-center mb-4 pt-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#1c3a1e] bg-[#eaf2eb] px-2.5 py-1 rounded-full border border-[#1c3a1e]/15">
+                                        {guideLang === 'ar' ? `الخطوة ${guideStep + 1} من 4` : `Step ${guideStep + 1} of 4`}
+                                    </span>
+
+                                    {/* Language Switcher */}
+                                    <div className="flex items-center bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-full p-0.5 shadow-xs">
+                                        <button
+                                            onClick={() => setGuideLang('en')}
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                                guideLang === 'en'
+                                                    ? 'bg-[#1c3a1e] text-white shadow-xs'
+                                                    : 'text-gray-500 hover:text-[#1c3a1e]'
+                                            }`}
+                                        >
+                                            EN
+                                        </button>
+                                        <button
+                                            onClick={() => setGuideLang('ar')}
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                                guideLang === 'ar'
+                                                    ? 'bg-[#1c3a1e] text-white shadow-xs'
+                                                    : 'text-gray-500 hover:text-[#1c3a1e]'
+                                            }`}
+                                        >
+                                            عربي
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleCloseGuide}
+                                    className="text-gray-400 hover:text-black font-bold p-1 rounded-full text-base transition-colors"
+                                    title={guideLang === 'ar' ? 'إغلاق' : 'Close Guide'}
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            {/* STEP 1: WELCOME */}
+                            {guideStep === 0 && (
+                                <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
+                                    {/* Image / Screenshot Container Slot #1 */}
+                                    <div className="relative w-full h-36 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                        <img
+                                            src="/images/guide-step-1.jpg"
+                                            alt="Step 1 Screenshot"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.target as HTMLElement).style.display = 'none';
+                                            }}
+                                        />
+                                        <div className="p-3 text-center space-y-1">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-[#d4af37] bg-[#1c3a1e] px-2 py-0.5 rounded-full inline-block">
+                                                📸 Slot #1: /public/images/guide-step-1.jpg
+                                            </span>
+                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
+                                                {guideLang === 'ar'
+                                                    ? 'صورة توضيحية: قائمة الطعام والأقسام'
+                                                    : 'Screenshot of menu categories & header'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
+                                        {guideLang === 'ar' ? 'أهلاً بكم في سكاي لايت فيلادج! 🌲' : 'Welcome to Skylight Village! 🌲'}
+                                    </h3>
+
+                                    <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                                        {guideLang === 'ar' ? (
+                                            <>
+                                                استمتع بالطلب المباشر من هاتفك لطاولتك رقم{' '}
+                                                <strong className="text-[#1c3a1e]">#{table?.table_number || 1}</strong>. تصفّح الأقسام، اختر أطباقك المفضلة وأرسل الطلب مباشرة للمطبخ!
+                                            </>
+                                        ) : (
+                                            <>
+                                                Enjoy self-ordering directly from your phone for{' '}
+                                                <strong className="text-[#1c3a1e]">Table #{table?.table_number || 1}</strong>. Browse categories, select dishes, and send orders straight to the kitchen!
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* STEP 2: CUSTOMIZE & ADD TO CART */}
+                            {guideStep === 1 && (
+                                <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
+                                    {/* Image / Screenshot Container Slot #2 */}
+                                    <div className="relative w-full h-36 bg-[#faf5e6] border border-[#d4af37]/30 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                        <img
+                                            src="/images/guide-step-2.jpg"
+                                            alt="Step 2 Screenshot"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.target as HTMLElement).style.display = 'none';
+                                            }}
+                                        />
+                                        <div className="p-3 text-center space-y-1">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-white bg-[#d4af37] px-2 py-0.5 rounded-full inline-block">
+                                                📸 Slot #2: /public/images/guide-step-2.jpg
+                                            </span>
+                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
+                                                {guideLang === 'ar'
+                                                    ? 'صورة توضيحية: الطبق وتحديد الإضافات'
+                                                    : 'Screenshot of dish item & options modal'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
+                                        {guideLang === 'ar' ? 'تخصيص الأطباق والإضافة للسلة 🛒' : 'Customize & Add to Cart 🛒'}
+                                    </h3>
+
+                                    <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                                        {guideLang === 'ar' ? (
+                                            <>
+                                                اضغط على أي طبق لاختيار الإضافات (مثل <strong className="text-[#1c3a1e]">الثوم الإضافي</strong>، <strong className="text-[#1c3a1e]">درجة الاستواء</strong>، أو ملاحظات خاصة) ثم أضفه إلى طلبك.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Tap any dish card to customize your order with options (e.g. <strong className="text-[#1c3a1e]">Extra Garlic</strong>, <strong className="text-[#1c3a1e]">Meat Doneness</strong>, or Special Notes).
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* STEP 3: CALL WAITER & SERVICE */}
+                            {guideStep === 2 && (
+                                <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
+                                    {/* Image / Screenshot Container Slot #3 */}
+                                    <div className="relative w-full h-36 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                        <img
+                                            src="/images/guide-step-3.jpg"
+                                            alt="Step 3 Screenshot"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.target as HTMLElement).style.display = 'none';
+                                            }}
+                                        />
+                                        <div className="p-3 text-center space-y-1">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-[#d4af37] bg-[#1c3a1e] px-2 py-0.5 rounded-full inline-block">
+                                                📸 Slot #3: /public/images/guide-step-3.jpg
+                                            </span>
+                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
+                                                {guideLang === 'ar'
+                                                    ? 'صورة توضيحية: زر الخدمة والسيرفيس'
+                                                    : 'Screenshot of floating Service Bell popover'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
+                                        {guideLang === 'ar' ? 'طلب الويتر والخدمة 🔔' : 'Call Waiter & Service 🔔'}
+                                    </h3>
+
+                                    <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                                        {guideLang === 'ar' ? (
+                                            <>
+                                                هل تحتاج لمساعدة، تغيير فحم الشيشة، أوطلب الفاتورة؟ اضغط على زر الجرس السريع في الأسفل في أي وقت.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Need human assistance, charcoal for shisha, or your check? Tap the floating Service Bell button at the bottom right.
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* STEP 4: LIVE KITCHEN ORDER STATUS */}
+                            {guideStep === 3 && (
+                                <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
+                                    {/* Image / Screenshot Container Slot #4 */}
+                                    <div className="relative w-full h-36 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                        <img
+                                            src="/images/guide-step-4.jpg"
+                                            alt="Step 4 Screenshot"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.target as HTMLElement).style.display = 'none';
+                                            }}
+                                        />
+                                        <div className="p-3 text-center space-y-1">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-block">
+                                                📸 Slot #4: /public/images/guide-step-4.jpg
+                                            </span>
+                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
+                                                {guideLang === 'ar'
+                                                    ? 'صورة توضيحية: شريط متابعة حالة الطلب المباشر'
+                                                    : 'Screenshot of live order status tracker banner'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
+                                        {guideLang === 'ar' ? 'متابعة حالة الطلب في المطبخ 🟡' : 'Live Kitchen Order Status 🟡'}
+                                    </h3>
+
+                                    <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                                        {guideLang === 'ar' ? (
+                                            <>
+                                                بعد إرسال الطلب، يتلقى الطهاة طلبك مباشرة. تتبع الحالة: <strong className="text-amber-700">🟡 تم الاستلام</strong> ➔ <strong className="text-blue-700">🔵 قيد التحضير</strong> ➔ <strong className="text-emerald-700">🟢 جاهز!</strong>
+                                            </>
+                                        ) : (
+                                            <>
+                                                Track your order live from the kitchen: <strong className="text-amber-700">🟡 Received</strong> ➔ <strong className="text-blue-700">🔵 Preparing</strong> ➔ <strong className="text-emerald-700">🟢 Ready!</strong>
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer Controls & Progress Indicators */}
+                        <div className="pt-3 border-t border-[#1c3a1e]/15 mt-3">
+                            {/* Step Dots */}
+                            <div className="flex justify-center items-center gap-1.5 mb-3">
+                                {[0, 1, 2, 3].map((stepIdx) => (
+                                    <button
+                                        key={stepIdx}
+                                        onClick={() => setGuideStep(stepIdx)}
+                                        className={`h-2 rounded-full transition-all ${
+                                            guideStep === stepIdx
+                                                ? 'w-6 bg-[#d4af37]'
+                                                : 'w-2 bg-gray-300 hover:bg-gray-400'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-3">
+                                {guideStep > 0 ? (
+                                    <button
+                                        onClick={() => setGuideStep((prev) => prev - 1)}
+                                        className="w-1/3 bg-[#eaf2eb] hover:bg-[#d8e6da] text-[#1c3a1e] font-bold py-3 rounded-2xl text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                        {guideLang === 'ar' ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                                        <span>{guideLang === 'ar' ? 'السابق' : 'Back'}</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleCloseGuide}
+                                        className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-2xl text-xs transition-all cursor-pointer"
+                                    >
+                                        {guideLang === 'ar' ? 'تخطي' : 'Skip'}
+                                    </button>
+                                )}
+
+                                {guideStep < 3 ? (
+                                    <button
+                                        onClick={() => setGuideStep((prev) => prev + 1)}
+                                        className="w-2/3 bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                        <span>{guideLang === 'ar' ? 'الخطوة التالية' : 'Next Step'}</span>
+                                        {guideLang === 'ar' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleCloseGuide}
+                                        className="w-2/3 bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                        <span>{guideLang === 'ar' ? 'ابدأ الطلب الآن! 🚀' : 'Start Ordering! 🚀'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             </div>
         </div>
     );

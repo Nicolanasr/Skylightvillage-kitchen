@@ -82,27 +82,25 @@ function ZReportContent() {
     .filter((p: any) => p.payment_method === 'card')
     .reduce((acc: number, p: any) => acc + Number(p.amount_usd), 0);
 
-  // Station Volume Breakdown
-  const stationVolume = {
-    mezza: allOrderItems
-      .filter((i: any) => i.station === 'mezza')
-      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
-    sajj: allOrderItems
-      .filter((i: any) => i.station === 'sajj')
-      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
-    grill: allOrderItems
-      .filter((i: any) => i.station === 'grill')
-      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
-    subs_sandwiches: allOrderItems
-      .filter((i: any) => i.station === 'subs_sandwiches')
-      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
-    bar: allOrderItems
-      .filter((i: any) => i.station === 'bar')
-      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
-    shisha: allOrderItems
-      .filter((i: any) => i.station === 'shisha')
-      .reduce((acc: number, i: any) => acc + Number(i.quantity), 0),
+  // Dynamic Station Volume Breakdown from database order items
+  const stationVolume: Record<string, number> = (allOrderItems || []).reduce((acc: Record<string, number>, item: any) => {
+    const st = item.station || 'mezza';
+    acc[st] = (acc[st] || 0) + Number(item.quantity);
+    return acc;
+  }, {});
+
+  const stationLabels: Record<string, string> = {
+    mezza: 'Mezza',
+    sajj: 'Sajj',
+    grill: 'BBQ',
+    subs_sandwiches: 'Subs & Sandwiches',
+    bar: 'Bar & Drinks',
+    shisha: 'Shisha',
   };
+
+  const dynamicStations = Array.from(
+    new Set([...Object.keys(stationLabels), ...Object.keys(stationVolume)])
+  );
 
   const handlePrintReport = () => {
     window.print();
@@ -201,41 +199,17 @@ function ZReportContent() {
           </h3>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Utensils className="h-5 w-5 mx-auto mb-2 text-[#1c3a1e]" />
-              <span className="text-xs text-gray-500 font-medium block">Mezza</span>
-              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.mezza} items</span>
-            </div>
-
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Flame className="h-5 w-5 mx-auto mb-2 text-amber-600" />
-              <span className="text-xs text-gray-500 font-medium block">Sajj</span>
-              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.sajj} items</span>
-            </div>
-
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Flame className="h-5 w-5 mx-auto mb-2 text-red-600" />
-              <span className="text-xs text-gray-500 font-medium block">BBQ</span>
-              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.grill} items</span>
-            </div>
-
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Utensils className="h-5 w-5 mx-auto mb-2 text-emerald-600" />
-              <span className="text-xs text-gray-500 font-medium block">Subs & Sandwiches</span>
-              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.subs_sandwiches} items</span>
-            </div>
-
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Wine className="h-5 w-5 mx-auto mb-2 text-blue-600" />
-              <span className="text-xs text-gray-500 font-medium block">Bar & Drinks</span>
-              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.bar} items</span>
-            </div>
-
-            <div className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
-              <Flame className="h-5 w-5 mx-auto mb-2 text-purple-600" />
-              <span className="text-xs text-gray-500 font-medium block">Shisha</span>
-              <span className="text-base font-bold text-[#1c3a1e]">{stationVolume.shisha} items</span>
-            </div>
+            {dynamicStations.map((stKey) => {
+              const label = stationLabels[stKey] || stKey.replace('_', ' ').toUpperCase();
+              const count = stationVolume[stKey] || 0;
+              return (
+                <div key={stKey} className="bg-[#fafbfa] p-4 rounded-2xl border border-[#1c3a1e]/10 text-center">
+                  <Utensils className="h-5 w-5 mx-auto mb-2 text-[#1c3a1e]" />
+                  <span className="text-xs text-gray-500 font-medium block">{label}</span>
+                  <span className="text-base font-bold text-[#1c3a1e]">{count} items</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

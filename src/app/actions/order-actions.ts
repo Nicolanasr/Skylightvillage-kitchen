@@ -48,11 +48,12 @@ export async function getOrderPageData(tableNumber: number, token: string) {
     }
 
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
     const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
     liveCategories = catRes.rows;
 
-    const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY name ASC');
+    const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC');
     liveMenuItems = itemRes.rows
       .filter((m: any) => !m.is_staff_only)
       .map((m: any) => ({
@@ -321,7 +322,7 @@ export async function getKDSData(stationFilter?: string) {
 
     const [res, menuRes] = await Promise.all([
       pool.query(query),
-      pool.query('SELECT * FROM menu_items ORDER BY name ASC'),
+      pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
     ]);
 
     menuItems = menuRes.rows.filter((m: any) => !m.is_staff_only);

@@ -25,7 +25,7 @@ export async function getPOSData() {
         pool.query('SELECT * FROM payments ORDER BY created_at DESC'),
         pool.query('SELECT * FROM discounts ORDER BY created_at DESC'),
         pool.query('SELECT * FROM service_calls ORDER BY created_at DESC'),
-        pool.query('SELECT * FROM menu_items ORDER BY name ASC'),
+        pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
         pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
       ]);
 
