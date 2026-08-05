@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRealtimeKDS } from '@/hooks/useRealtimeKDS';
 import { ItemStatus, OrderItem } from '@/lib/types';
 import { updateOrderItemStatus, revertOrderItemStatus, markKDSItemsPrinted } from '../actions/order-actions';
@@ -49,6 +50,11 @@ function KDSContent() {
     const [bumpingTrayTableNum, setBumpingTrayTableNum] = useState<number | null>(null);
     const [isPrinting, setIsPrinting] = useState<boolean>(false);
     const [currentTime, setCurrentTime] = useState<number>(Date.now());
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     const { items, menuItems, refreshKDSData } = useRealtimeKDS(stationFilter);
     const [localItems, setLocalItems] = useState<OrderItem[]>([]);
@@ -347,49 +353,52 @@ function KDSContent() {
 
     return (
         <div className="min-h-screen bg-[#fafbfa] text-[#1c3a1e] p-4 md:p-6 print:p-0 print:bg-white">
-            {/* ESC/POS THERMAL STATION CHIT PRINT CONTAINER */}
-            <div className="print-kds-container hidden print:block print:w-full print:m-0 print:p-0 font-mono text-black text-xs">
-                {groupedKDSPrintTickets.map((ticket, tIdx) => (
-                    <div key={tIdx} className="kds-chit-ticket mb-2 pb-2 border-b border-dashed border-black print:p-1">
-                        {/* Compact Station & Table Header */}
-                        <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-baseline">
-                            <span className="text-base font-black uppercase tracking-tight">{ticket.stationName}</span>
-                            <span className="text-lg font-black bg-black text-white px-2 py-0.5">TBL #{ticket.tableNumber}</span>
-                        </div>
+            {/* ESC/POS THERMAL STATION CHIT PRINT CONTAINER PORTAL */}
+            {isMounted && createPortal(
+                <div className="print-kds-container hidden print:block print:w-full print:m-0 print:p-0 font-mono text-black text-xs">
+                    {groupedKDSPrintTickets.map((ticket, tIdx) => (
+                        <div key={tIdx} className="kds-chit-ticket mb-2 pb-2 border-b border-dashed border-black print:p-1">
+                            {/* Compact Station & Table Header */}
+                            <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-baseline">
+                                <span className="text-base font-black uppercase tracking-tight">{ticket.stationName}</span>
+                                <span className="text-lg font-black bg-black text-white px-2 py-0.5">TBL #{ticket.tableNumber}</span>
+                            </div>
 
-                        {/* Timestamp Sub-header */}
-                        <div className="flex justify-between text-[10px] font-bold mb-1 border-b border-black/20 pb-0.5">
-                            <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span>Chit #{tIdx + 1} ({ticket.ticketItems.length} items)</span>
-                        </div>
+                            {/* Timestamp Sub-header */}
+                            <div className="flex justify-between text-[10px] font-bold mb-1 border-b border-black/20 pb-0.5">
+                                <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <span>Chit #{tIdx + 1} ({ticket.ticketItems.length} items)</span>
+                            </div>
 
-                        {/* Compact Ticket Items List */}
-                        <div className="space-y-1 py-1">
-                            {ticket.ticketItems.map((item, iIdx) => (
-                                <div key={iIdx} className="text-xs leading-snug border-b border-gray-200 pb-1">
-                                    <div className="font-black text-sm text-black flex justify-between">
-                                        <span>{item.quantity}x {item.item_name}</span>
+                            {/* Compact Ticket Items List */}
+                            <div className="space-y-1 py-1">
+                                {ticket.ticketItems.map((item, iIdx) => (
+                                    <div key={iIdx} className="text-xs leading-snug border-b border-gray-200 pb-1">
+                                        <div className="font-black text-sm text-black flex justify-between">
+                                            <span>{item.quantity}x {item.item_name}</span>
+                                        </div>
+
+                                        {item.special_notes && item.special_notes.trim() !== '' && (
+                                            <div className="text-[11px] font-black pl-2 mt-0.5 text-black">
+                                                *** NOTE: {item.special_notes} ***
+                                            </div>
+                                        )}
+
+                                        {Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
+                                            <div className="text-[11px] font-bold pl-2 mt-0.5 text-black">
+                                                {item.selected_modifiers.map((m: any, mIdx: number) => (
+                                                    <div key={mIdx}>+ {m.group ? `${m.group}: ` : ''}{m.option || m.name}</div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {item.special_notes && item.special_notes.trim() !== '' && (
-                                        <div className="text-[11px] font-black pl-2 mt-0.5 text-black">
-                                            *** NOTE: {item.special_notes} ***
-                                        </div>
-                                    )}
-
-                                    {Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
-                                        <div className="text-[11px] font-bold pl-2 mt-0.5 text-black">
-                                            {item.selected_modifiers.map((m: any, mIdx: number) => (
-                                                <div key={mIdx}>+ {m.group ? `${m.group}: ` : ''}{m.option || m.name}</div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>,
+                document.body
+            )}
 
             {/* Header Bar */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-[#1c3a1e]/15 print:hidden">

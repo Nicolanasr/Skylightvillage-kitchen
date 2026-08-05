@@ -52,44 +52,53 @@ body {
 
 /* Page Print Rules */
 @page {
-  margin: 0.5cm;
+  size: 80mm auto;
+  margin: 0;
 }
 
 @media print {
-  body, html {
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
   @page {
     size: 80mm auto;
     margin: 0;
   }
 
-  body * {
+  html, body {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  /* Completely collapse all body children EXCEPT print containers */
+  body > *:not(.print-kds-container):not(.print-receipt-container):not(.print-qr-container) {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
     visibility: hidden !important;
   }
 
-  .print-receipt-container,
-  .print-receipt-container *,
-  .print-qr-container,
-  .print-qr-container *,
-  .print-kds-container,
-  .print-kds-container * {
-    visibility: visible !important;
+  .print\:hidden {
+    display: none !important;
   }
 
-  .print-receipt-container {
+  .print-receipt-container,
+  .print-kds-container {
     display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    visibility: visible !important;
+    position: static !important;
     width: 76mm !important;
     max-width: 76mm !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 auto !important;
-    padding: 2mm 2mm !important;
+    padding: 2mm 2mm 0 2mm !important;
     background: #ffffff !important;
     color: #000000 !important;
     font-family: 'Outfit', 'Courier New', monospace, sans-serif !important;
@@ -98,11 +107,17 @@ body {
     box-sizing: border-box !important;
   }
 
+  .print-receipt-container *,
+  .print-kds-container * {
+    visibility: visible !important;
+  }
+
   .print-qr-container {
     display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    visibility: visible !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0.5in !important;
@@ -110,28 +125,26 @@ body {
     color: #000000 !important;
   }
 
-  .print-kds-container {
-    display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 76mm !important;
-    max-width: 76mm !important;
-    margin: 0 auto !important;
-    padding: 2mm 2mm !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-family: 'Outfit', 'Courier New', monospace, sans-serif !important;
-    font-size: 12px !important;
-    line-height: 1.25 !important;
-    box-sizing: border-box !important;
-  }
-
   .kds-chit-ticket {
-    page-break-after: always !important;
-    break-after: page !important;
+    height: auto !important;
     margin-bottom: 2mm !important;
     padding-bottom: 2mm !important;
     border-bottom: 1px dashed #000000 !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .kds-chit-ticket:not(:last-child) {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .kds-chit-ticket:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
   }
 }
