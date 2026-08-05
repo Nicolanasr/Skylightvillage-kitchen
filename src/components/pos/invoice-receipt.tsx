@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CalculatedBill, formatLbp, formatUsd, getInvoiceReference } from '@/lib/currency';
 import { OrderItem } from '@/lib/types';
 import { QRCodeSVG } from 'qrcode.react';
@@ -19,6 +21,11 @@ export function ThermalReceipt({
     sessionId?: string;
     forceVisible?: boolean;
 }) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const activeItems = items.filter((i) => i.status !== 'cancelled');
 
     // Aggregate duplicate items by item_name + modifiers + price + comp status
@@ -64,7 +71,7 @@ export function ThermalReceipt({
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const billId = getInvoiceReference(tableNumber, sessionId || items[0]?.session_id);
 
-    return (
+    const receiptContent = (
         <div className={`print-receipt-container text-black bg-white font-sans text-xs w-[76mm] max-w-[76mm] p-2 mx-auto ${forceVisible ? 'block' : 'hidden print:block'}`}>
             {/* Header / Logo */}
             <header className="text-center mb-2">
@@ -194,4 +201,8 @@ export function ThermalReceipt({
             </footer>
         </div>
     );
+
+    if (forceVisible) return receiptContent;
+    if (!mounted) return null;
+    return createPortal(receiptContent, document.body);
 }
