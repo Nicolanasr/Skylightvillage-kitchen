@@ -81,6 +81,7 @@ function POSContent() {
 
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
     const [showAllFloorTables, setShowAllFloorTables] = useState(false);
+    const [cartSearchQuery, setCartSearchQuery] = useState<string>('');
 
     // Modals & Triggers
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -156,6 +157,18 @@ function POSContent() {
                 i.status !== 'cancelled')
         )
         : [];
+
+    const filteredCartItems = sessionItems.filter((item) => {
+        if (!cartSearchQuery.trim()) return true;
+        const q = cartSearchQuery.toLowerCase().trim();
+        const nameMatch = item.item_name.toLowerCase().includes(q);
+        const guestMatch = (item.guest_name || '').toLowerCase().includes(q);
+        const noteMatch = (item.special_notes || '').toLowerCase().includes(q);
+        const modMatch = (item.selected_modifiers || []).some((m: any) =>
+            `${m.group || ''} ${m.option || m.name || ''}`.toLowerCase().includes(q)
+        );
+        return nameMatch || guestMatch || noteMatch || modMatch;
+    });
     const sessionDiscounts = activeSession
         ? discounts.filter((d) => d.session_id === activeSession.id)
         : [];
@@ -1025,6 +1038,28 @@ function POSContent() {
                                     </div>
                                 )}
 
+                                {/* CART SEARCH BAR */}
+                                {sessionItems.length > 0 && (
+                                    <div className="relative mb-3">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search items in cart, guests, or notes... 🔍"
+                                            value={cartSearchQuery}
+                                            onChange={(e) => setCartSearchQuery(e.target.value)}
+                                            className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 text-[#1c3a1e] font-bold text-xs pl-9 pr-8 py-2 rounded-xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all"
+                                        />
+                                        {cartSearchQuery && (
+                                            <button
+                                                onClick={() => setCartSearchQuery('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black p-0.5 cursor-pointer text-xs"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Session Order Items List with Guest Tags & Paid Badges */}
                                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                                     {sessionItems.length === 0 ? (
@@ -1037,8 +1072,18 @@ function POSContent() {
                                                 + Add First Order Item as Waiter
                                             </button>
                                         </div>
+                                    ) : filteredCartItems.length === 0 ? (
+                                        <div className="text-center py-6 bg-[#fafbfa] rounded-xl border border-dashed border-gray-300">
+                                            <p className="text-gray-500 text-xs font-bold mb-2">No cart items match "{cartSearchQuery}"</p>
+                                            <button
+                                                onClick={() => setCartSearchQuery('')}
+                                                className="text-[11px] text-[#1c3a1e] font-black underline hover:text-[#d4af37] cursor-pointer"
+                                            >
+                                                Clear Search Filter
+                                            </button>
+                                        </div>
                                     ) : (
-                                        sessionItems.map((item) => (
+                                        filteredCartItems.map((item) => (
                                             <div
                                                 key={item.id}
                                                 className={`bg-[#fafbfa] border rounded-xl p-3 ${item.is_paid
