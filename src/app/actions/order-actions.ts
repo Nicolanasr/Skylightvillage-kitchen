@@ -32,7 +32,7 @@ export async function getOrderPageData(tableNumber: number, token: string) {
 
     if (table) {
       const sessRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE primary_table_id = $1 AND status = 'active'",
+        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
         [table.id]
       );
       if (sessRes.rows.length > 0) {
@@ -211,7 +211,7 @@ export async function addWaiterManualOrderItem(data: {
   let session: any = null;
   try {
     const sessRes = await pool.query(
-      "SELECT * FROM table_sessions WHERE primary_table_id = $1 AND status = 'active'",
+      "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
       [data.tableId]
     );
     if (sessRes.rows.length > 0) {

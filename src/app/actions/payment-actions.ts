@@ -174,18 +174,29 @@ export async function mergeTables(primaryTableId: string, secondaryTableIds: str
       );
     }
 
+    const allTableIds = Array.from(new Set([primaryTableId, ...secondaryTableIds]));
+    const tablesRes = await pool.query("SELECT id, table_number FROM tables WHERE id::text = ANY($1::text[])", [allTableIds]);
+    const mergedTableNums = tablesRes.rows.map((r: any) => r.table_number);
+
     for (const secId of secondaryTableIds) {
       const secSessRes = await pool.query(
-        "SELECT id FROM table_sessions WHERE primary_table_id = $1 AND status = 'active' AND id != $2",
+        "SELECT id FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active' AND id != $2",
         [secId, primarySessionId]
       );
       for (const secSess of secSessRes.rows) {
         await pool.query("UPDATE table_sessions SET status = 'closed' WHERE id = $1", [secSess.id]);
         await pool.query('UPDATE order_items SET session_id = $1 WHERE session_id = $2', [primarySessionId, secSess.id]);
+        await pool.query('UPDATE discounts SET session_id = $1 WHERE session_id = $2', [primarySessionId, secSess.id]);
+        await pool.query('UPDATE payments SET session_id = $1 WHERE session_id = $2', [primarySessionId, secSess.id]);
       }
     }
 
-    const allTableIds = Array.from(new Set([primaryTableId, ...secondaryTableIds]));
+    // Re-assign ALL active/unpaid order items belonging to any merged table to primarySessionId
+    await pool.query(
+      "UPDATE order_items SET session_id = $1 WHERE (table_number = ANY($2::int[]) OR session_id IN (SELECT id FROM table_sessions WHERE primary_table_id::text = ANY($3::text[]) OR ANY(merged_table_ids)::text = ANY($3::text[]))) AND is_paid = false",
+      [primarySessionId, mergedTableNums, allTableIds]
+    );
+
     await pool.query("UPDATE tables SET status = 'merged' WHERE id::text = ANY($1::text[])", [allTableIds]);
   } catch (e) {
     console.error('Neon mergeTables error:', e);

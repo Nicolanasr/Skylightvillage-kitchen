@@ -128,7 +128,7 @@ function POSContent() {
         guestName?: string;
     } | null>(null);
 
-    // Active Session Resolution
+    // Active Session Resolution & Merged Table Resolution
     const activeSession = selectedTable
         ? sessions.find(
             (s) =>
@@ -138,8 +138,23 @@ function POSContent() {
         )
         : null;
 
+    const activeSessionTableIds = activeSession
+        ? Array.from(new Set([activeSession.primary_table_id, ...(activeSession.merged_table_ids || [])]))
+        : [];
+
+    const activeSessionTableNumbers = tables
+        .filter((t) => activeSessionTableIds.includes(t.id))
+        .map((t) => t.table_number);
+
     const sessionItems = activeSession
-        ? localOrderItems.filter((i) => i.session_id === activeSession.id)
+        ? localOrderItems.filter((i) =>
+            i.session_id === activeSession.id ||
+            (activeSessionTableNumbers.length > 0 &&
+                i.table_number !== undefined &&
+                activeSessionTableNumbers.includes(i.table_number) &&
+                !i.is_paid &&
+                i.status !== 'cancelled')
+        )
         : [];
     const sessionDiscounts = activeSession
         ? discounts.filter((d) => d.session_id === activeSession.id)
