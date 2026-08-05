@@ -21,6 +21,8 @@ import {
     Monitor,
     CheckSquare,
     Loader2,
+    Search,
+    X,
 } from 'lucide-react';
 
 export default function KDSPage() {
@@ -33,6 +35,10 @@ export default function KDSPage() {
 
 function KDSContent() {
     const [stationFilter, setStationFilter] = useState<string>('all');
+    const [selectedTables, setSelectedTables] = useState<number[]>([]); // Empty = ALL tables
+    const [selectedStatuses, setSelectedStatuses] = useState<ItemStatus[]>([]); // Empty = ALL statuses
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [groupByTable, setGroupByTable] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<'tickets' | 'expediter'>('tickets');
     const [sortBy, setSortBy] = useState<'received' | 'status' | 'time' | 'alphabet'>('received');
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
@@ -161,10 +167,72 @@ function KDSContent() {
         return a.id.localeCompare(b.id);
     });
 
-    const displayedItems =
-        stationFilter === 'all'
-            ? sortedItems
-            : sortedItems.filter((item) => item.station === stationFilter);
+    // Dynamic List of active table numbers
+    const availableTableNumbers = Array.from(
+        new Set(activeKitchenItems.map((i) => i.table_number || 1))
+    ).sort((a, b) => a - b);
+
+    // Filter Items by Station, Multi-Table, Multi-Status & Search Query
+    const displayedItems = sortedItems.filter((item) => {
+        // Station Filter
+        if (stationFilter !== 'all' && item.station !== stationFilter) return false;
+
+        // Multi-Table Selection Filter (If any selected)
+        if (selectedTables.length > 0 && !selectedTables.includes(item.table_number || 1)) {
+            return false;
+        }
+
+        // Multi-Status Selection Filter (If any selected)
+        if (selectedStatuses.length > 0 && !selectedStatuses.includes(item.status)) {
+            return false;
+        }
+
+        // Search Query Filter
+        if (searchQuery.trim() !== '') {
+            const q = searchQuery.toLowerCase().trim();
+            const tblStr = `table #${item.table_number || 1} tbl #${item.table_number || 1} #${item.table_number || 1} ${item.table_number || 1}`;
+            const nameStr = item.item_name.toLowerCase();
+            const noteStr = (item.special_notes || '').toLowerCase();
+            const modStr = (item.selected_modifiers || []).map((m: any) => `${m.group} ${m.option}`).join(' ').toLowerCase();
+
+            const matches =
+                tblStr.includes(q) ||
+                nameStr.includes(q) ||
+                noteStr.includes(q) ||
+                modStr.includes(q);
+
+            if (!matches) return false;
+        }
+
+        return true;
+    });
+
+    // Grouping by Table for Grouped View
+    const itemsGroupedByTable = displayedItems.reduce<Record<number, OrderItem[]>>((acc, item) => {
+        const tblNum = item.table_number || 1;
+        if (!acc[tblNum]) acc[tblNum] = [];
+        acc[tblNum].push(item);
+        return acc;
+    }, {});
+
+    const toggleTableSelection = (tbl: number) => {
+        setSelectedTables((prev) =>
+            prev.includes(tbl) ? prev.filter((t) => t !== tbl) : [...prev, tbl]
+        );
+    };
+
+    const toggleStatusSelection = (st: ItemStatus) => {
+        setSelectedStatuses((prev) =>
+            prev.includes(st) ? prev.filter((s) => s !== st) : [...prev, st]
+        );
+    };
+
+    const resetAllFilters = () => {
+        setSelectedTables([]);
+        setSelectedStatuses([]);
+        setSearchQuery('');
+        setStationFilter('all');
+    };
 
     const stationDisplayNames: Record<string, string> = {
         mezza: 'Mezza Station (Hot/Cold & Salads)',
@@ -457,8 +525,134 @@ function KDSContent() {
                 )}
             </div>
 
-            {/* EXPEDITER TABLE PASS VIEW */}
+            {/* SEARCH & MULTI-FILTER CONTROL SUITE */}
+            {activeTab === 'tickets' && (
+                <div className="bg-white p-4 rounded-3xl border border-[#1c3a1e]/15 shadow-sm mb-6 space-y-3.5 print:hidden">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                        {/* Search Input Bar */}
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search table #, dish name, or special instructions..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 text-[#1c3a1e] font-bold text-xs pl-10 pr-9 py-2.5 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black p-0.5 cursor-pointer"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Layout Mode Toggle */}
+                        <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl shrink-0">
+                            <span className="text-[10px] font-black text-[#1c3a1e] uppercase px-2">Layout:</span>
+                            <button
+                                onClick={() => setGroupByTable(false)}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                    !groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                }`}
+                            >
+                                📋 Single Cards ({displayedItems.length})
+                            </button>
+                            <button
+                                onClick={() => setGroupByTable(true)}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                    groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                }`}
+                            >
+                                🍽️ Group by Table ({Object.keys(itemsGroupedByTable).length})
+                            </button>
+                        </div>
+
+                        {(selectedTables.length > 0 || selectedStatuses.length > 0 || searchQuery !== '' || stationFilter !== 'all') && (
+                            <button
+                                onClick={resetAllFilters}
+                                className="text-xs font-black text-red-600 hover:text-red-800 underline transition-colors cursor-pointer self-end lg:self-center"
+                            >
+                                Reset All Filters ↺
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3 border-t border-[#1c3a1e]/10">
+                        {/* Multi-Select Status Pills */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-black text-[#1c3a1e] mr-1">Status:</span>
+                            {[
+                                { id: 'pending' as ItemStatus, label: '🟡 Pending (Received)', color: 'bg-amber-500 text-white' },
+                                { id: 'preparing' as ItemStatus, label: '🔵 Preparing (Cooking)', color: 'bg-blue-600 text-white' },
+                                { id: 'ready' as ItemStatus, label: '🟢 Ready (Pass)', color: 'bg-emerald-600 text-white' },
+                            ].map((st) => {
+                                const isSelected = selectedStatuses.includes(st.id);
+                                return (
+                                    <button
+                                        key={st.id}
+                                        onClick={() => toggleStatusSelection(st.id)}
+                                        className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
+                                            isSelected
+                                                ? `${st.color} border-transparent shadow-xs scale-105`
+                                                : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
+                                        }`}
+                                    >
+                                        {st.label}
+                                    </button>
+                                );
+                            })}
+                            {selectedStatuses.length > 0 && (
+                                <button
+                                    onClick={() => setSelectedStatuses([])}
+                                    className="text-[10px] font-extrabold text-gray-500 hover:text-black ml-1 underline cursor-pointer"
+                                >
+                                    Clear Statuses
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Multi-Select Table Pills */}
+                        {availableTableNumbers.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs font-black text-[#1c3a1e] mr-1">Tables:</span>
+                                <button
+                                    onClick={() => setSelectedTables([])}
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
+                                        selectedTables.length === 0
+                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-xs'
+                                            : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
+                                    }`}
+                                >
+                                    All ({availableTableNumbers.length})
+                                </button>
+                                {availableTableNumbers.map((tbl) => {
+                                    const isSelected = selectedTables.includes(tbl);
+                                    return (
+                                        <button
+                                            key={tbl}
+                                            onClick={() => toggleTableSelection(tbl)}
+                                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all border cursor-pointer ${
+                                                isSelected
+                                                    ? 'bg-[#d4af37] text-[#1c3a1e] border-[#d4af37] shadow-xs scale-105'
+                                                    : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
+                                            }`}
+                                        >
+                                            #{tbl}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* MAIN CONTENT AREA */}
             {activeTab === 'expediter' ? (
+                /* EXPEDITER TABLE PASS VIEW */
                 Object.keys(readyItemsByTable).length === 0 ? (
                     <div className="text-center py-24 bg-white rounded-3xl border border-[#1c3a1e]/15 shadow-sm print:hidden">
                         <Truck className="h-16 w-16 mx-auto mb-4 text-[#1c3a1e] opacity-30" />
@@ -502,7 +696,7 @@ function KDSContent() {
                                                     <button
                                                         disabled={isAnyBumping}
                                                         onClick={() => handleUndoStatus(item.id)}
-                                                        className="p-1.5 rounded-lg bg-[#eaf2eb] text-[#1c3a1e] hover:bg-gray-200 transition-colors"
+                                                        className="p-1.5 rounded-lg bg-[#eaf2eb] text-[#1c3a1e] hover:bg-gray-200 transition-colors cursor-pointer"
                                                         title="Undo back to Preparing"
                                                     >
                                                         <RotateCcw className="h-3.5 w-3.5" />
@@ -510,7 +704,7 @@ function KDSContent() {
                                                     <button
                                                         disabled={isAnyBumping}
                                                         onClick={() => handleStatusClick(item.id, 'ready')}
-                                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1"
+                                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer"
                                                     >
                                                         <span>Deliver</span>
                                                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -535,6 +729,191 @@ function KDSContent() {
                                 </button>
                             </div>
                         ))}
+                    </div>
+                )
+            ) : groupByTable ? (
+                /* GROUPED BY TABLE VIEW FOR CHEFS */
+                Object.keys(itemsGroupedByTable).length === 0 ? (
+                    <div className="text-center py-24 bg-white rounded-3xl border border-[#1c3a1e]/15 shadow-sm print:hidden">
+                        <ChefHat className="h-16 w-16 mx-auto mb-4 text-[#1c3a1e] opacity-30" />
+                        <h3 className="text-lg font-bold text-[#1c3a1e]">No Kitchen Orders Match Filters!</h3>
+                        <p className="text-xs text-gray-500 mt-1">Try resetting table, status, or search filters.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
+                        {Object.entries(itemsGroupedByTable).map(([tblNumStr, tableItems]) => {
+                            const tblNum = parseInt(tblNumStr, 10);
+                            const earliestTime = Math.min(...tableItems.map((i) => new Date(i.created_at).getTime()));
+                            const elapsedMins = Math.floor((currentTime - earliestTime) / 60000);
+
+                            let timerColor = 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30';
+                            if (elapsedMins >= 10 && elapsedMins < 15) {
+                                timerColor = 'bg-amber-500/10 text-amber-800 border-amber-500/30';
+                            } else if (elapsedMins >= 15) {
+                                timerColor = 'bg-red-500/10 text-red-700 border-red-500/30 animate-pulse';
+                            }
+
+                            const hasPending = tableItems.some((i) => i.status === 'pending');
+                            const hasPreparing = tableItems.some((i) => i.status === 'preparing');
+
+                            return (
+                                <div
+                                    key={tblNum}
+                                    className="bg-white rounded-3xl p-5 border-2 border-[#1c3a1e]/15 shadow-md flex flex-col justify-between space-y-4"
+                                >
+                                    <div>
+                                        {/* Table Card Header */}
+                                        <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15 mb-3">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="bg-[#1c3a1e] text-white font-black text-sm px-3.5 py-1 rounded-xl shadow-xs">
+                                                    TABLE #{tblNum}
+                                                </div>
+                                                <span className="text-xs font-bold text-gray-600">
+                                                    ({tableItems.length} {tableItems.length === 1 ? 'item' : 'items'})
+                                                </span>
+                                            </div>
+
+                                            <div className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border flex items-center gap-1 ${timerColor}`}>
+                                                <Clock className="h-3.5 w-3.5" />
+                                                <span>{elapsedMins}m</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Table Level Quick Bulk Actions */}
+                                        {(hasPending || hasPreparing) && (
+                                            <div className="flex items-center gap-2 mb-3">
+                                                {hasPending && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            const pendingItems = tableItems.filter((i) => i.status === 'pending');
+                                                            for (const item of pendingItems) {
+                                                                await handleStatusClick(item.id, 'pending');
+                                                            }
+                                                        }}
+                                                        className="flex-1 bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-black py-1.5 px-2 rounded-xl text-[11px] transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                                                    >
+                                                        <span>Start Cooking All</span>
+                                                        <ChevronRight className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                                {hasPreparing && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            const preparingItems = tableItems.filter((i) => i.status === 'preparing');
+                                                            for (const item of preparingItems) {
+                                                                await handleStatusClick(item.id, 'preparing');
+                                                            }
+                                                        }}
+                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-1.5 px-2 rounded-xl text-[11px] transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                                                    >
+                                                        <span>Mark All Ready</span>
+                                                        <ChevronRight className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Table Items List */}
+                                        <div className="space-y-3">
+                                            {tableItems.map((item) => {
+                                                const mItem = menuItems.find((m) => m.id === item.menu_item_id);
+                                                const statusButtonStyles = {
+                                                    pending: 'bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-extrabold',
+                                                    preparing: 'bg-blue-600 hover:bg-blue-700 text-white font-extrabold',
+                                                    ready: 'bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold',
+                                                    delivered: 'bg-gray-200 text-gray-600',
+                                                    cancelled: 'bg-red-500/10 text-red-700',
+                                                };
+
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        className="bg-[#fafbfa] border border-[#1c3a1e]/15 p-3 rounded-2xl space-y-2 shadow-2xs"
+                                                    >
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex items-center gap-2.5">
+                                                                {mItem?.image_url && (
+                                                                    <img
+                                                                        src={mItem.image_url}
+                                                                        alt={item.item_name}
+                                                                        className="h-9 w-9 rounded-lg object-cover border border-[#1c3a1e]/15 flex-shrink-0"
+                                                                    />
+                                                                )}
+                                                                <div>
+                                                                    <div className="font-black text-sm text-[#1c3a1e]">
+                                                                        {item.quantity}x {item.item_name}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                                                                        STATION: {(stationDisplayNames[item.station] || item.station).replace(' Station', '').replace(' (Hot/Cold & Salads)', '')}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <span className={`uppercase px-2 py-0.5 rounded-md text-[9px] font-black border ${
+                                                                item.status === 'pending'
+                                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                                    : item.status === 'preparing'
+                                                                    ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                                                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                            }`}>{item.status}</span>
+                                                        </div>
+
+                                                        {/* Modifiers List */}
+                                                        {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                                            <div className="space-y-0.5 pl-1">
+                                                                {item.selected_modifiers.map((mod: any, idx: number) => (
+                                                                    <div
+                                                                        key={idx}
+                                                                        className="text-[11px] text-[#1c3a1e] font-medium"
+                                                                    >
+                                                                        + {mod.group}: <span className="font-black">{mod.option}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Special Notes */}
+                                                        {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
+                                                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1 text-[11px] text-red-800 font-semibold">
+                                                                *** NOTE: {item.special_notes} ***
+                                                            </div>
+                                                        )}
+
+                                                        {/* Action Buttons for this item */}
+                                                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-[#1c3a1e]/10">
+                                                            {item.status !== 'pending' && (
+                                                                <button
+                                                                    disabled={isAnyBumping}
+                                                                    onClick={() => handleUndoStatus(item.id)}
+                                                                    className="bg-[#eaf2eb] hover:bg-gray-200 border border-[#1c3a1e]/20 text-[#1c3a1e] p-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                                                                    title="Undo Status"
+                                                                >
+                                                                    <RotateCcw className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            )}
+
+                                                            <button
+                                                                disabled={isAnyBumping}
+                                                                onClick={() => handleStatusClick(item.id, item.status)}
+                                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all shadow-xs disabled:opacity-50 cursor-pointer ${statusButtonStyles[item.status]}`}
+                                                            >
+                                                                {item.status === 'pending'
+                                                                    ? 'Start Cooking'
+                                                                    : item.status === 'preparing'
+                                                                    ? 'Mark Ready'
+                                                                    : item.status === 'ready'
+                                                                    ? 'Deliver'
+                                                                    : 'Done'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )
             ) : (
