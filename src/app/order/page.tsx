@@ -89,20 +89,34 @@ function CustomerOrderContent() {
     const [orderSuccessMsg, setOrderSuccessMsg] = useState<string | null>(null);
     const [addedToastMsg, setAddedToastMsg] = useState<string | null>(null);
 
-    // First-Time Customer Guide State
+    // Self-Ordering Welcome Notice & Visual Guide States
+    const [isWelcomeNoticeOpen, setIsWelcomeNoticeOpen] = useState(false);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
     const [guideStep, setGuideStep] = useState(0);
     const [guideLang, setGuideLang] = useState<'en' | 'ar'>('en');
 
-    // Auto-open guide for first-time QR scan customers
+    // Auto-open clear self-ordering welcome notice for first-time QR scan customers
     useEffect(() => {
         try {
-            const hasSeen = localStorage.getItem('skylight_has_seen_guide');
-            if (!hasSeen) {
-                setIsGuideOpen(true);
+            const hasSeenNotice = localStorage.getItem('skylight_has_seen_welcome_notice');
+            if (!hasSeenNotice) {
+                setIsWelcomeNoticeOpen(true);
             }
         } catch (e) {}
     }, []);
+
+    const handleCloseWelcomeNotice = () => {
+        setIsWelcomeNoticeOpen(false);
+        try {
+            localStorage.setItem('skylight_has_seen_welcome_notice', 'true');
+        } catch (e) {}
+    };
+
+    const handleOpenGuideFromNotice = () => {
+        handleCloseWelcomeNotice();
+        setGuideStep(0);
+        setIsGuideOpen(true);
+    };
 
     const handleCloseGuide = () => {
         setIsGuideOpen(false);
@@ -971,22 +985,110 @@ function CustomerOrderContent() {
                         <span>{addedToastMsg}</span>
                     </div>
                 )}
+            </div>
+
+            {/* FIRST-TIME CUSTOMER SELF-ORDERING WELCOME NOTICE MODAL */}
+            {isWelcomeNoticeOpen && (
+                <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white border border-[#1c3a1e]/20 w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl text-[#1c3a1e] relative overflow-hidden flex flex-col justify-between space-y-6">
+                        {/* Decorative Gold Header Bar */}
+                        <div className="absolute top-0 left-0 right-0 h-2.5 bg-gradient-to-r from-[#1c3a1e] via-[#d4af37] to-[#1c3a1e]" />
+
+                        {/* Top Close Button */}
+                        <div className="flex justify-between items-center pt-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-black uppercase tracking-wider text-[#1c3a1e] bg-[#eaf2eb] px-3.5 py-1.5 rounded-full border border-[#1c3a1e]/20 flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-[#d4af37] animate-pulse" />
+                                    Self-Ordering System | الطلب الذاتي
+                                </span>
+                            </div>
+                            <button
+                                onClick={handleCloseWelcomeNotice}
+                                className="text-gray-400 hover:text-black font-bold p-1 rounded-full text-base transition-colors"
+                                title="Close"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {/* Hero Icon Badge */}
+                        <div className="text-center py-1 space-y-4">
+                            <div className="h-20 w-20 bg-[#eaf2eb] rounded-3xl flex items-center justify-center mx-auto border border-[#1c3a1e]/15 shadow-sm">
+                                <Utensils className="h-10 w-10 text-[#1c3a1e]" />
+                            </div>
+
+                            <div className="space-y-1">
+                                <h3 className="text-2xl font-black text-[#1c3a1e] tracking-tight">
+                                    Welcome to Skylight Village 🌲
+                                </h3>
+                                <p className="text-sm font-extrabold text-[#d4af37]">
+                                    Table #{table?.table_number || 10} • الطاولة #{table?.table_number || 10}
+                                </p>
+                            </div>
+
+                            {/* Dual Language Clear Explanation Box */}
+                            <div className="bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-2xl p-4 sm:p-5 space-y-4 text-left shadow-xs">
+                                {/* English Version */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-sm font-black text-[#1c3a1e]">
+                                        <span>🇬🇧 English: Self-Ordering System</span>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-gray-700 font-semibold leading-relaxed">
+                                        You are using our live digital self-ordering menu. Simply browse dishes, customize your options, and send orders directly to our kitchen!
+                                    </p>
+                                </div>
+
+                                <div className="border-t border-[#1c3a1e]/15" />
+
+                                {/* Arabic Version (RTL) */}
+                                <div className="space-y-1.5 text-right" dir="rtl">
+                                    <div className="flex items-center gap-1.5 text-sm font-black text-[#1c3a1e]">
+                                        <span>🇱🇧 العربية: نظام الطلب الذاتي المباشر</span>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-gray-700 font-bold leading-relaxed">
+                                        أهلاً بكم! هذا نظام طلب إلكتروني ذاتي لطاولتك. تصفّح قائمة الطعام، خصّص أطباقك المفضلة، وأرسل طلبك مباشرة إلى المطبخ من هاتفك!
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="space-y-3 pt-1">
+                            <button
+                                onClick={handleCloseWelcomeNotice}
+                                className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-4 rounded-2xl text-sm sm:text-base shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <span>Start Self-Ordering 🚀 | ابدأ الطلب الذاتي</span>
+                            </button>
+
+                            <button
+                                onClick={handleOpenGuideFromNotice}
+                                className="w-full bg-[#eaf2eb] hover:bg-[#d8e6da] text-[#1c3a1e] font-extrabold py-3 rounded-2xl text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer border border-[#1c3a1e]/15"
+                            >
+                                <HelpCircle className="h-4 w-4 text-[#1c3a1e]" />
+                                <span>How It Works Guide (5 Steps) | دليل الاستخدام</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* FIRST-TIME CUSTOMER INTERACTIVE ONBOARDING GUIDE MODAL */}
             {isGuideOpen && (
                 <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
                     <div
                         dir={guideLang === 'ar' ? 'rtl' : 'ltr'}
-                        className="bg-white border border-[#1c3a1e]/20 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e] relative overflow-hidden flex flex-col justify-between min-h-[490px]"
+                        className="bg-white border border-[#1c3a1e]/20 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e] relative overflow-hidden flex flex-col justify-between min-h-[520px]"
                     >
                         {/* Top Decorative Gold Header Bar */}
                         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#1c3a1e] via-[#d4af37] to-[#1c3a1e]" />
 
                         <div>
                             {/* Modal Header Controls */}
-                            <div className="flex justify-between items-center mb-4 pt-1">
+                            <div className="flex justify-between items-center mb-3 pt-1">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-[#1c3a1e] bg-[#eaf2eb] px-2.5 py-1 rounded-full border border-[#1c3a1e]/15">
-                                        {guideLang === 'ar' ? `الخطوة ${guideStep + 1} من 4` : `Step ${guideStep + 1} of 4`}
+                                        {guideLang === 'ar' ? `الخطوة ${guideStep + 1} من 5` : `Step ${guideStep + 1} of 5`}
                                     </span>
 
                                     {/* Language Switcher */}
@@ -1023,160 +1125,133 @@ function CustomerOrderContent() {
                                 </button>
                             </div>
 
-                            {/* STEP 1: WELCOME */}
+                            {/* STEP 1: BROWSE MENU */}
                             {guideStep === 0 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
-                                    {/* Image / Screenshot Container Slot #1 */}
-                                    <div className="relative w-full h-36 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                    <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
                                         <img
-                                            src="/images/guide-step-1.jpg"
-                                            alt="Step 1 Screenshot"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLElement).style.display = 'none';
-                                            }}
+                                            src="/images/sc-guide-1.png"
+                                            alt="Browse Menu Screenshot"
+                                            className="w-full h-full object-cover object-top"
                                         />
-                                        <div className="p-3 text-center space-y-1">
-                                            <span className="text-[9px] font-black uppercase tracking-wider text-[#d4af37] bg-[#1c3a1e] px-2 py-0.5 rounded-full inline-block">
-                                                📸 Slot #1: /public/images/guide-step-1.jpg
-                                            </span>
-                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
-                                                {guideLang === 'ar'
-                                                    ? 'صورة توضيحية: قائمة الطعام والأقسام'
-                                                    : 'Screenshot of menu categories & header'}
-                                            </p>
-                                        </div>
                                     </div>
 
                                     <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
-                                        {guideLang === 'ar' ? 'أهلاً بكم في سكاي لايت فيلادج! 🌲' : 'Welcome to Skylight Village! 🌲'}
+                                        {guideLang === 'ar' ? 'أهلاً بكم وتصفح قائمة الطعام 🌲' : 'Welcome & Browse Menu 🌲'}
                                     </h3>
 
                                     <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
                                         {guideLang === 'ar' ? (
                                             <>
-                                                استمتع بالطلب المباشر من هاتفك لطاولتك رقم{' '}
-                                                <strong className="text-[#1c3a1e]">#{table?.table_number || 1}</strong>. تصفّح الأقسام، اختر أطباقك المفضلة وأرسل الطلب مباشرة للمطبخ!
+                                                تصفّح الأقسام (المقبلات، الصاج، المشاوي، المشروبات، الشيشة) واضغط على أي طبق لبدء الطلب لطاولتك رقم{' '}
+                                                <strong className="text-[#1c3a1e]">#{table?.table_number || 10}</strong>!
                                             </>
                                         ) : (
                                             <>
-                                                Enjoy self-ordering directly from your phone for{' '}
-                                                <strong className="text-[#1c3a1e]">Table #{table?.table_number || 1}</strong>. Browse categories, select dishes, and send orders straight to the kitchen!
+                                                Browse categories (Mezza, Sajj, BBQ, Bar, Shisha) & tap any item card to start ordering for{' '}
+                                                <strong className="text-[#1c3a1e]">Table #{table?.table_number || 10}</strong>!
                                             </>
                                         )}
                                     </p>
                                 </div>
                             )}
 
-                            {/* STEP 2: CUSTOMIZE & ADD TO CART */}
+                            {/* STEP 2: CUSTOMIZE DISH & OPTIONS */}
                             {guideStep === 1 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
-                                    {/* Image / Screenshot Container Slot #2 */}
-                                    <div className="relative w-full h-36 bg-[#faf5e6] border border-[#d4af37]/30 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                    <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
                                         <img
-                                            src="/images/guide-step-2.jpg"
-                                            alt="Step 2 Screenshot"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLElement).style.display = 'none';
-                                            }}
+                                            src="/images/sc-guide-2.png"
+                                            alt="Customize Dish Screenshot"
+                                            className="w-full h-full object-cover object-top"
                                         />
-                                        <div className="p-3 text-center space-y-1">
-                                            <span className="text-[9px] font-black uppercase tracking-wider text-white bg-[#d4af37] px-2 py-0.5 rounded-full inline-block">
-                                                📸 Slot #2: /public/images/guide-step-2.jpg
-                                            </span>
-                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
-                                                {guideLang === 'ar'
-                                                    ? 'صورة توضيحية: الطبق وتحديد الإضافات'
-                                                    : 'Screenshot of dish item & options modal'}
-                                            </p>
-                                        </div>
                                     </div>
 
                                     <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
-                                        {guideLang === 'ar' ? 'تخصيص الأطباق والإضافة للسلة 🛒' : 'Customize & Add to Cart 🛒'}
+                                        {guideLang === 'ar' ? 'تحديد الإضافات والملاحظات 📝' : 'Customize Options & Special Notes 📝'}
                                     </h3>
 
                                     <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
                                         {guideLang === 'ar' ? (
                                             <>
-                                                اضغط على أي طبق لاختيار الإضافات (مثل <strong className="text-[#1c3a1e]">الثوم الإضافي</strong>، <strong className="text-[#1c3a1e]">درجة الاستواء</strong>، أو ملاحظات خاصة) ثم أضفه إلى طلبك.
+                                                اختر الإضافات المطلوبة (مثل بيبسي، سفن أب، الثوم الإضافي) وأضف ملاحظاتك الخاصة للطهي قبل الإضافة للسلة!
                                             </>
                                         ) : (
                                             <>
-                                                Tap any dish card to customize your order with options (e.g. <strong className="text-[#1c3a1e]">Extra Garlic</strong>, <strong className="text-[#1c3a1e]">Meat Doneness</strong>, or Special Notes).
+                                                Choose required options (e.g. Pepsi, 7up, Extra Garlic) and add your special requests before adding to cart!
                                             </>
                                         )}
                                     </p>
                                 </div>
                             )}
 
-                            {/* STEP 3: CALL WAITER & SERVICE */}
+                            {/* STEP 3: REVIEW CART & SUBMIT */}
                             {guideStep === 2 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
-                                    {/* Image / Screenshot Container Slot #3 */}
-                                    <div className="relative w-full h-36 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                    <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
                                         <img
-                                            src="/images/guide-step-3.jpg"
-                                            alt="Step 3 Screenshot"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLElement).style.display = 'none';
-                                            }}
+                                            src="/images/sc-guide-3.png"
+                                            alt="Cart Drawer Screenshot"
+                                            className="w-full h-full object-cover object-top"
                                         />
-                                        <div className="p-3 text-center space-y-1">
-                                            <span className="text-[9px] font-black uppercase tracking-wider text-[#d4af37] bg-[#1c3a1e] px-2 py-0.5 rounded-full inline-block">
-                                                📸 Slot #3: /public/images/guide-step-3.jpg
-                                            </span>
-                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
-                                                {guideLang === 'ar'
-                                                    ? 'صورة توضيحية: زر الخدمة والسيرفيس'
-                                                    : 'Screenshot of floating Service Bell popover'}
-                                            </p>
-                                        </div>
                                     </div>
 
                                     <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
-                                        {guideLang === 'ar' ? 'طلب الويتر والخدمة 🔔' : 'Call Waiter & Service 🔔'}
+                                        {guideLang === 'ar' ? 'مراجعة السلة وإرسال الطلب 🛒' : 'Review Cart & Submit Order 🛒'}
                                     </h3>
 
                                     <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
                                         {guideLang === 'ar' ? (
                                             <>
-                                                هل تحتاج لمساعدة، تغيير فحم الشيشة، أوطلب الفاتورة؟ اضغط على زر الجرس السريع في الأسفل في أي وقت.
+                                                راجع محتويات السلة والأسعار بالدولار والليرة اللبنانية، ثم اضغط على زر <strong className="text-[#1c3a1e]">إرسال الطلب للمطبخ</strong>!
                                             </>
                                         ) : (
                                             <>
-                                                Need human assistance, charcoal for shisha, or your check? Tap the floating Service Bell button at the bottom right.
+                                                Inspect cart items & totals in USD ($) and LBP (L.L.), then tap <strong className="text-[#1c3a1e]">Submit Order to Kitchen</strong>!
                                             </>
                                         )}
                                     </p>
                                 </div>
                             )}
 
-                            {/* STEP 4: LIVE KITCHEN ORDER STATUS */}
+                            {/* STEP 4: CALL WAITER & SERVICE BELL */}
                             {guideStep === 3 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
-                                    {/* Image / Screenshot Container Slot #4 */}
-                                    <div className="relative w-full h-36 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group">
+                                    <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
                                         <img
-                                            src="/images/guide-step-4.jpg"
-                                            alt="Step 4 Screenshot"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLElement).style.display = 'none';
-                                            }}
+                                            src="/images/sc-guide-4.png"
+                                            alt="Service Bell Screenshot"
+                                            className="w-full h-full object-cover object-top"
                                         />
-                                        <div className="p-3 text-center space-y-1">
-                                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-block">
-                                                📸 Slot #4: /public/images/guide-step-4.jpg
-                                            </span>
-                                            <p className="text-[11px] font-extrabold text-[#1c3a1e]">
-                                                {guideLang === 'ar'
-                                                    ? 'صورة توضيحية: شريط متابعة حالة الطلب المباشر'
-                                                    : 'Screenshot of live order status tracker banner'}
-                                            </p>
-                                        </div>
+                                    </div>
+
+                                    <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
+                                        {guideLang === 'ar' ? 'طلب الويتر والفحم والخدمة 🔔' : 'Call Waiter & Service Bell 🔔'}
+                                    </h3>
+
+                                    <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                                        {guideLang === 'ar' ? (
+                                            <>
+                                                هل تحتاج لمساعدة الويتر، تغيير فحم الشيشة، أوطلب الفاتورة؟ اضغط على زر الجرس السريع في الأسفل في أي وقت!
+                                            </>
+                                        ) : (
+                                            <>
+                                                Need extra napkins, charcoal for shisha, or your check? Tap the floating bell icon at the bottom right anytime!
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* STEP 5: LIVE ORDER TRACKER */}
+                            {guideStep === 4 && (
+                                <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
+                                        <img
+                                            src="/images/sc-guide-5.png"
+                                            alt="Live Order Status Screenshot"
+                                            className="w-full h-full object-cover object-top"
+                                        />
                                     </div>
 
                                     <h3 className="text-lg font-black text-[#1c3a1e] tracking-tight">
@@ -1186,11 +1261,11 @@ function CustomerOrderContent() {
                                     <p className="text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
                                         {guideLang === 'ar' ? (
                                             <>
-                                                بعد إرسال الطلب، يتلقى الطهاة طلبك مباشرة. تتبع الحالة: <strong className="text-amber-700">🟡 تم الاستلام</strong> ➔ <strong className="text-blue-700">🔵 قيد التحضير</strong> ➔ <strong className="text-emerald-700">🟢 جاهز!</strong>
+                                                تابع حالة طلبك مباشرة من المطبخ: <strong className="text-amber-700">🟡 تم الاستلام</strong> ➔ <strong className="text-blue-700">🔵 قيد التحضير</strong> ➔ <strong className="text-emerald-700">🟢 جاهز للتقديم!</strong>
                                             </>
                                         ) : (
                                             <>
-                                                Track your order live from the kitchen: <strong className="text-amber-700">🟡 Received</strong> ➔ <strong className="text-blue-700">🔵 Preparing</strong> ➔ <strong className="text-emerald-700">🟢 Ready!</strong>
+                                                Track your order live from the kitchen: <strong className="text-amber-700">🟡 Received</strong> ➔ <strong className="text-blue-700">🔵 Cooking</strong> ➔ <strong className="text-emerald-700">🟢 Ready on its way!</strong>
                                             </>
                                         )}
                                     </p>
@@ -1202,7 +1277,7 @@ function CustomerOrderContent() {
                         <div className="pt-3 border-t border-[#1c3a1e]/15 mt-3">
                             {/* Step Dots */}
                             <div className="flex justify-center items-center gap-1.5 mb-3">
-                                {[0, 1, 2, 3].map((stepIdx) => (
+                                {[0, 1, 2, 3, 4].map((stepIdx) => (
                                     <button
                                         key={stepIdx}
                                         onClick={() => setGuideStep(stepIdx)}
@@ -1234,7 +1309,7 @@ function CustomerOrderContent() {
                                     </button>
                                 )}
 
-                                {guideStep < 3 ? (
+                                {guideStep < 4 ? (
                                     <button
                                         onClick={() => setGuideStep((prev) => prev + 1)}
                                         className="w-2/3 bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer"
@@ -1255,7 +1330,6 @@ function CustomerOrderContent() {
                     </div>
                 </div>
             )}
-            </div>
         </div>
     );
 }
