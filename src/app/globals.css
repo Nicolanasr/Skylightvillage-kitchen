@@ -130,8 +130,8 @@ body {
   .kds-chit-ticket {
     page-break-after: always !important;
     break-after: page !important;
-    margin-bottom: 16px !important;
-    padding-bottom: 16px !important;
-    border-bottom: 2px dashed #000000 !important;
+    margin-bottom: 2mm !important;
+    padding-bottom: 2mm !important;
+    border-bottom: 1px dashed #000000 !important;
   }
 }
