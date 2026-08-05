@@ -65,15 +65,15 @@ export function ThermalReceipt({
     const billId = getInvoiceReference(tableNumber, sessionId || items[0]?.session_id);
 
     return (
-        <div className={`print-receipt-container text-black bg-white font-sans text-xs w-[2.8in] p-2 mx-auto ${forceVisible ? 'block' : 'hidden print:block'}`}>
+        <div className={`print-receipt-container text-black bg-white font-sans text-xs w-[76mm] max-w-[76mm] p-2 mx-auto ${forceVisible ? 'block' : 'hidden print:block'}`}>
             {/* Header / Logo */}
             <header className="text-center mb-2">
                 <img
                     src="/images/Skylight-logo-white.png"
                     alt="Skylight Village Logo"
-                    className="w-40 h-auto mx-auto mb-1 object-contain brightness-0"
+                    className="w-36 h-auto mx-auto mb-1 object-contain brightness-0 filter"
                 />
-                <p className="text-[10px] text-gray-700 font-medium m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
+                <p className="text-[10px] text-black font-bold m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
             </header>
 
             {/* Bill Details */}

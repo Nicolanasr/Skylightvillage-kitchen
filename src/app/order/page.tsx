@@ -566,7 +566,7 @@ function CustomerOrderContent() {
                                                 />
                                                 {item.is_bestseller && (
                                                     <div className="absolute top-1 left-1 bg-[#d4af37] text-[#1c3a1e] font-black text-[9px] px-1.5 py-0.5 rounded-md shadow-sm z-10 flex items-center gap-0.5">
-                                                        ⭐ Bestseller
+                                                        ⭐ Speciality
                                                     </div>
                                                 )}
                                                 {isOutOfStock && (
@@ -584,7 +584,7 @@ function CustomerOrderContent() {
                                                             <span>{item.name}</span>
                                                             {item.is_bestseller && (
                                                                 <span className="bg-[#d4af37]/20 text-[#1c3a1e] font-black text-[9px] px-1.5 py-0.5 rounded-md border border-[#d4af37]/40">
-                                                                    ⭐ Bestseller
+                                                                    ⭐ Speciality
                                                                 </span>
                                                             )}
                                                         </h3>

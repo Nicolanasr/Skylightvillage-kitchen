@@ -566,7 +566,7 @@ function AdminContent() {
                                                                             </span>
                                                                             {item.is_bestseller && (
                                                                                 <span className="text-[9px] font-black text-amber-900 uppercase tracking-wider bg-amber-400/20 px-1.5 py-0.5 rounded-lg border border-amber-400/40">
-                                                                                    ⭐ Bestseller
+                                                                                    ⭐ Speciality
                                                                                 </span>
                                                                             )}
                                                                             {item.is_staff_only && (
@@ -1394,7 +1394,7 @@ function AdminContent() {
                                         className="h-4 w-4 rounded accent-[#d4af37] bg-[#fafbfa] border-[#1c3a1e]/20"
                                     />
                                     <label htmlFor="editIsBestseller" className="text-xs font-black text-[#1c3a1e] cursor-pointer flex items-center gap-1">
-                                        ⭐ Mark as Bestseller / Chef's Special (Displays gold badge on menu)
+                                        ⭐ Mark as Speciality / Chef's Special (Displays gold badge on menu)
                                     </label>
                                 </div>
 
@@ -1545,7 +1545,7 @@ function AdminContent() {
                                         className="h-4 w-4 rounded accent-amber-500 bg-slate-950 border-slate-800"
                                     />
                                     <label htmlFor="newItemIsBestseller" className="text-xs font-black text-amber-400 cursor-pointer flex items-center gap-1">
-                                        ⭐ Mark as Bestseller / Chef's Special (Displays gold badge on menu)
+                                        ⭐ Mark as Speciality / Chef's Special (Displays gold badge on menu)
                                     </label>
                                 </div>
 

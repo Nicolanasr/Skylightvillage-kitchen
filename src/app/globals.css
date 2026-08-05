@@ -86,15 +86,15 @@ body {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 2.8in !important;
-    max-width: 2.8in !important;
-    margin: 0 !important;
-    padding: 4px !important;
+    width: 76mm !important;
+    max-width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 2mm !important;
     background: #ffffff !important;
     color: #000000 !important;
-    font-family: 'PT Sans', sans-serif, monospace !important;
+    font-family: 'Outfit', 'Courier New', monospace, sans-serif !important;
     font-size: 12px !important;
-    line-height: 1.2 !important;
+    line-height: 1.25 !important;
     box-sizing: border-box !important;
   }
 
@@ -115,15 +115,15 @@ body {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 2.8in !important;
-    max-width: 2.8in !important;
-    margin: 0 !important;
-    padding: 4px !important;
+    width: 76mm !important;
+    max-width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 2mm !important;
     background: #ffffff !important;
     color: #000000 !important;
-    font-family: 'PT Sans', sans-serif, monospace !important;
+    font-family: 'Outfit', 'Courier New', monospace, sans-serif !important;
     font-size: 12px !important;
-    line-height: 1.2 !important;
+    line-height: 1.25 !important;
     box-sizing: border-box !important;
   }
 
