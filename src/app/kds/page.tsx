@@ -39,6 +39,7 @@ function KDSContent() {
     const [selectedStatuses, setSelectedStatuses] = useState<ItemStatus[]>([]); // Empty = ALL statuses
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [groupByTable, setGroupByTable] = useState<boolean>(false);
+    const [activePrintOverride, setActivePrintOverride] = useState<string[] | null>(null);
     const [activeTab, setActiveTab] = useState<'tickets' | 'expediter'>('tickets');
     const [sortBy, setSortBy] = useState<'received' | 'status' | 'time' | 'alphabet'>('received');
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
@@ -246,6 +247,9 @@ function KDSContent() {
     };
 
     const itemsToPrint = items.filter((item) => {
+        if (activePrintOverride) {
+            return activePrintOverride.includes(item.id);
+        }
         if (item.status === 'cancelled' || item.status === 'delivered') return false;
         if (!showPrintedItems && (item.is_printed || printedItemIds.includes(item.id))) return false;
         if (stationFilter !== 'all' && item.station !== stationFilter) return false;
@@ -276,6 +280,39 @@ function KDSContent() {
         existing.ticketItems.push(item);
         return acc;
     }, []);
+
+    const handlePrintSingleChit = async (targetItems: OrderItem[]) => {
+        if (!targetItems || targetItems.length === 0) return;
+        setIsPrinting(true);
+        const targetIds = targetItems.map((i) => i.id);
+
+        setActivePrintOverride(targetIds);
+
+        setLocalItems((prev) =>
+            prev.map((item) => {
+                if (targetIds.includes(item.id)) {
+                    return {
+                        ...item,
+                        is_printed: true,
+                        status: item.status === 'pending' ? 'preparing' : item.status,
+                    };
+                }
+                return item;
+            })
+        );
+        setPrintedItemIds((prev) => [...new Set([...prev, ...targetIds])]);
+
+        setTimeout(async () => {
+            window.print();
+            setActivePrintOverride(null);
+            try {
+                await markKDSItemsPrinted(targetIds);
+                await refreshKDSData();
+            } finally {
+                setIsPrinting(false);
+            }
+        }, 50);
+    };
 
     const handlePrintKDSChits = async () => {
         if (itemsToPrint.length === 0) return;
@@ -773,9 +810,21 @@ function KDSContent() {
                                                 </span>
                                             </div>
 
-                                            <div className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border flex items-center gap-1 ${timerColor}`}>
-                                                <Clock className="h-3.5 w-3.5" />
-                                                <span>{elapsedMins}m</span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    disabled={isPrinting}
+                                                    onClick={() => handlePrintSingleChit(tableItems)}
+                                                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold px-2.5 py-1 rounded-xl text-[11px] flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                                    title="Print Chit for this Table only"
+                                                >
+                                                    <Printer className="h-3.5 w-3.5" />
+                                                    <span>Print Chit</span>
+                                                </button>
+
+                                                <div className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border flex items-center gap-1 ${timerColor}`}>
+                                                    <Clock className="h-3.5 w-3.5" />
+                                                    <span>{elapsedMins}m</span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -881,6 +930,15 @@ function KDSContent() {
 
                                                         {/* Action Buttons for this item */}
                                                         <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-[#1c3a1e]/10">
+                                                            <button
+                                                                disabled={isPrinting}
+                                                                onClick={() => handlePrintSingleChit([item])}
+                                                                className="bg-gray-100 hover:bg-[#1c3a1e] hover:text-white border border-gray-300 text-gray-700 p-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                                                                title="Print Chit for this 1 item"
+                                                            >
+                                                                <Printer className="h-3.5 w-3.5" />
+                                                            </button>
+
                                                             {item.status !== 'pending' && (
                                                                 <button
                                                                     disabled={isAnyBumping}
@@ -1021,6 +1079,16 @@ function KDSContent() {
                                         </span>
 
                                         <div className="flex items-center gap-1.5">
+                                            <button
+                                                disabled={isPrinting}
+                                                onClick={() => handlePrintSingleChit([item])}
+                                                className="bg-gray-100 hover:bg-[#1c3a1e] hover:text-white border border-gray-300 text-[#1c3a1e] p-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                                                title="Print Chit for this 1 item"
+                                            >
+                                                <Printer className="h-3.5 w-3.5" />
+                                                <span className="hidden sm:inline">Print</span>
+                                            </button>
+
                                             {item.status !== 'pending' && (
                                                 <button
                                                     disabled={isAnyBumping}
