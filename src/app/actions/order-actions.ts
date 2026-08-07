@@ -4,6 +4,7 @@ import { pool } from '@/lib/db';
 import { ItemStatus, SelectedModifier, StationType, OrderItem } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
+import { logItemStatusChange } from './report-actions';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber: number, token: string) {
@@ -38,12 +39,9 @@ export async function getOrderPageData(tableNumber: number, token: string) {
       if (sessRes.rows.length > 0) {
         session = sessRes.rows[0];
       } else {
-        const newSessId = randomUUID();
-        const insertSess = await pool.query(
-          "INSERT INTO table_sessions (id, primary_table_id, status) VALUES ($1, $2, 'active') RETURNING *",
-          [newSessId, table.id]
-        );
-        session = insertSess.rows[0] || { id: newSessId, primary_table_id: table.id, status: 'active' };
+        // Do NOT insert an empty session into DB on menu load!
+        // Return a virtual session reference so active sessions are only created when an order is actually submitted.
+        session = { id: `virtual-${table.id}`, primary_table_id: table.id, status: 'active', is_virtual: true };
       }
     }
 
@@ -61,7 +59,7 @@ export async function getOrderPageData(tableNumber: number, token: string) {
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 
-    if (session) {
+    if (session && !session.is_virtual && !session.id.startsWith('virtual-')) {
       const ordItemsRes = await pool.query('SELECT * FROM order_items WHERE session_id = $1 ORDER BY created_at ASC', [session.id]);
       liveItems = ordItemsRes.rows;
 
@@ -104,21 +102,76 @@ export async function submitCustomerOrder(data: {
     return { success: false, error: 'No items in order' };
   }
 
+  let activeSession: any = null;
   let primaryTable: any = null;
   let tableNumber = 1;
 
   try {
-    const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1', [data.sessionId]);
-    if (sessRes.rows.length > 0) {
-      const session = sessRes.rows[0];
-      const tblRes = await pool.query('SELECT * FROM tables WHERE id = $1', [session.primary_table_id]);
+    let targetTableId = '';
+    const isVirtual = data.sessionId.startsWith('virtual-');
+    if (isVirtual) {
+      targetTableId = data.sessionId.replace('virtual-', '');
+    } else {
+      const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1 AND status = \'active\'', [data.sessionId]);
+      if (sessRes.rows.length > 0) {
+        activeSession = sessRes.rows[0];
+      }
+    }
+
+    if (!activeSession) {
+      // Session does not exist in DB yet (e.g. virtual or new order) -> resolve table and create session ON-DEMAND!
+      let tblRes: any = { rows: [] };
+      if (targetTableId) {
+        tblRes = await pool.query('SELECT * FROM tables WHERE id = $1', [targetTableId]);
+      }
+      if (tblRes.rows.length === 0) {
+        tblRes = await pool.query('SELECT * FROM tables ORDER BY table_number ASC LIMIT 1');
+      }
+
+      if (tblRes.rows.length > 0) {
+        primaryTable = tblRes.rows[0];
+        tableNumber = primaryTable.table_number;
+
+        const activeSessRes = await pool.query(
+          "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+          [primaryTable.id]
+        );
+        if (activeSessRes.rows.length > 0) {
+          activeSession = activeSessRes.rows[0];
+        } else {
+          // Create real active session in DB NOW because an order is actually being submitted!
+          const newSessId = randomUUID();
+          const insertSess = await pool.query(
+            "INSERT INTO table_sessions (id, primary_table_id, status) VALUES ($1, $2, 'active') RETURNING *",
+            [newSessId, primaryTable.id]
+          );
+          activeSession = insertSess.rows[0];
+          await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1", [primaryTable.id]);
+        }
+      }
+    }
+
+    if (activeSession && !primaryTable) {
+      const tblRes = await pool.query('SELECT * FROM tables WHERE id = $1', [activeSession.primary_table_id]);
       if (tblRes.rows.length > 0) {
         primaryTable = tblRes.rows[0];
         tableNumber = primaryTable.table_number;
       }
     }
   } catch (e) {
-    console.error('Neon session query error:', e);
+    console.error('Neon session query error in submitCustomerOrder:', e);
+  }
+
+  // Fallback check to ensure finalSessionId is NEVER a "virtual-" string
+  let finalSessionId = activeSession ? activeSession.id : '';
+  if (!finalSessionId || finalSessionId.startsWith('virtual-')) {
+    const fallbackSessId = randomUUID();
+    const fallbackTblId = primaryTable?.id || (await pool.query('SELECT id FROM tables LIMIT 1')).rows[0]?.id;
+    const fallbackSess = await pool.query(
+      "INSERT INTO table_sessions (id, primary_table_id, status) VALUES ($1, $2, 'active') RETURNING *",
+      [fallbackSessId, fallbackTblId]
+    );
+    finalSessionId = fallbackSess.rows[0].id;
   }
 
   if (primaryTable && primaryTable.status === 'bill_requested') {
@@ -129,16 +182,22 @@ export async function submitCustomerOrder(data: {
   const itemsToInsert: OrderItem[] = [];
 
   for (const item of data.items) {
+    const modifiersExtraSum = (item.selectedModifiers || []).reduce(
+      (sum: number, mod: any) => sum + Number(mod.price_extra || mod.price_extra_usd || 0),
+      0
+    );
+    const effectiveUnitPrice = Number(item.unitPriceUsd) + modifiersExtraSum;
+
     for (let q = 0; q < item.quantity; q++) {
       const newItem: OrderItem = {
         id: randomUUID(),
         order_id: orderId,
-        session_id: data.sessionId,
+        session_id: finalSessionId,
         table_number: tableNumber,
         menu_item_id: item.menuItemId,
         item_name: item.itemName,
         quantity: 1,
-        unit_price_usd: item.unitPriceUsd,
+        unit_price_usd: effectiveUnitPrice,
         station: item.station,
         status: 'pending' as ItemStatus,
         selected_modifiers: item.selectedModifiers || [],
@@ -151,7 +210,7 @@ export async function submitCustomerOrder(data: {
   }
 
   try {
-    await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, data.sessionId]);
+    await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, finalSessionId]);
 
     const valuePlaceholders: string[] = [];
     const params: any[] = [];
@@ -239,6 +298,12 @@ export async function addWaiterManualOrderItem(data: {
     const params: any[] = [];
     let pIdx = 1;
 
+    const modifiersExtraSum = (data.selectedModifiers || []).reduce(
+      (sum: number, mod: any) => sum + Number(mod.price_extra || mod.price_extra_usd || 0),
+      0
+    );
+    const effectiveUnitPriceUsd = Number(data.unitPriceUsd) + modifiersExtraSum;
+
     for (let i = 0; i < data.quantity; i++) {
       valuePlaceholders.push(
         `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11})`
@@ -251,7 +316,7 @@ export async function addWaiterManualOrderItem(data: {
         data.menuItemId,
         data.itemName,
         1,
-        data.unitPriceUsd,
+        effectiveUnitPriceUsd,
         data.station,
         'pending',
         JSON.stringify(data.selectedModifiers || []),
@@ -271,6 +336,98 @@ export async function addWaiterManualOrderItem(data: {
     console.error('Neon waiter manual order item insert error:', e);
   }
 
+  return { success: true };
+}
+
+export async function addBatchWaiterManualOrderItems(data: {
+  tableId: string;
+  tableNumber: number;
+  items: Array<{
+    menuItemId: string;
+    itemName: string;
+    quantity: number;
+    unitPriceUsd: number;
+    station: StationType;
+    selectedModifiers?: SelectedModifier[];
+    specialNotes?: string;
+  }>;
+}) {
+  if (!pool || !data.items || data.items.length === 0) return { success: false, error: 'No items provided' };
+
+  let session: any = null;
+  try {
+    const sessRes = await pool.query(
+      "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+      [data.tableId]
+    );
+    if (sessRes.rows.length > 0) {
+      session = sessRes.rows[0];
+    } else {
+      const newSessId = randomUUID();
+      const insertSess = await pool.query(
+        "INSERT INTO table_sessions (id, primary_table_id, status) VALUES ($1, $2, 'active') RETURNING *",
+        [newSessId, data.tableId]
+      );
+      session = insertSess.rows[0] || { id: newSessId, primary_table_id: data.tableId, status: 'active' };
+      await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [data.tableId, data.tableNumber]);
+    }
+  } catch (e) {
+    console.error('Neon waiter session creation error:', e);
+  }
+
+  if (!session) return { success: false, error: 'Failed to find/create active session' };
+
+  const orderId = randomUUID();
+  try {
+    await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, session.id]);
+
+    const valuePlaceholders: string[] = [];
+    const params: any[] = [];
+    let pIdx = 1;
+
+    for (const item of data.items) {
+      const modifiersExtraSum = (item.selectedModifiers || []).reduce(
+        (sum: number, mod: any) => sum + Number(mod.price_extra || mod.price_extra_usd || 0),
+        0
+      );
+      const effectiveUnitPriceUsd = Number(item.unitPriceUsd) + modifiersExtraSum;
+
+      for (let i = 0; i < item.quantity; i++) {
+        valuePlaceholders.push(
+          `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11})`
+        );
+        params.push(
+          randomUUID(),
+          orderId,
+          session.id,
+          data.tableNumber,
+          item.menuItemId,
+          item.itemName,
+          1,
+          effectiveUnitPriceUsd,
+          item.station,
+          'pending',
+          JSON.stringify(item.selectedModifiers || []),
+          item.specialNotes || ''
+        );
+        pIdx += 12;
+      }
+    }
+
+    if (valuePlaceholders.length > 0) {
+      await pool.query(
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes)
+         VALUES ${valuePlaceholders.join(', ')}`,
+        params
+      );
+    }
+  } catch (e) {
+    console.error('Neon addBatchWaiterManualOrderItems error:', e);
+    return { success: false, error: 'Failed to insert batch items' };
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/kds');
   return { success: true };
 }
 
@@ -306,26 +463,30 @@ export async function getKDSData(stationFilter?: string) {
   let menuItems: any[] = [];
 
   try {
-    // DB Normalization: update legacy cold_mezza / hot_mezza DB values
+    // DB Normalization & Cleanup: cancel lingering pending items from closed sessions
     await pool.query("UPDATE order_items SET station = 'mezza' WHERE station IN ('cold_mezza', 'hot_mezza')").catch(() => {});
     await pool.query("UPDATE menu_items SET station = 'mezza' WHERE station IN ('cold_mezza', 'hot_mezza')").catch(() => {});
+    await pool.query("UPDATE order_items SET status = 'cancelled' WHERE session_id IN (SELECT id FROM table_sessions WHERE status = 'closed') AND status IN ('pending', 'preparing')").catch(() => {});
 
     const query = `
-      SELECT oi.*, COALESCE(mi.station, oi.station) AS station 
+      SELECT oi.*, COALESCE(mi.station, oi.station) AS station, ts.primary_table_id, ts.merged_table_ids
       FROM order_items oi
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN table_sessions ts ON oi.session_id = ts.id
       WHERE ts.status = 'active'
+      AND (oi.is_paid IS NOT TRUE)
       AND oi.status NOT IN ('delivered', 'cancelled')
       ORDER BY oi.created_at ASC
     `;
 
-    const [res, menuRes] = await Promise.all([
+    const [res, menuRes, tblRes] = await Promise.all([
       pool.query(query),
       pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+      pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
     ]);
 
     menuItems = menuRes.rows.filter((m: any) => !m.is_staff_only);
+    const tables = tblRes.rows;
 
     const staffOnlyItemIds = new Set(
       menuRes.rows.filter((m: any) => m.is_staff_only).map((m: any) => m.id)
@@ -340,10 +501,36 @@ export async function getKDSData(stationFilter?: string) {
 
     items = res.rows
       .filter((item: any) => !staffOnlyItemIds.has(item.menu_item_id))
-      .map((item: any) => ({
-        ...item,
-        station: normalizeStation(item.station),
-      }));
+      .map((item: any) => {
+        let mergedNums: number[] = [];
+        if (item.merged_table_ids) {
+          let rawArr: string[] = [];
+          if (Array.isArray(item.merged_table_ids)) {
+            rawArr = item.merged_table_ids;
+          } else if (typeof item.merged_table_ids === 'string') {
+            try {
+              const formattedStr = (item.merged_table_ids as string)
+                .replace(/^{/, '[')
+                .replace(/}$/, ']');
+              rawArr = JSON.parse(formattedStr);
+            } catch (e) {}
+          }
+          mergedNums = rawArr
+            .map((tid) => tables.find((t) => t.id === tid)?.table_number)
+            .filter((num): num is number => num !== undefined);
+        }
+
+        const primaryTblNum = tables.find((t) => t.id === item.primary_table_id)?.table_number || item.table_number || 1;
+        const allTableNums = Array.from(new Set([primaryTblNum, ...mergedNums])).sort((a, b) => a - b);
+        const tableLabel = allTableNums.length > 1 ? `TABLE #${allTableNums.join(' & #')}` : `TABLE #${primaryTblNum}`;
+
+        return {
+          ...item,
+          table_number: primaryTblNum,
+          table_display_label: tableLabel,
+          station: normalizeStation(item.station),
+        };
+      });
   } catch (e) {
     console.error('Neon KDS fetch error:', e);
   }
@@ -358,7 +545,7 @@ export async function updateOrderItemStatus(itemId: string, status: ItemStatus) 
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query('UPDATE order_items SET status = $1 WHERE id = $2', [status, itemId]);
+    await logItemStatusChange(itemId, status);
   } catch (e) {
     console.error('Neon updateOrderItemStatus error:', e);
   }
@@ -370,7 +557,9 @@ export async function updateMultipleOrderItemsStatus(itemIds: string[], status: 
   if (!pool || !itemIds || itemIds.length === 0) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query('UPDATE order_items SET status = $1 WHERE id::text = ANY($2::text[])', [status, itemIds]);
+    for (const id of itemIds) {
+      await logItemStatusChange(id, status);
+    }
   } catch (e) {
     console.error('Neon updateMultipleOrderItemsStatus error:', e);
   }
@@ -397,7 +586,7 @@ export async function revertOrderItemStatus(itemId: string) {
     const currentStatus = res.rows[0].status as ItemStatus;
     const prevStatus = prevStatusMap[currentStatus] || 'pending';
 
-    await pool.query('UPDATE order_items SET status = $1 WHERE id = $2', [prevStatus, itemId]);
+    await logItemStatusChange(itemId, prevStatus, currentStatus);
   } catch (e) {
     console.error('Neon revertOrderItemStatus error:', e);
   }

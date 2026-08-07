@@ -24,6 +24,7 @@ import {
     Loader2,
     Search,
     X,
+    Shield,
 } from 'lucide-react';
 
 export default function KDSPage() {
@@ -44,6 +45,7 @@ function KDSContent() {
     const [activeTab, setActiveTab] = useState<'tickets' | 'expediter'>('tickets');
     const [sortBy, setSortBy] = useState<'received' | 'status' | 'time' | 'alphabet'>('received');
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
     const [printedItemIds, setPrintedItemIds] = useState<string[]>([]);
     const [bumpingItemIds, setBumpingItemIds] = useState<Record<string, boolean>>({});
     const isAnyBumping = Object.values(bumpingItemIds).some(Boolean);
@@ -361,7 +363,9 @@ function KDSContent() {
                             {/* Compact Station & Table Header */}
                             <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-baseline">
                                 <span className="text-base font-black uppercase tracking-tight">{ticket.stationName}</span>
-                                <span className="text-lg font-black bg-black text-white px-2 py-0.5">TBL #{ticket.tableNumber}</span>
+                                <span className="text-lg font-black bg-black text-white px-2 py-0.5">
+                                    {(ticket.ticketItems[0] as any)?.table_display_label || `TBL #${ticket.tableNumber}`}
+                                </span>
                             </div>
 
                             {/* Timestamp Sub-header */}
@@ -403,13 +407,6 @@ function KDSContent() {
             {/* Header Bar */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-[#1c3a1e]/15 print:hidden">
                 <div className="flex items-center gap-3">
-                    <div className="bg-[#1c3a1e] p-2.5 rounded-2xl shadow-sm">
-                        <img
-                            src="/images/Skylight-logo-white.png"
-                            alt="Skylight Village Logo"
-                            className="h-8 w-auto object-contain filter invert"
-                        />
-                    </div>
                     <div>
                         <h1 className="text-2xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
                             <span>Skylight Kitchen KDS</span>
@@ -430,6 +427,14 @@ function KDSContent() {
                     >
                         <Monitor className="h-4 w-4 text-[#1c3a1e]" />
                         <span>POS Waiter Terminal</span>
+                    </a>
+
+                    <a
+                        href="/admin"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"
+                    >
+                        <Shield className="h-4 w-4 text-[#1c3a1e]" />
+                        <span>Admin Manager</span>
                     </a>
 
                     <button
@@ -526,53 +531,71 @@ function KDSContent() {
                     })}
                 </div>
 
-                {/* Sort Mode Controls */}
+                {/* Sort Mode & Filter Toggle Controls */}
                 {activeTab === 'tickets' && (
-                    <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl shrink-0">
-                        <span className="text-[10px] font-extrabold text-[#1c3a1e] uppercase px-2">Sort By:</span>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl shrink-0">
+                            <span className="text-[10px] font-extrabold text-[#1c3a1e] uppercase px-2">Sort By:</span>
+                            <button
+                                onClick={() => setSortBy('received')}
+                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'received'
+                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
+                                title="Cards stay fixed in received order (Changing status does NOT move card position)"
+                            >
+                                As Received
+                            </button>
+                            <button
+                                onClick={() => setSortBy('status')}
+                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'status'
+                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
+                            >
+                                By Status
+                            </button>
+                            <button
+                                onClick={() => setSortBy('time')}
+                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'time'
+                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
+                            >
+                                By Time
+                            </button>
+                            <button
+                                onClick={() => setSortBy('alphabet')}
+                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'alphabet'
+                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
+                            >
+                                Alphabetical
+                            </button>
+                        </div>
+
                         <button
-                            onClick={() => setSortBy('received')}
-                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'received'
-                                ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
-                            title="Cards stay fixed in received order (Changing status does NOT move card position)"
+                            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                            className={`px-3.5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-1.5 cursor-pointer border ${
+                                showAdvancedFilters || searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0
+                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-sm'
+                                    : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
+                            }`}
+                            title="Toggle Search and Multi-Filters"
                         >
-                            As Received
-                        </button>
-                        <button
-                            onClick={() => setSortBy('status')}
-                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'status'
-                                ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
-                        >
-                            By Status
-                        </button>
-                        <button
-                            onClick={() => setSortBy('time')}
-                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'time'
-                                ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
-                        >
-                            By Time
-                        </button>
-                        <button
-                            onClick={() => setSortBy('alphabet')}
-                            className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'alphabet'
-                                ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
-                        >
-                            Alphabetical
+                            <Search className="h-4 w-4" />
+                            <span>Filters & Search</span>
+                            {(searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0) && (
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                            )}
                         </button>
                     </div>
                 )}
             </div>
 
-            {/* SEARCH & MULTI-FILTER CONTROL SUITE */}
-            {activeTab === 'tickets' && (
+            {/* SEARCH & MULTI-FILTER CONTROL SUITE (Collapsible) */}
+            {activeTab === 'tickets' && (showAdvancedFilters || searchQuery !== '' || selectedTables.length > 0 || selectedStatuses.length > 0) && (
                 <div className="bg-white p-4 rounded-3xl border border-[#1c3a1e]/15 shadow-sm mb-6 space-y-3.5 print:hidden">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                         {/* Search Input Bar */}
@@ -600,17 +623,15 @@ function KDSContent() {
                             <span className="text-[10px] font-black text-[#1c3a1e] uppercase px-2">Layout:</span>
                             <button
                                 onClick={() => setGroupByTable(false)}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                    !groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${!groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
                             >
                                 📋 Single Cards ({displayedItems.length})
                             </button>
                             <button
                                 onClick={() => setGroupByTable(true)}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                    groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
                             >
                                 🍽️ Group by Table ({Object.keys(itemsGroupedByTable).length})
                             </button>
@@ -640,11 +661,10 @@ function KDSContent() {
                                     <button
                                         key={st.id}
                                         onClick={() => toggleStatusSelection(st.id)}
-                                        className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
-                                            isSelected
+                                        className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${isSelected
                                                 ? `${st.color} border-transparent shadow-xs scale-105`
                                                 : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
-                                        }`}
+                                            }`}
                                     >
                                         {st.label}
                                     </button>
@@ -666,11 +686,10 @@ function KDSContent() {
                                 <span className="text-xs font-black text-[#1c3a1e] mr-1">Tables:</span>
                                 <button
                                     onClick={() => setSelectedTables([])}
-                                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
-                                        selectedTables.length === 0
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${selectedTables.length === 0
                                             ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-xs'
                                             : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
-                                    }`}
+                                        }`}
                                 >
                                     All ({availableTableNumbers.length})
                                 </button>
@@ -680,11 +699,10 @@ function KDSContent() {
                                         <button
                                             key={tbl}
                                             onClick={() => toggleTableSelection(tbl)}
-                                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all border cursor-pointer ${
-                                                isSelected
+                                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all border cursor-pointer ${isSelected
                                                     ? 'bg-[#d4af37] text-[#1c3a1e] border-[#d4af37] shadow-xs scale-105'
                                                     : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
-                                            }`}
+                                                }`}
                                         >
                                             #{tbl}
                                         </button>
@@ -907,13 +925,12 @@ function KDSContent() {
                                                                 </div>
                                                             </div>
 
-                                                            <span className={`uppercase px-2 py-0.5 rounded-md text-[9px] font-black border ${
-                                                                item.status === 'pending'
+                                                            <span className={`uppercase px-2 py-0.5 rounded-md text-[9px] font-black border ${item.status === 'pending'
                                                                     ? 'bg-amber-100 text-amber-900 border-amber-300'
                                                                     : item.status === 'preparing'
-                                                                    ? 'bg-blue-100 text-blue-900 border-blue-300'
-                                                                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                                            }`}>{item.status}</span>
+                                                                        ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                                                        : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                                }`}>{item.status}</span>
                                                         </div>
 
                                                         {/* Modifiers List */}
@@ -967,10 +984,10 @@ function KDSContent() {
                                                                 {item.status === 'pending'
                                                                     ? 'Start Cooking'
                                                                     : item.status === 'preparing'
-                                                                    ? 'Mark Ready'
-                                                                    : item.status === 'ready'
-                                                                    ? 'Deliver'
-                                                                    : 'Done'}
+                                                                        ? 'Mark Ready'
+                                                                        : item.status === 'ready'
+                                                                            ? 'Deliver'
+                                                                            : 'Done'}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -1034,7 +1051,7 @@ function KDSContent() {
                                                 <div>
                                                     <h3 className="flex items-center gap-1.5 flex-wrap mb-1 text-sm font-extrabold text-[#1c3a1e]">
                                                         <div className="bg-[#1c3a1e] text-white text-xs font-black px-2.5 py-0.5 rounded-lg">
-                                                            TABLE #{item.table_number || 1}
+                                                            {(item as any).table_display_label || `TABLE #${item.table_number || 1}`}
                                                         </div>
                                                         <span>{item.quantity}x {item.item_name}</span>
                                                     </h3>
@@ -1078,13 +1095,12 @@ function KDSContent() {
                                     {/* Card Action Footer with Individual Dish Bump Control */}
                                     <div className="pt-3 border-t border-[#1c3a1e]/15 flex items-center justify-between mt-3">
                                         <span className="text-xs font-bold text-gray-500">
-                                            Status: <strong className={`uppercase px-2 py-0.5 rounded-md text-[10px] font-black border ${
-                                                item.status === 'pending'
+                                            Status: <strong className={`uppercase px-2 py-0.5 rounded-md text-[10px] font-black border ${item.status === 'pending'
                                                     ? 'bg-amber-100 text-amber-900 border-amber-300'
                                                     : item.status === 'preparing'
-                                                    ? 'bg-blue-100 text-blue-900 border-blue-300'
-                                                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                            }`}>{item.status}</strong>
+                                                        ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                                        : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                }`}>{item.status}</strong>
                                         </span>
 
                                         <div className="flex items-center gap-1.5">

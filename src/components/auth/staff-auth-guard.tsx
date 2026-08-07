@@ -24,7 +24,14 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
         const storedStaff = sessionStorage.getItem('skylight_staff_member');
         if (storedStaff) {
             try {
-                setActiveStaff(JSON.parse(storedStaff));
+                const parsed = JSON.parse(storedStaff);
+                if (pageTitle.toLowerCase().includes('admin') && parsed.role !== 'Manager') {
+                    sessionStorage.removeItem('skylight_staff_member');
+                    setActiveStaff(null);
+                    setErrorMsg('Manager PIN required to access Admin Portal');
+                } else {
+                    setActiveStaff(parsed);
+                }
             } catch (e) {
                 sessionStorage.removeItem('skylight_staff_member');
             }
@@ -48,6 +55,12 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
             (pinInput === '9999' ? { id: 'stf-admin', name: 'Admin Manager', pin: '9999', role: 'Manager' as const } : null);
 
         if (matchedStaff) {
+            if (pageTitle.toLowerCase().includes('admin') && matchedStaff.role !== 'Manager') {
+                setErrorMsg('Access Denied: Only Manager accounts can access the Admin Portal');
+                setPinInput('');
+                return;
+            }
+
             sessionStorage.setItem('skylight_staff_member', JSON.stringify(matchedStaff));
             setActiveStaff(matchedStaff);
             setErrorMsg(null);

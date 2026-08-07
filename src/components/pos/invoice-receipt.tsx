@@ -4,6 +4,12 @@ import { CalculatedBill, formatLbp, formatUsd, getInvoiceReference } from '@/lib
 import { OrderItem } from '@/lib/types';
 import { QRCodeSVG } from 'qrcode.react';
 
+export interface SplitPaymentDetails {
+    splitTypeLabel: string;
+    amountPaidUsd: number;
+    paymentMethod: string;
+}
+
 export function ThermalReceipt({
     tableNumber,
     items,
@@ -12,6 +18,8 @@ export function ThermalReceipt({
     guestName,
     sessionId,
     forceVisible = false,
+    onClosePreview,
+    splitPaymentDetails,
 }: {
     tableNumber: number;
     items: OrderItem[];
@@ -20,11 +28,16 @@ export function ThermalReceipt({
     guestName?: string;
     sessionId?: string;
     forceVisible?: boolean;
+    onClosePreview?: () => void;
+    splitPaymentDetails?: SplitPaymentDetails;
 }) {
     const [mounted, setMounted] = useState(false);
+
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    if (!mounted) return null;
 
     const activeItems = items.filter((i) => i.status !== 'cancelled');
 
@@ -71,8 +84,8 @@ export function ThermalReceipt({
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const billId = getInvoiceReference(tableNumber, sessionId || items[0]?.session_id);
 
-    const receiptContent = (
-        <div className={`print-receipt-container text-black bg-white font-sans text-xs w-[76mm] max-w-[76mm] p-2 mx-auto ${forceVisible ? 'block' : 'hidden print:block'}`}>
+    const receiptMarkup = (
+        <div className="print-receipt-container text-black bg-white font-sans text-xs w-[76mm] max-w-[76mm] p-2 mx-auto">
             {/* Header / Logo */}
             <header className="text-center mb-2">
                 <img
@@ -81,6 +94,11 @@ export function ThermalReceipt({
                     className="w-36 h-auto mx-auto mb-1 object-contain brightness-0 filter"
                 />
                 <p className="text-[10px] text-black font-bold m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
+                {splitPaymentDetails && (
+                    <span className="inline-block mt-1 bg-black text-white text-[10px] font-black uppercase px-2 py-0.5 rounded">
+                        SPLIT GUEST INVOICE
+                    </span>
+                )}
             </header>
 
             {/* Bill Details */}
@@ -94,17 +112,17 @@ export function ThermalReceipt({
                         <td className="text-[11px] py-0.5">Table #: <span className="font-bold">TABLE #{tableNumber}</span></td>
                         <td className="text-[11px] py-0.5 text-right">Bill #: <span className="font-bold">{billId}</span></td>
                     </tr>
-                    {guestName && (
+                    {(guestName || splitPaymentDetails?.splitTypeLabel) && (
                         <tr>
                             <td colSpan={2} className="text-[11px] py-0.5 text-center font-black uppercase text-purple-950 border-t border-b border-black my-1">
-                                GUEST CHECK: {guestName.toUpperCase()}
+                                {guestName ? `GUEST CHECK: ${guestName.toUpperCase()}` : splitPaymentDetails?.splitTypeLabel}
                             </td>
                         </tr>
                     )}
                 </tbody>
             </table>
 
-            {/* Items Table with Quantity Aggregation */}
+            {/* Items Table */}
             <table className="items w-full text-xs border-collapse my-2 text-black">
                 <thead>
                     <tr className="border-t border-b border-black">
@@ -122,7 +140,9 @@ export function ThermalReceipt({
                         return (
                             <tr key={item.id} className="border-b border-gray-300 text-[11px]">
                                 <td className="py-1 text-left align-top font-bold pr-1">
-                                    <div className="text-black font-extrabold">{item.item_name}</div>
+                                    <div className="text-black font-extrabold">
+                                        {item.item_name} {item.is_comped && <span className="text-[10px] text-black font-black uppercase tracking-wider">(FREE ITEM)</span>}
+                                    </div>
                                     {item.selected_modifiers && item.selected_modifiers.length > 0 && (
                                         <div className="text-[9.5px] text-gray-700 font-medium pl-2 mt-0.5 space-y-0.5">
                                             {item.selected_modifiers.map((m: any, mIdx: number) => (
@@ -135,9 +155,9 @@ export function ThermalReceipt({
                                     )}
                                 </td>
                                 <td className="py-1 text-center align-top font-bold">{item.quantity}</td>
-                                <td className="py-1 text-right align-top font-medium">${unitPrice.toFixed(2)}</td>
+                                <td className="py-1 text-right align-top font-medium">{item.is_comped ? '$0.00' : `$${unitPrice.toFixed(2)}`}</td>
                                 <td className="py-1 text-right align-top font-bold">
-                                    {item.is_comped ? 'COMP' : `$${lineTotal.toFixed(2)}`}
+                                    {item.is_comped ? 'FREE ($0.00)' : `$${lineTotal.toFixed(2)}`}
                                 </td>
                             </tr>
                         );
@@ -145,11 +165,11 @@ export function ThermalReceipt({
 
                     {/* Subtotal */}
                     <tr className="text-xs">
-                        <td colSpan={3} className="sum-up line text-right font-bold pt-2 border-t border-black">Subtotal</td>
+                        <td colSpan={3} className="sum-up line text-right font-bold pt-2 border-t border-black">Full Subtotal</td>
                         <td className="line text-right font-bold pt-2 border-t border-black">${totals.subtotalUsd.toFixed(2)}</td>
                     </tr>
 
-                    {/* Discount if present */}
+                    {/* Discount */}
                     {totals.discountUsd > 0 && (
                         <tr className="text-xs">
                             <td colSpan={3} className="sum-up text-right font-semibold">Discount</td>
@@ -157,25 +177,52 @@ export function ThermalReceipt({
                         </tr>
                     )}
 
-                    {/* Net Total USD */}
-                    <tr>
-                        <th colSpan={3} className="total text text-right py-1 text-xs font-black border-t border-b border-dashed border-black">
-                            Total USD
-                        </th>
-                        <th className="total price text-right py-1 text-xs font-black border-t border-b border-dashed border-black">
-                            ${totals.finalTotalUsd.toFixed(2)}
-                        </th>
-                    </tr>
+                    {/* Split Details Section */}
+                    {splitPaymentDetails ? (
+                        <>
+                            <tr>
+                                <th colSpan={3} className="total text text-right py-1 text-xs font-black border-t border-b border-dashed border-black">
+                                    Split Guest Paid ({splitPaymentDetails.paymentMethod.toUpperCase()})
+                                </th>
+                                <th className="total price text-right py-1 text-xs font-black border-t border-b border-dashed border-black">
+                                    ${splitPaymentDetails.amountPaidUsd.toFixed(2)}
+                                </th>
+                            </tr>
 
-                    {/* Total LBP - Prevent line wrapping */}
-                    <tr>
-                        <th colSpan={3} className="text-right py-1 text-[10.5px] font-extrabold text-gray-800 whitespace-nowrap">
-                            Total LBP (89,500/$)
-                        </th>
-                        <th className="text-right py-1 text-[10.5px] font-black text-gray-900 whitespace-nowrap">
-                            <span className="whitespace-nowrap inline-block">{totals.finalTotalLbp}</span>
-                        </th>
-                    </tr>
+                            <tr>
+                                <th colSpan={3} className="text-right py-1 text-[10.5px] font-extrabold text-gray-800 whitespace-nowrap">
+                                    Paid LBP (89,500/$)
+                                </th>
+                                <th className="text-right py-1 text-[10.5px] font-black text-gray-900 whitespace-nowrap">
+                                    <span className="whitespace-nowrap inline-block">
+                                        {formatLbp(splitPaymentDetails.amountPaidUsd * 89500)}
+                                    </span>
+                                </th>
+                            </tr>
+                        </>
+                    ) : (
+                        <>
+                            {/* Net Total USD */}
+                            <tr>
+                                <th colSpan={3} className="total text text-right py-1 text-xs font-black border-t border-b border-dashed border-black">
+                                    Total USD
+                                </th>
+                                <th className="total price text-right py-1 text-xs font-black border-t border-b border-dashed border-black">
+                                    ${totals.finalTotalUsd.toFixed(2)}
+                                </th>
+                            </tr>
+
+                            {/* Total LBP */}
+                            <tr>
+                                <th colSpan={3} className="text-right py-1 text-[10.5px] font-extrabold text-gray-800 whitespace-nowrap">
+                                    Total LBP (89,500/$)
+                                </th>
+                                <th className="text-right py-1 text-[10.5px] font-black text-gray-900 whitespace-nowrap">
+                                    <span className="whitespace-nowrap inline-block">{totals.finalTotalLbp}</span>
+                                </th>
+                            </tr>
+                        </>
+                    )}
                 </tbody>
             </table>
 
@@ -202,7 +249,35 @@ export function ThermalReceipt({
         </div>
     );
 
-    if (forceVisible) return receiptContent;
-    if (!mounted) return null;
-    return createPortal(receiptContent, document.body);
+    return (
+        <>
+            {/* On-screen Preview inside Modal */}
+            {forceVisible && (
+                <div className="fixed inset-0 z-50 bg-[#1c3a1e]/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-sm rounded-3xl p-6 shadow-2xl text-[#1c3a1e] max-h-[90vh] flex flex-col justify-between overflow-hidden">
+                        <div className="overflow-y-auto pr-1">
+                            {receiptMarkup}
+                        </div>
+
+                        <div className="flex gap-3 pt-4 border-t border-[#1c3a1e]/15 mt-2">
+                            <button
+                                onClick={onClosePreview}
+                                className="w-1/2 bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-bold py-3 rounded-2xl text-xs cursor-pointer"
+                            >
+                                Close Preview
+                            </button>
+                            <button
+                                onClick={() => window.print()}
+                                className="w-1/2 bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs shadow-xs transition-all cursor-pointer"
+                            >
+                                Print Thermal Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Single Portal to document.body for @media print */}
+            {createPortal(receiptMarkup, document.body)}
+        </>
+    );
 }

@@ -18,19 +18,48 @@ export async function getPOSData() {
 
   if (pool) {
     try {
+      await pool.query(`
+        DELETE FROM table_sessions 
+        WHERE status = 'closed' 
+          AND id NOT IN (SELECT DISTINCT session_id FROM order_items WHERE session_id IS NOT NULL)
+      `).catch(() => {});
+
+      // Fix merged table items re-assignment in database
+      await pool.query(`
+        UPDATE order_items oi
+        SET session_id = ts.id
+        FROM table_sessions ts
+        WHERE ts.merged_table_ids IS NOT NULL 
+          AND cardinality(ts.merged_table_ids) > 0
+          AND oi.table_number IN (
+              SELECT table_number FROM tables WHERE id::text = ANY(ts.merged_table_ids::text[])
+          )
+          AND (oi.session_id != ts.id OR oi.session_id IS NULL)
+      `).catch(() => {});
+
       const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes] = await Promise.all([
         pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
-        pool.query('SELECT * FROM table_sessions ORDER BY created_at DESC'),
-        pool.query('SELECT * FROM order_items ORDER BY created_at DESC'),
-        pool.query('SELECT * FROM payments ORDER BY created_at DESC'),
-        pool.query('SELECT * FROM discounts ORDER BY created_at DESC'),
-        pool.query('SELECT * FROM service_calls ORDER BY created_at DESC'),
+        pool.query('SELECT * FROM table_sessions ORDER BY created_at DESC LIMIT 500'),
+        pool.query("SELECT * FROM order_items WHERE status != 'cancelled' ORDER BY created_at DESC LIMIT 2000"),
+        pool.query('SELECT * FROM payments ORDER BY created_at DESC LIMIT 1000'),
+        pool.query('SELECT * FROM discounts ORDER BY created_at DESC LIMIT 1000'),
+        pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
         pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
         pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
       ]);
 
       tables = tblRes.rows;
-      sessions = sessRes.rows;
+      sessions = sessRes.rows.map((s: any) => {
+        let mergedArr: string[] = [];
+        if (Array.isArray(s.merged_table_ids)) {
+          mergedArr = s.merged_table_ids;
+        } else if (typeof s.merged_table_ids === 'string' && s.merged_table_ids.trim()) {
+          try {
+            mergedArr = JSON.parse(s.merged_table_ids.replace(/^{/, '[').replace(/}$/, ']'));
+          } catch (e) {}
+        }
+        return { ...s, merged_table_ids: mergedArr };
+      });
       orderItems = ordRes.rows;
       payments = payRes.rows;
       discounts = discRes.rows;
@@ -191,9 +220,11 @@ export async function mergeTables(primaryTableId: string, secondaryTableIds: str
       }
     }
 
-    // Re-assign ALL active/unpaid order items belonging to any merged table to primarySessionId
+    // Re-assign ALL order items (both paid and unpaid) belonging to any merged table to primarySessionId
     await pool.query(
-      "UPDATE order_items SET session_id = $1 WHERE (table_number = ANY($2::int[]) OR session_id IN (SELECT id FROM table_sessions WHERE primary_table_id::text = ANY($3::text[]) OR ANY(merged_table_ids)::text = ANY($3::text[]))) AND is_paid = false",
+      `UPDATE order_items SET session_id = $1 
+       WHERE table_number = ANY($2::int[]) 
+          OR session_id IN (SELECT id FROM table_sessions WHERE primary_table_id::text = ANY($3::text[]) OR ANY(merged_table_ids)::text = ANY($3::text[]))`,
       [primarySessionId, mergedTableNums, allTableIds]
     );
 
@@ -232,6 +263,32 @@ export async function unmergeSingleTable(primarySessionId: string, tableIdToUnme
   return { success: true };
 }
 
+export async function unmergeAllTables(primarySessionId: string) {
+  if (!pool) return { success: false, error: 'DB connection error' };
+
+  try {
+    const sessRes = await pool.query('SELECT * FROM table_sessions WHERE id = $1', [primarySessionId]);
+    if (sessRes.rows.length === 0) return { success: false, error: 'Session not found' };
+
+    const session = sessRes.rows[0];
+    const mergedIds: string[] = session.merged_table_ids || [];
+
+    await pool.query('UPDATE table_sessions SET merged_table_ids = $1 WHERE id = $2', [[], primarySessionId]);
+    if (mergedIds.length > 0) {
+      await pool.query("UPDATE tables SET status = 'available' WHERE id::text = ANY($1::text[])", [mergedIds]);
+    }
+    if (session.primary_table_id) {
+      await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1", [session.primary_table_id]);
+    }
+  } catch (e) {
+    console.error('Neon unmergeAllTables error:', e);
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  return { success: true };
+}
+
 export async function applyDiscount(sessionId: string, type: 'percentage' | 'fixed', value: number, reason = '') {
   if (!pool) return { success: false, error: 'DB connection error' };
 
@@ -241,6 +298,13 @@ export async function applyDiscount(sessionId: string, type: 'percentage' | 'fix
       `INSERT INTO discounts (id, session_id, type, value, reason) VALUES ($1, $2, $3, $4, $5)`,
       [discountId, sessionId, type, value, reason]
     );
+
+    await logStaffActivity({
+      staffName: 'Manager',
+      staffRole: 'Manager',
+      actionType: 'discount_applied',
+      details: `Applied ${type} discount of ${value} (${reason || 'General Discount'})`,
+    });
   } catch (e) {
     console.error('Neon error applying discount:', e);
   }
@@ -312,6 +376,7 @@ export async function processSplitPayment(data: {
         const tableIdsToReset = Array.from(new Set([session.primary_table_id, ...(session.merged_table_ids || [])]));
         await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [session.id]);
         await pool.query("UPDATE tables SET status = 'available' WHERE id::text = ANY($1::text[])", [tableIdsToReset]);
+        await pool.query('UPDATE order_items SET is_paid = true WHERE session_id = $1', [session.id]);
       }
 
       const tblRes = await pool.query('SELECT table_number FROM tables WHERE id = $1', [session.primary_table_id]);
@@ -344,6 +409,7 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
 
     await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [sessionId]);
     await pool.query("UPDATE tables SET status = 'available' WHERE id::text = ANY($1::text[])", [tableIdsToReset]);
+    await pool.query("UPDATE order_items SET is_paid = true WHERE session_id = $1", [sessionId]);
     await pool.query("UPDATE order_items SET status = 'cancelled' WHERE session_id = $1 AND status IN ('pending', 'preparing')", [sessionId]);
     await pool.query("UPDATE service_calls SET status = 'resolved' WHERE session_id = $1 AND status = 'pending'", [sessionId]);
 
@@ -364,15 +430,23 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
   return { success: true };
 }
 
-export async function compOrderItem(orderItemId: string) {
+export async function compOrderItem(orderItemId: string, forceStatus?: boolean) {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query('UPDATE order_items SET is_comped = true WHERE id = $1', [orderItemId]);
+    if (forceStatus !== undefined) {
+      await pool.query('UPDATE order_items SET is_comped = $1 WHERE id = $2', [forceStatus, orderItemId]);
+    } else {
+      await pool.query('UPDATE order_items SET is_comped = NOT is_comped WHERE id = $1', [orderItemId]);
+    }
   } catch (e) {
     console.error('Neon error comping item:', e);
   }
 
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  revalidatePath('/kds');
+  revalidatePath('/admin');
   return { success: true };
 }
 

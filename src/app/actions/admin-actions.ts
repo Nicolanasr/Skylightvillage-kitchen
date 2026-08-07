@@ -331,6 +331,25 @@ export async function deleteTableAction(tableId: string) {
   return { success: true };
 }
 
+export async function updateCategory(categoryId: string, name: string, sortOrder?: number) {
+  if (!pool) return { success: false, error: 'DB connection error' };
+
+  try {
+    await pool.query(
+      'UPDATE menu_categories SET name = $1, sort_order = COALESCE($2, sort_order) WHERE id = $3',
+      [name, sortOrder, categoryId]
+    );
+  } catch (e: any) {
+    console.error('Neon updateCategory error:', e);
+    return { success: false, error: e.message };
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  revalidatePath('/admin');
+  return { success: true };
+}
+
 export async function updateTableAction(tableId: string, newTableNumber: number) {
   if (!newTableNumber || newTableNumber <= 0 || !pool) return { success: false, error: 'Invalid table number' };
 

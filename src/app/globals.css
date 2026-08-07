@@ -52,19 +52,19 @@ body {
 
 /* Page Print Rules */
 @page {
-  size: 80mm auto;
-  margin: 0;
+  size: auto;
+  margin: 5mm;
 }
 
 @media print {
   @page {
-    size: 80mm auto;
-    margin: 0;
+    size: auto;
+    margin: 5mm;
   }
 
   html, body {
-    width: 80mm !important;
-    max-width: 80mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -115,14 +115,17 @@ body {
   .print-qr-container {
     display: block !important;
     visibility: visible !important;
-    position: relative !important;
-    left: auto !important;
-    top: auto !important;
+    position: static !important;
     width: 100% !important;
+    max-width: 100% !important;
     margin: 0 !important;
-    padding: 0.5in !important;
+    padding: 20px !important;
     background: #ffffff !important;
     color: #000000 !important;
+  }
+
+  .print-qr-container * {
+    visibility: visible !important;
   }
 
   .kds-chit-ticket {
