@@ -78,6 +78,8 @@ export async function getPOSData() {
     const activeSess = sessions.find(
       (s) =>
         s.status === 'active' &&
+        s.order_type !== 'takeout' &&
+        s.order_type !== 'camping' &&
         (s.primary_table_id === tbl.id ||
           (tbl.table_number && s.primary_table_id === `tbl-${tbl.table_number}`) ||
           s.merged_table_ids?.includes(tbl.id))

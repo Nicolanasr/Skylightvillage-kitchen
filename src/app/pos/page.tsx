@@ -9,6 +9,7 @@ import { ThermalReceipt } from '@/components/pos/invoice-receipt';
 import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
 import { POSHeader } from '@/components/pos/POSHeader';
 import { POSFloorPlan } from '@/components/pos/POSFloorPlan';
+import { POSTakeoutWorkbench } from '@/components/pos/POSTakeoutWorkbench';
 import { POSMenuGrid } from '@/components/pos/POSMenuGrid';
 import { POSCartPanel } from '@/components/pos/POSCartPanel';
 import { POSModals } from '@/components/pos/POSModals';
@@ -28,6 +29,7 @@ function POSContent() {
 
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [showAllFloorTables, setShowAllFloorTables] = useState(true);
+  const [posViewMode, setPosViewMode] = useState<'tables' | 'takeout'>('tables');
   const [addingItemId, setAddingItemId] = useState<string | null>(null);
 
   // Modals state
@@ -83,6 +85,15 @@ function POSContent() {
   const activeSession = selectedTable
     ? sessions.find((s) => {
         if (s.status !== 'active') return false;
+
+        // Non-table Takeout/Camping virtual selection
+        if (selectedTable.table_number === 0 || selectedTable.qr_code_token === 'takeout') {
+          return s.id === selectedTable.id;
+        }
+
+        // Physical floor table (table_number > 0): ignore takeout & camping non-table sessions
+        if (s.order_type === 'takeout' || s.order_type === 'camping') return false;
+
         if (s.primary_table_id === selectedTable.id) return true;
 
         let rawArr: string[] = [];
@@ -185,22 +196,45 @@ function POSContent() {
           refreshPOSData={refreshPOSData}
           showAllFloorTables={showAllFloorTables}
           setShowAllFloorTables={setShowAllFloorTables}
+          posViewMode={posViewMode}
+          setPosViewMode={setPosViewMode}
         />
 
         {/* Main Content Layout */}
         {showAllFloorTables ? (
-          <POSFloorPlan
-            tables={tables}
-            sessions={sessions}
-            orderItems={orderItems}
-            discounts={discounts}
-            payments={payments}
-            selectedTable={selectedTable}
-            onSelectTable={(tbl) => {
-              setSelectedTable(tbl);
-              setShowAllFloorTables(false);
-            }}
-          />
+          posViewMode === 'tables' ? (
+            <POSFloorPlan
+              tables={tables}
+              sessions={sessions}
+              orderItems={orderItems}
+              discounts={discounts}
+              payments={payments}
+              selectedTable={selectedTable}
+              onSelectTable={(tbl) => {
+                setSelectedTable(tbl);
+                setShowAllFloorTables(false);
+              }}
+            />
+          ) : (
+            <POSTakeoutWorkbench
+              sessions={sessions}
+              orderItems={orderItems}
+              discounts={discounts}
+              payments={payments}
+              selectedSession={activeSession}
+              onSelectSession={(sess) => {
+                const virtualTbl: Table = {
+                  id: sess.id,
+                  table_number: 0,
+                  qr_code_token: 'takeout',
+                  status: 'occupied',
+                };
+                setSelectedTable(virtualTbl);
+                setShowAllFloorTables(false);
+              }}
+              refreshPOSData={refreshPOSData}
+            />
+          )
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left 7 Columns: Menu Grid */}

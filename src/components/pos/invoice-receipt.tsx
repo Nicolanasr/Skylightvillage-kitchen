@@ -109,13 +109,25 @@ export function ThermalReceipt({
                         <td className="text-[11px] py-0.5 text-right">Time : <span className="font-bold">{timeStr}</span></td>
                     </tr>
                     <tr>
-                        <td className="text-[11px] py-0.5">Table #: <span className="font-bold">TABLE #{tableNumber}</span></td>
+                        <td className="text-[11px] py-0.5">
+                            {items[0]?.order_type === 'takeout' || tableNumber === 0 ? (
+                                <span className="font-black text-black uppercase">🛍️ TAKEOUT ORDER</span>
+                            ) : items[0]?.order_type === 'camping' ? (
+                                <span className="font-black text-black uppercase">🏕️ CAMPING ORDER</span>
+                            ) : (
+                                <>Table #: <span className="font-bold">TABLE #{tableNumber}</span></>
+                            )}
+                        </td>
                         <td className="text-[11px] py-0.5 text-right">Bill #: <span className="font-bold">{billId}</span></td>
                     </tr>
-                    {(guestName || splitPaymentDetails?.splitTypeLabel) && (
+                    {(items[0]?.customer_name || guestName || splitPaymentDetails?.splitTypeLabel) && (
                         <tr>
-                            <td colSpan={2} className="text-[11px] py-0.5 text-center font-black uppercase text-purple-950 border-t border-b border-black my-1">
-                                {guestName ? `GUEST CHECK: ${guestName.toUpperCase()}` : splitPaymentDetails?.splitTypeLabel}
+                            <td colSpan={2} className="text-[11px] py-0.5 text-center font-black uppercase text-black border-t border-b border-black my-1">
+                                {items[0]?.customer_name
+                                    ? `CUSTOMER: ${items[0].customer_name.toUpperCase()} ${items[0]?.customer_phone ? `(${items[0].customer_phone})` : ''}`
+                                    : guestName
+                                    ? `GUEST CHECK: ${guestName.toUpperCase()}`
+                                    : splitPaymentDetails?.splitTypeLabel}
                             </td>
                         </tr>
                     )}

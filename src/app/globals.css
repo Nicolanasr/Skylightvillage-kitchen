@@ -76,7 +76,7 @@ body {
   }
 
   /* Completely collapse all body children EXCEPT print containers */
-  body > *:not(.print-kds-container):not(.print-receipt-container):not(.print-qr-container) {
+  body > *:not(.print-kds-container):not(.print-receipt-container):not(.print-qr-container):not(.print-voucher-container) {
     display: none !important;
     height: 0 !important;
     max-height: 0 !important;
@@ -89,7 +89,8 @@ body {
   }
 
   .print-receipt-container,
-  .print-kds-container {
+  .print-kds-container,
+  .print-voucher-container {
     display: block !important;
     visibility: visible !important;
     position: static !important;
@@ -108,8 +109,16 @@ body {
   }
 
   .print-receipt-container *,
-  .print-kds-container * {
+  .print-kds-container *,
+  .print-voucher-container * {
     visibility: visible !important;
+  }
+
+  .voucher-ticket {
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+    width: 100% !important;
   }
 
   .print-qr-container {

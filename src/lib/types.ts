@@ -18,6 +18,9 @@ export interface TableSession {
   primary_table_id: string;
   merged_table_ids: string[];
   status: SessionStatus;
+  order_type?: 'dine_in' | 'takeout' | 'camping' | 'event' | 'event_voucher';
+  customer_name?: string;
+  customer_phone?: string;
   created_at: string;
   closed_at?: string;
 }
@@ -67,6 +70,9 @@ export interface OrderItem {
   table_number?: number;
   seat_number?: number;
   guest_name?: string;
+  order_type?: 'dine_in' | 'takeout' | 'camping' | 'event' | 'event_voucher';
+  customer_name?: string;
+  customer_phone?: string;
   menu_item_id: string;
   item_name: string;
   quantity: number;

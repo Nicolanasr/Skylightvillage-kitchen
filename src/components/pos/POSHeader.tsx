@@ -3,13 +3,15 @@
 import React from 'react';
 import { ServiceCall } from '@/lib/types';
 import { resolveServiceCall } from '@/app/actions/payment-actions';
-import { Bell, Monitor, ChefHat, Shield } from 'lucide-react';
+import { Bell, Monitor, ChefHat, Shield, ArrowLeft } from 'lucide-react';
 
 interface POSHeaderProps {
     serviceCalls: ServiceCall[];
     refreshPOSData: () => void;
     showAllFloorTables: boolean;
     setShowAllFloorTables: (val: boolean) => void;
+    posViewMode?: 'tables' | 'takeout';
+    setPosViewMode?: (mode: 'tables' | 'takeout') => void;
 }
 
 export const POSHeader: React.FC<POSHeaderProps> = ({
@@ -17,6 +19,8 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
     refreshPOSData,
     showAllFloorTables,
     setShowAllFloorTables,
+    posViewMode = 'tables',
+    setPosViewMode,
 }) => {
     const pendingCalls = serviceCalls.filter((c) => c.status === 'pending');
 
@@ -49,7 +53,17 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
 
             {/* Main Navigation Header */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-[#1c3a1e]/15 gap-4">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                    {!showAllFloorTables && (
+                        <button
+                            onClick={() => setShowAllFloorTables(true)}
+                            className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all shadow-md cursor-pointer shrink-0"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>Back to {posViewMode === 'takeout' ? 'Workbench' : 'Tables'}</span>
+                        </button>
+                    )}
+
                     <div>
                         <h1 className="text-2xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
                             <Monitor className="h-6 w-6 text-[#d4af37]" />
@@ -61,17 +75,43 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Quick Action Navigation Links */}
+                {/* Quick Action Navigation Links & Mode Selector */}
                 <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        onClick={() => setShowAllFloorTables(!showAllFloorTables)}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${showAllFloorTables
-                                ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
-                                : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
+                    <div className="flex items-center gap-1 bg-[#eaf2eb] p-1 rounded-xl border border-[#1c3a1e]/15">
+                        <button
+                            onClick={() => {
+                                setPosViewMode?.('tables');
+                                setShowAllFloorTables(true);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                posViewMode === 'tables' && showAllFloorTables
+                                    ? 'bg-[#1c3a1e] text-white shadow-xs'
+                                    : 'text-[#1c3a1e] hover:bg-white/50'
                             }`}
+                        >
+                            🍽️ Tables
+                        </button>
+                        <button
+                            onClick={() => {
+                                setPosViewMode?.('takeout');
+                                setShowAllFloorTables(true);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                posViewMode === 'takeout' && showAllFloorTables
+                                    ? 'bg-amber-600 text-white shadow-xs'
+                                    : 'text-[#1c3a1e] hover:bg-white/50'
+                            }`}
+                        >
+                            🛍️ Takeout & Camping
+                        </button>
+                    </div>
+
+                    <a
+                        href="/events"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-xs"
                     >
-                        {showAllFloorTables ? 'View Selected Table Cart' : 'View Floor Plan Overview'}
-                    </button>
+                        <span>🎟️ Event Vouchers</span>
+                    </a>
 
                     <a
                         href="/kds"

@@ -126,7 +126,9 @@ function KDSContent() {
         }
     };
 
-    const activeKitchenItems = localItems.filter((i) => i.status !== 'cancelled' && i.status !== 'delivered');
+    const activeKitchenItems = localItems.filter(
+        (i) => i.status !== 'cancelled' && i.status !== 'delivered' && i.order_type !== 'event' && i.order_type !== 'event_voucher'
+    );
 
     const readyItemsByTable = activeKitchenItems
         .filter((i) => i.status === 'ready')
@@ -216,11 +218,13 @@ function KDSContent() {
         return true;
     });
 
-    // Grouping by Table for Grouped View
-    const itemsGroupedByTable = displayedItems.reduce<Record<number, OrderItem[]>>((acc, item) => {
-        const tblNum = item.table_number || 1;
-        if (!acc[tblNum]) acc[tblNum] = [];
-        acc[tblNum].push(item);
+    // Grouping by Session / Table for Grouped View
+    const itemsGroupedByCard = displayedItems.reduce<Record<string, OrderItem[]>>((acc, item) => {
+        const key = (item.order_type === 'takeout' || item.order_type === 'camping' || item.table_number === 0)
+            ? `session-${item.session_id}`
+            : `table-${item.table_number ?? 1}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
         return acc;
     }, {});
 
@@ -364,7 +368,11 @@ function KDSContent() {
                             <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-baseline">
                                 <span className="text-base font-black uppercase tracking-tight">{ticket.stationName}</span>
                                 <span className="text-lg font-black bg-black text-white px-2 py-0.5">
-                                    {(ticket.ticketItems[0] as any)?.table_display_label || `TBL #${ticket.tableNumber}`}
+                                    {ticket.ticketItems[0]?.order_type === 'takeout' || ticket.tableNumber === 0
+                                        ? `TAKEOUT ${ticket.ticketItems[0]?.customer_name ? `— ${ticket.ticketItems[0].customer_name}` : ''}`
+                                        : ticket.ticketItems[0]?.order_type === 'camping'
+                                        ? `CAMPING ${ticket.ticketItems[0]?.customer_name ? `— ${ticket.ticketItems[0].customer_name}` : ''}`
+                                        : `TBL #${ticket.tableNumber}`}
                                 </span>
                             </div>
 
@@ -633,7 +641,7 @@ function KDSContent() {
                                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
                                     }`}
                             >
-                                🍽️ Group by Table ({Object.keys(itemsGroupedByTable).length})
+                                🍽️ Group by Table ({Object.keys(itemsGroupedByCard).length})
                             </button>
                         </div>
 
@@ -797,7 +805,7 @@ function KDSContent() {
                 )
             ) : groupByTable ? (
                 /* GROUPED BY TABLE VIEW FOR CHEFS */
-                Object.keys(itemsGroupedByTable).length === 0 ? (
+                Object.keys(itemsGroupedByCard).length === 0 ? (
                     <div className="text-center py-24 bg-white rounded-3xl border border-[#1c3a1e]/15 shadow-sm print:hidden">
                         <ChefHat className="h-16 w-16 mx-auto mb-4 text-[#1c3a1e] opacity-30" />
                         <h3 className="text-lg font-bold text-[#1c3a1e]">No Kitchen Orders Match Filters!</h3>
@@ -805,8 +813,13 @@ function KDSContent() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
-                        {Object.entries(itemsGroupedByTable).map(([tblNumStr, tableItems]) => {
-                            const tblNum = parseInt(tblNumStr, 10);
+                        {Object.entries(itemsGroupedByCard).map(([cardKey, tableItems]) => {
+                            const firstItem = tableItems[0];
+                            const tblNum = firstItem?.table_number ?? 1;
+                            const isTakeout = firstItem?.order_type === 'takeout' || tblNum === 0;
+                            const isCamping = firstItem?.order_type === 'camping';
+                            const custName = firstItem?.customer_name;
+
                             const earliestTime = Math.min(...tableItems.map((i) => new Date(i.created_at).getTime()));
                             const elapsedMins = Math.floor((currentTime - earliestTime) / 60000);
 
@@ -822,16 +835,26 @@ function KDSContent() {
 
                             return (
                                 <div
-                                    key={tblNum}
+                                    key={cardKey}
                                     className="bg-white rounded-3xl p-5 border-2 border-[#1c3a1e]/15 shadow-md flex flex-col justify-between space-y-4"
                                 >
                                     <div>
                                         {/* Table Card Header */}
                                         <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15 mb-3">
                                             <div className="flex items-center gap-2.5">
-                                                <div className="bg-[#1c3a1e] text-white font-black text-sm px-3.5 py-1 rounded-xl shadow-xs">
-                                                    TABLE #{tblNum}
-                                                </div>
+                                                {isTakeout ? (
+                                                    <div className="bg-amber-600 text-white font-black text-sm px-3.5 py-1 rounded-xl shadow-xs">
+                                                        🛍️ TAKEOUT {custName ? `— ${custName}` : ''}
+                                                    </div>
+                                                ) : isCamping ? (
+                                                    <div className="bg-purple-700 text-white font-black text-sm px-3.5 py-1 rounded-xl shadow-xs">
+                                                        🏕️ CAMPING {custName ? `— ${custName}` : ''}
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-[#1c3a1e] text-white font-black text-sm px-3.5 py-1 rounded-xl shadow-xs">
+                                                        TABLE #{tblNum}
+                                                    </div>
+                                                )}
                                                 <span className="text-xs font-bold text-gray-600">
                                                     ({tableItems.length} {tableItems.length === 1 ? 'item' : 'items'})
                                                 </span>
@@ -1050,9 +1073,19 @@ function KDSContent() {
                                                 )}
                                                 <div>
                                                     <h3 className="flex items-center gap-1.5 flex-wrap mb-1 text-sm font-extrabold text-[#1c3a1e]">
-                                                        <div className="bg-[#1c3a1e] text-white text-xs font-black px-2.5 py-0.5 rounded-lg">
-                                                            {(item as any).table_display_label || `TABLE #${item.table_number || 1}`}
-                                                        </div>
+                                                        {item.order_type === 'takeout' || item.table_number === 0 ? (
+                                                            <div className="bg-amber-600 text-white text-xs font-black px-2.5 py-0.5 rounded-lg shadow-xs">
+                                                                🛍️ TAKEOUT {item.customer_name ? `— ${item.customer_name}` : ''}
+                                                            </div>
+                                                        ) : item.order_type === 'camping' ? (
+                                                            <div className="bg-purple-700 text-white text-xs font-black px-2.5 py-0.5 rounded-lg shadow-xs">
+                                                                🏕️ CAMPING {item.customer_name ? `— ${item.customer_name}` : ''}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-[#1c3a1e] text-white text-xs font-black px-2.5 py-0.5 rounded-lg shadow-xs">
+                                                                TABLE #{item.table_number || 1}
+                                                            </div>
+                                                        )}
                                                         <span>{item.quantity}x {item.item_name}</span>
                                                     </h3>
                                                     <span className="text-[10px] text-gray-600 font-bold block uppercase tracking-wider">

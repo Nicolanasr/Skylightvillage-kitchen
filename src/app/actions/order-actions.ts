@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto';
 import { logItemStatusChange } from './report-actions';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
-export async function getOrderPageData(tableNumber: number, token: string) {
+export async function getOrderPageData(tableNumber?: number | string, token?: string) {
   if (!pool) return { table: null, session: null, categories: [], menuItems: [], orderItems: [], discounts: [], payments: [], exchangeRate: 89500 };
 
   let table: any = null;
@@ -19,29 +19,30 @@ export async function getOrderPageData(tableNumber: number, token: string) {
   let livePayments: any[] = [];
 
   try {
-    const tblRes = await pool.query('SELECT * FROM tables WHERE table_number = $1', [tableNumber]);
-    if (tblRes.rows.length > 0) {
-      table = tblRes.rows[0];
-    } else {
-      const newTblId = randomUUID();
-      const insertTbl = await pool.query(
-        'INSERT INTO tables (id, table_number, qr_code_token, status) VALUES ($1, $2, $3, $4) RETURNING *',
-        [newTblId, tableNumber, token || `token-table-${tableNumber}`, 'occupied']
-      );
-      table = insertTbl.rows[0];
-    }
-
-    if (table) {
-      const sessRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
-        [table.id]
-      );
-      if (sessRes.rows.length > 0) {
-        session = sessRes.rows[0];
+    const numTbl = Number(tableNumber);
+    if (tableNumber !== undefined && tableNumber !== null && !isNaN(numTbl) && numTbl > 0) {
+      const tblRes = await pool.query('SELECT * FROM tables WHERE table_number = $1', [numTbl]);
+      if (tblRes.rows.length > 0) {
+        table = tblRes.rows[0];
       } else {
-        // Do NOT insert an empty session into DB on menu load!
-        // Return a virtual session reference so active sessions are only created when an order is actually submitted.
-        session = { id: `virtual-${table.id}`, primary_table_id: table.id, status: 'active', is_virtual: true };
+        const newTblId = randomUUID();
+        const insertTbl = await pool.query(
+          'INSERT INTO tables (id, table_number, qr_code_token, status) VALUES ($1, $2, $3, $4) RETURNING *',
+          [newTblId, numTbl, token || `token-table-${numTbl}`, 'occupied']
+        );
+        table = insertTbl.rows[0];
+      }
+
+      if (table) {
+        const sessRes = await pool.query(
+          "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+          [table.id]
+        );
+        if (sessRes.rows.length > 0) {
+          session = sessRes.rows[0];
+        } else {
+          session = { id: `virtual-${table.id}`, primary_table_id: table.id, status: 'active', is_virtual: true };
+        }
       }
     }
 
@@ -66,9 +67,43 @@ export async function getOrderPageData(tableNumber: number, token: string) {
       const discRes = await pool.query('SELECT * FROM discounts WHERE session_id = $1', [session.id]);
       liveDiscounts = discRes.rows;
 
-      const payRes = await pool.query('SELECT * FROM payments WHERE session_id = $1', [session.id]);
+    const payRes = await pool.query('SELECT * FROM payments WHERE session_id = $1', [session.id]);
       livePayments = payRes.rows;
     }
+
+    let nextEventTicketNumber = 101;
+    try {
+      const evtRes = await pool.query(
+        `SELECT customer_name FROM table_sessions 
+         WHERE order_type = 'event_voucher' 
+         ORDER BY created_at DESC LIMIT 100`
+      );
+      let maxNum = 100;
+      for (const row of evtRes.rows) {
+        if (row.customer_name) {
+          const match = row.customer_name.match(/EVT-(\d+)/i);
+          if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      }
+      nextEventTicketNumber = maxNum + 1;
+    } catch (e) {
+      console.error('Neon nextEventTicketNumber query error:', e);
+    }
+
+    return {
+      table,
+      session,
+      categories: liveCategories,
+      menuItems: liveMenuItems,
+      orderItems: liveItems,
+      discounts: liveDiscounts,
+      payments: livePayments,
+      exchangeRate: 89500,
+      nextEventTicketNumber,
+    };
   } catch (e) {
     console.error('Neon getOrderPageData error:', e);
   }
@@ -82,12 +117,73 @@ export async function getOrderPageData(tableNumber: number, token: string) {
     discounts: liveDiscounts,
     payments: livePayments,
     exchangeRate: 89500,
+    nextEventTicketNumber: 101,
   };
+}
+
+export async function createTakeoutOrCampingSession(data: {
+  orderType: 'takeout' | 'camping';
+  customerName: string;
+  customerPhone?: string;
+}) {
+  if (!pool) return { success: false, error: 'DB connection error' };
+
+  try {
+    await pool.query("ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
+    await pool.query('ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT');
+    await pool.query('ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_phone TEXT');
+
+    await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_name TEXT');
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_phone TEXT');
+
+    await pool.query('ALTER TABLE table_sessions ALTER COLUMN primary_table_id DROP NOT NULL').catch(() => {});
+
+    // Check if there is already an active session for the same mobile number
+    const cleanPhone = data.customerPhone ? data.customerPhone.trim() : '';
+    if (cleanPhone) {
+      const existingRes = await pool.query(
+        "SELECT * FROM table_sessions WHERE customer_phone = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+        [cleanPhone]
+      );
+      if (existingRes.rows.length > 0) {
+        const existingSess = existingRes.rows[0];
+        if (data.customerName && data.customerName.trim()) {
+          await pool.query('UPDATE table_sessions SET customer_name = $1 WHERE id = $2', [data.customerName.trim(), existingSess.id]);
+        }
+        revalidatePath('/pos');
+        revalidatePath('/order');
+        revalidatePath('/takeout');
+        revalidatePath('/kds');
+        return { success: true, sessionId: existingSess.id, session: { ...existingSess, customer_name: data.customerName.trim() || existingSess.customer_name } };
+      }
+    }
+
+    const sessionId = randomUUID();
+    const res = await pool.query(
+      `INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status, order_type, customer_name, customer_phone)
+       VALUES ($1, NULL, $2, 'active', $3, $4, $5) RETURNING *`,
+      [sessionId, [], data.orderType, data.customerName, cleanPhone]
+    );
+
+    revalidatePath('/pos');
+    revalidatePath('/order');
+    revalidatePath('/takeout');
+    revalidatePath('/kds');
+
+    return { success: true, sessionId, session: res.rows[0] };
+  } catch (e: any) {
+    console.error('Neon createTakeoutOrCampingSession error:', e);
+    return { success: false, error: e.message };
+  }
 }
 
 // Action for submitting customer orders (inserts individual 1x items for per-dish KDS status tracking)
 export async function submitCustomerOrder(data: {
   sessionId: string;
+  orderType?: 'dine_in' | 'takeout' | 'camping';
+  customerName?: string;
+  customerPhone?: string;
   items: Array<{
     menuItemId: string;
     itemName: string;
@@ -174,7 +270,15 @@ export async function submitCustomerOrder(data: {
     finalSessionId = fallbackSess.rows[0].id;
   }
 
-  if (primaryTable && primaryTable.status === 'bill_requested') {
+  const isTakeoutOrCamping = data.orderType === 'takeout' || data.orderType === 'camping' || activeSession?.order_type === 'takeout' || activeSession?.order_type === 'camping';
+  if (isTakeoutOrCamping) {
+    tableNumber = 0;
+  }
+  const effOrderType = data.orderType || activeSession?.order_type || 'dine_in';
+  const effCustName = data.customerName || activeSession?.customer_name || '';
+  const effCustPhone = data.customerPhone || activeSession?.customer_phone || '';
+
+  if (primaryTable && primaryTable.status === 'bill_requested' && !isTakeoutOrCamping) {
     return { success: false, error: 'Pre-bill has been printed. Cart is locked. Please contact your waiter.' };
   }
 
@@ -194,6 +298,9 @@ export async function submitCustomerOrder(data: {
         order_id: orderId,
         session_id: finalSessionId,
         table_number: tableNumber,
+        order_type: effOrderType,
+        customer_name: effCustName,
+        customer_phone: effCustPhone,
         menu_item_id: item.menuItemId,
         item_name: item.itemName,
         quantity: 1,
@@ -217,7 +324,7 @@ export async function submitCustomerOrder(data: {
     let pIdx = 1;
 
     for (const newItem of itemsToInsert) {
-      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11})`);
+      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14})`);
       params.push(
         newItem.id,
         newItem.order_id,
@@ -230,14 +337,17 @@ export async function submitCustomerOrder(data: {
         newItem.station,
         newItem.status,
         JSON.stringify(newItem.selected_modifiers || []),
-        newItem.special_notes || ''
+        newItem.special_notes || '',
+        effOrderType,
+        effCustName,
+        effCustPhone
       );
-      pIdx += 12;
+      pIdx += 15;
     }
 
     if (valuePlaceholders.length > 0) {
       await pool.query(
-        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes)
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
@@ -270,7 +380,7 @@ export async function addWaiterManualOrderItem(data: {
   let session: any = null;
   try {
     const sessRes = await pool.query(
-      "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+      "SELECT * FROM table_sessions WHERE (id = $1 OR primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
       [data.tableId]
     );
     if (sessRes.rows.length > 0) {
@@ -282,13 +392,21 @@ export async function addWaiterManualOrderItem(data: {
         [newSessId, data.tableId]
       );
       session = insertSess.rows[0] || { id: newSessId, primary_table_id: data.tableId, status: 'active' };
-      await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [data.tableId, data.tableNumber]);
+      if (data.tableNumber !== 0) {
+        await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [data.tableId, data.tableNumber]);
+      }
     }
   } catch (e) {
     console.error('Neon waiter session creation error:', e);
   }
 
   if (!session) return { success: false, error: 'Failed to find/create active session' };
+
+  const isTakeoutOrCamping = session.order_type === 'takeout' || session.order_type === 'camping' || data.tableNumber === 0;
+  const effTableNumber = isTakeoutOrCamping ? 0 : data.tableNumber;
+  const effOrderType = session.order_type || 'dine_in';
+  const effCustName = session.customer_name || '';
+  const effCustPhone = session.customer_phone || '';
 
   const orderId = randomUUID();
   try {
@@ -306,13 +424,13 @@ export async function addWaiterManualOrderItem(data: {
 
     for (let i = 0; i < data.quantity; i++) {
       valuePlaceholders.push(
-        `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11})`
+        `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11}, $${pIdx + 12}, $${pIdx + 13}, $${pIdx + 14})`
       );
       params.push(
         randomUUID(),
         orderId,
         session.id,
-        data.tableNumber,
+        effTableNumber,
         data.menuItemId,
         data.itemName,
         1,
@@ -320,14 +438,17 @@ export async function addWaiterManualOrderItem(data: {
         data.station,
         'pending',
         JSON.stringify(data.selectedModifiers || []),
-        data.specialNotes || ''
+        data.specialNotes || '',
+        effOrderType,
+        effCustName,
+        effCustPhone
       );
-      pIdx += 12;
+      pIdx += 15;
     }
 
     if (valuePlaceholders.length > 0) {
       await pool.query(
-        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes)
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
@@ -357,7 +478,7 @@ export async function addBatchWaiterManualOrderItems(data: {
   let session: any = null;
   try {
     const sessRes = await pool.query(
-      "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+      "SELECT * FROM table_sessions WHERE (id = $1 OR primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
       [data.tableId]
     );
     if (sessRes.rows.length > 0) {
@@ -369,13 +490,21 @@ export async function addBatchWaiterManualOrderItems(data: {
         [newSessId, data.tableId]
       );
       session = insertSess.rows[0] || { id: newSessId, primary_table_id: data.tableId, status: 'active' };
-      await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [data.tableId, data.tableNumber]);
+      if (data.tableNumber !== 0) {
+        await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [data.tableId, data.tableNumber]);
+      }
     }
   } catch (e) {
     console.error('Neon waiter session creation error:', e);
   }
 
   if (!session) return { success: false, error: 'Failed to find/create active session' };
+
+  const isTakeoutOrCamping = session.order_type === 'takeout' || session.order_type === 'camping' || data.tableNumber === 0;
+  const effTableNumber = isTakeoutOrCamping ? 0 : data.tableNumber;
+  const effOrderType = session.order_type || 'dine_in';
+  const effCustName = session.customer_name || '';
+  const effCustPhone = session.customer_phone || '';
 
   const orderId = randomUUID();
   try {
@@ -394,13 +523,13 @@ export async function addBatchWaiterManualOrderItems(data: {
 
       for (let i = 0; i < item.quantity; i++) {
         valuePlaceholders.push(
-          `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11})`
+          `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11}, $${pIdx + 12}, $${pIdx + 13}, $${pIdx + 14})`
         );
         params.push(
           randomUUID(),
           orderId,
           session.id,
-          data.tableNumber,
+          effTableNumber,
           item.menuItemId,
           item.itemName,
           1,
@@ -408,15 +537,18 @@ export async function addBatchWaiterManualOrderItems(data: {
           item.station,
           'pending',
           JSON.stringify(item.selectedModifiers || []),
-          item.specialNotes || ''
+          item.specialNotes || '',
+          effOrderType,
+          effCustName,
+          effCustPhone
         );
-        pIdx += 12;
+        pIdx += 15;
       }
     }
 
     if (valuePlaceholders.length > 0) {
       await pool.query(
-        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes)
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
@@ -638,4 +770,155 @@ export async function markKDSItemsPrinted(itemIds: string[]) {
   }
 
   return { success: true };
+}
+
+export async function submitEventVoucherOrder(data: {
+  items: Array<{
+    menuItem: any;
+    quantity: number;
+    selectedModifiers?: any[];
+    specialNotes?: string;
+  }>;
+  paymentMethod: 'cash_usd' | 'cash_lbp' | 'card';
+  guestName?: string;
+  ticketTag?: string;
+}) {
+  if (!pool) return { success: false, error: 'DB connection error' };
+
+  try {
+    await pool.query("ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
+    await pool.query('ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT');
+    await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_name TEXT');
+
+    await pool.query('ALTER TABLE table_sessions ALTER COLUMN primary_table_id DROP NOT NULL').catch(() => {});
+
+    const sessionId = randomUUID();
+    const tag = data.ticketTag || `EVT-${Math.floor(100 + Math.random() * 900)}`;
+    const fullCustomerName = `${tag}${data.guestName ? ` (${data.guestName})` : ''}`;
+
+    const sessRes = await pool.query(
+      `INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status, order_type, customer_name)
+       VALUES ($1, NULL, $2, 'closed', 'event_voucher', $3) RETURNING *`,
+      [sessionId, [], fullCustomerName]
+    );
+
+    const insertedOrderItems: any[] = [];
+    let totalUsd = 0;
+
+    for (const entry of data.items) {
+      const item = entry.menuItem;
+      const mods = entry.selectedModifiers || [];
+      const modTotal = mods.reduce((sum: number, m: any) => sum + Number(m.price_extra || m.price || 0), 0);
+      const unitPrice = Number(item.price_usd) + modTotal;
+      const itemTotal = unitPrice * entry.quantity;
+      totalUsd += itemTotal;
+
+      const orderItemId = randomUUID();
+      const itemRes = await pool.query(
+        `INSERT INTO order_items (id, session_id, table_number, menu_item_id, item_name, unit_price_usd, quantity, selected_modifiers, special_notes, station, status, order_type, customer_name)
+         VALUES ($1, $2, 0, $3, $4, $5, $6, $7, $8, $9, 'delivered', 'event_voucher', $10) RETURNING *`,
+        [
+          orderItemId,
+          sessionId,
+          item.id,
+          item.name,
+          unitPrice,
+          entry.quantity,
+          JSON.stringify(mods),
+          entry.specialNotes || 'Event Voucher Claim',
+          item.station || 'mezza',
+          fullCustomerName,
+        ]
+      );
+      insertedOrderItems.push(itemRes.rows[0]);
+    }
+
+    // Record Payment
+    const mappedPaymentMethod =
+      data.paymentMethod === 'cash_lbp' ? 'lbp' :
+      data.paymentMethod === 'cash_usd' ? 'cash' :
+      'card';
+
+    const payId = randomUUID();
+    await pool.query(
+      `INSERT INTO payments (id, session_id, amount_usd, payment_method)
+       VALUES ($1, $2, $3, $4)`,
+      [payId, sessionId, totalUsd, mappedPaymentMethod]
+    );
+
+    revalidatePath('/events');
+    revalidatePath('/pos/reports');
+
+    return {
+      success: true,
+      sessionId,
+      ticketTag: tag,
+      totalUsd,
+      orderItems: insertedOrderItems,
+    };
+  } catch (e: any) {
+    console.error('Neon submitEventVoucherOrder error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getEventVouchersReport() {
+  if (!pool)
+    return {
+      success: false,
+      totalOrders: 0,
+      totalUsd: 0,
+      paymentMethods: { cash: 0, lbp: 0, card: 0 },
+      items: [],
+      recentSessions: [],
+    };
+
+  try {
+    const sessRes = await pool.query(
+      `SELECT ts.id, ts.customer_name, ts.created_at, p.amount_usd as paid_usd, p.payment_method
+       FROM table_sessions ts
+       LEFT JOIN payments p ON p.session_id = ts.id
+       WHERE ts.order_type = 'event_voucher'
+       ORDER BY ts.created_at DESC`
+    );
+
+    const itemRes = await pool.query(
+      `SELECT item_name, station, SUM(quantity) as total_qty, SUM(unit_price_usd * quantity) as total_usd
+       FROM order_items
+       WHERE order_type = 'event_voucher'
+       GROUP BY item_name, station
+       ORDER BY total_qty DESC`
+    );
+
+    let totalUsd = 0;
+    const paymentMethods: Record<string, number> = { cash: 0, lbp: 0, card: 0 };
+
+    for (const row of sessRes.rows) {
+      const amt = Number(row.paid_usd || 0);
+      totalUsd += amt;
+      const pm = row.payment_method || 'cash';
+      paymentMethods[pm] = (paymentMethods[pm] || 0) + amt;
+    }
+
+    return {
+      success: true,
+      totalOrders: sessRes.rows.length,
+      totalUsd,
+      paymentMethods,
+      items: itemRes.rows,
+      recentSessions: sessRes.rows.slice(0, 50),
+    };
+  } catch (e: any) {
+    console.error('Neon getEventVouchersReport error:', e);
+    return {
+      success: false,
+      error: e.message,
+      totalOrders: 0,
+      totalUsd: 0,
+      paymentMethods: { cash: 0, lbp: 0, card: 0 },
+      items: [],
+      recentSessions: [],
+    };
+  }
 }

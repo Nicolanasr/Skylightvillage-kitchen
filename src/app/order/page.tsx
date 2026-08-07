@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
     MenuItem,
     ModifierGroup,
@@ -53,8 +53,16 @@ export default function CustomerOrderPage() {
 
 function CustomerOrderContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const tableParam = searchParams.get('table');
     const tokenParam = searchParams.get('token');
+
+    // Strict Access Guard: If visitor does not have a valid table QR param, redirect to /takeout
+    useEffect(() => {
+        if (!tableParam) {
+            router.push('/takeout');
+        }
+    }, [tableParam, router]);
 
     const [table, setTable] = useState<Table | null>(null);
     const [session, setSession] = useState<TableSession | null>(null);
