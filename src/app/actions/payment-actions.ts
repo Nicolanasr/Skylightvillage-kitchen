@@ -5,6 +5,7 @@ import { calculateBillTotals } from '@/lib/currency';
 import { logStaffActivity } from './audit-actions';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
+import { deductRecipeStockForItems, restockRecipeStockForItems } from './inventory-actions';
 
 export async function getPOSData() {
   let tables: any[] = [];
@@ -456,11 +457,26 @@ export async function cancelOrderItem(orderItemId: string) {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query("UPDATE order_items SET status = 'cancelled' WHERE id = $1", [orderItemId]);
+    const itemRes = await pool.query('SELECT * FROM order_items WHERE id = $1', [orderItemId]);
+    if (itemRes.rows.length > 0) {
+      const item = itemRes.rows[0];
+      await pool.query("UPDATE order_items SET status = 'cancelled' WHERE id = $1", [orderItemId]);
+
+      if (item.menu_item_id) {
+        await restockRecipeStockForItems(
+          [{ menuItemId: item.menu_item_id, quantity: Number(item.quantity || 1) }],
+          `Cancelled: ${item.item_name} (Table #${item.table_number || 1})`
+        );
+      }
+    }
   } catch (e) {
     console.error('Neon error cancelling item:', e);
   }
 
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  revalidatePath('/kds');
+  revalidatePath('/admin');
   return { success: true };
 }
 
@@ -468,11 +484,26 @@ export async function restoreCancelledOrderItem(orderItemId: string) {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query("UPDATE order_items SET status = 'pending' WHERE id = $1", [orderItemId]);
+    const itemRes = await pool.query('SELECT * FROM order_items WHERE id = $1', [orderItemId]);
+    if (itemRes.rows.length > 0) {
+      const item = itemRes.rows[0];
+      await pool.query("UPDATE order_items SET status = 'pending' WHERE id = $1", [orderItemId]);
+
+      if (item.menu_item_id) {
+        await deductRecipeStockForItems(
+          [{ menuItemId: item.menu_item_id, quantity: Number(item.quantity || 1) }],
+          `Restored Order Item: ${item.item_name}`
+        );
+      }
+    }
   } catch (e) {
     console.error('Neon error restoring item:', e);
   }
 
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  revalidatePath('/kds');
+  revalidatePath('/admin');
   return { success: true };
 }
 
@@ -480,15 +511,37 @@ export async function updateOrderItemQuantity(orderItemId: string, newQty: numbe
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    if (newQty <= 0) {
-      await pool.query("UPDATE order_items SET status = 'cancelled' WHERE id = $1", [orderItemId]);
-    } else {
-      await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [newQty, orderItemId]);
+    const itemRes = await pool.query('SELECT * FROM order_items WHERE id = $1', [orderItemId]);
+    if (itemRes.rows.length > 0) {
+      const item = itemRes.rows[0];
+      const oldQty = Number(item.quantity || 1);
+      const diff = newQty - oldQty;
+
+      if (newQty <= 0) {
+        await cancelOrderItem(orderItemId);
+      } else {
+        await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [newQty, orderItemId]);
+        if (diff > 0 && item.menu_item_id) {
+          await deductRecipeStockForItems(
+            [{ menuItemId: item.menu_item_id, quantity: diff }],
+            `Added +${diff} Qty: ${item.item_name}`
+          );
+        } else if (diff < 0 && item.menu_item_id) {
+          await restockRecipeStockForItems(
+            [{ menuItemId: item.menu_item_id, quantity: Math.abs(diff) }],
+            `Reduced -${Math.abs(diff)} Qty: ${item.item_name}`
+          );
+        }
+      }
     }
   } catch (e) {
     console.error('Neon error updating item qty:', e);
   }
 
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  revalidatePath('/kds');
+  revalidatePath('/admin');
   return { success: true };
 }
 

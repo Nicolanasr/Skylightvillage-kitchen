@@ -13,11 +13,12 @@ import {
     Trash2,
     Monitor,
     ChefHat,
+    Package,
 } from 'lucide-react';
 
 interface AdminHeaderProps {
-    activeTab: 'menu' | 'categories' | 'tables' | 'staff' | 'invoices' | 'reports';
-    setActiveTab: (tab: 'menu' | 'categories' | 'tables' | 'staff' | 'invoices' | 'reports') => void;
+    activeTab: 'menu' | 'categories' | 'inventory' | 'tables' | 'staff' | 'invoices' | 'reports';
+    setActiveTab: (tab: 'menu' | 'categories' | 'inventory' | 'tables' | 'staff' | 'invoices' | 'reports') => void;
     isSeeding: boolean;
     isWiping: boolean;
     seedStatus: string | null;
@@ -53,6 +54,17 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 {/* Navigation & Database Quick Actions */}
                 <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
                     <a
+                        href="/admin/inventory"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
+                        title="Open Inventory Portal in a new tab"
+                    >
+                        <Package className="h-4 w-4 text-[#d4af37]" />
+                        <span>📦 Open Stock Inventory Page ↗</span>
+                    </a>
+
+                    <a
                         href="/pos"
                         className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
                     >
@@ -82,6 +94,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 {[
                     { id: 'menu', label: 'Menu Items Catalog', icon: UtensilsCrossed },
                     { id: 'categories', label: 'Menu Categories', icon: Layers },
+                    { id: 'inventory', label: 'Recipe & Inventory BOM', icon: Package },
                     { id: 'tables', label: 'Tables & QR Manager', icon: Grid },
                     { id: 'staff', label: 'Staff Accounts & PINs', icon: Lock },
                     { id: 'invoices', label: 'Order History & Invoices', icon: Receipt },

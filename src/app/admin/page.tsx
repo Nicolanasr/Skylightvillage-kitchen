@@ -21,6 +21,7 @@ import { getDetailedOdooReportData, StatusLogEntry } from '../actions/report-act
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminMenuManager } from '@/components/admin/AdminMenuManager';
 import { AdminCategoryManager } from '@/components/admin/AdminCategoryManager';
+import { AdminInventoryManager } from '@/components/admin/AdminInventoryManager';
 import { AdminTableManager } from '@/components/admin/AdminTableManager';
 import { OrderHistoryTracker } from '@/components/admin/OrderHistoryTracker';
 import { OdooAnalyticsReports } from '@/components/admin/OdooAnalyticsReports';
@@ -38,7 +39,7 @@ export default function AdminPage() {
 function AdminContent() {
   const { categories, menuItems, orderItems, tables, sessions, discounts, payments, refreshPOSData } =
     useRealtimePOS();
-  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'inventory' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
   // Database Action Banners
@@ -346,7 +347,12 @@ function AdminContent() {
           />
         )}
 
-        {/* TAB 3: TABLES & QR CODES */}
+        {/* TAB 3: INVENTORY & RECIPE BOM MANAGER */}
+        {activeTab === 'inventory' && (
+          <AdminInventoryManager />
+        )}
+
+        {/* TAB 4: TABLES & QR CODES */}
         {activeTab === 'tables' && (
           <AdminTableManager tables={tables} refreshPOSData={refreshPOSData} />
         )}

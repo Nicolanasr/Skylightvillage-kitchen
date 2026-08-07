@@ -2,6 +2,7 @@
 
 import { pool } from '@/lib/db';
 import { ItemStatus } from '@/lib/types';
+import { restockRecipeStockForItems } from './inventory-actions';
 
 export interface StatusLogEntry {
   id: string;
@@ -86,6 +87,14 @@ export async function logItemStatusChange(
       await pool.query(`UPDATE order_items SET status = $1, ${timestampCol} WHERE id = $2`, [newStatus, itemId]);
     } else {
       await pool.query('UPDATE order_items SET status = $1 WHERE id = $2', [newStatus, itemId]);
+    }
+
+    // Restock Raw Ingredients if Item was Cancelled / Voided
+    if (newStatus === 'cancelled' && item.menu_item_id) {
+      await restockRecipeStockForItems(
+        [{ menuItemId: item.menu_item_id, quantity: Number(item.quantity || 1) }],
+        `Cancelled: ${item.item_name} (Table #${item.table_number || 1})`
+      );
     }
 
     // Insert transition log

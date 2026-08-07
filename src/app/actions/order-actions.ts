@@ -5,6 +5,7 @@ import { ItemStatus, SelectedModifier, StationType, OrderItem } from '@/lib/type
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 import { logItemStatusChange } from './report-actions';
+import { deductRecipeStockForItems } from './inventory-actions';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
@@ -351,6 +352,12 @@ export async function submitCustomerOrder(data: {
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
+
+      // Real-Time Stock Deduction
+      await deductRecipeStockForItems(
+        data.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
+        effOrderType === 'takeout' ? 'Takeout Order' : `Table #${tableNumber}`
+      );
     }
 
     if (primaryTable) {
@@ -452,6 +459,12 @@ export async function addWaiterManualOrderItem(data: {
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
+
+      // Real-Time Stock Deduction
+      await deductRecipeStockForItems(
+        [{ menuItemId: data.menuItemId, quantity: data.quantity }],
+        effOrderType === 'takeout' ? 'Takeout POS' : `POS Table #${effTableNumber}`
+      );
     }
   } catch (e) {
     console.error('Neon waiter manual order item insert error:', e);
@@ -551,6 +564,12 @@ export async function addBatchWaiterManualOrderItems(data: {
         `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
+      );
+
+      // Real-Time Stock Deduction
+      await deductRecipeStockForItems(
+        data.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
+        effOrderType === 'takeout' ? 'Takeout POS Batch' : `POS Batch Table #${effTableNumber}`
       );
     }
   } catch (e) {
@@ -847,8 +866,15 @@ export async function submitEventVoucherOrder(data: {
       [payId, sessionId, totalUsd, mappedPaymentMethod]
     );
 
+    // Real-time Recipe Ingredient Inventory Stock Deduction
+    await deductRecipeStockForItems(
+      data.items.map((e) => ({ menuItemId: e.menuItem.id, quantity: e.quantity })),
+      `Event Voucher ${tag}`
+    );
+
     revalidatePath('/events');
     revalidatePath('/pos/reports');
+    revalidatePath('/admin');
 
     return {
       success: true,
