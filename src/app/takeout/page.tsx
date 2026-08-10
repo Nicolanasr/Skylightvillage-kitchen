@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getOrderPageData, submitCustomerOrder, createTakeoutOrCampingSession } from '@/app/actions/order-actions';
-import { MenuItem, MenuCategory, SelectedModifier } from '@/lib/types';
+import { MenuItem, MenuCategory, SelectedModifier, getMenuItemPrice } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { ShoppingBag, CheckCircle, Search, Sparkles, User, Phone, MapPin, PackageCheck, AlertCircle, ArrowRight, Edit3, Plus } from 'lucide-react';
 
@@ -141,7 +141,8 @@ export default function CustomerTakeoutPage() {
   const cartItemCount = cartItemsList.reduce((sum, i) => sum + i.quantity, 0);
   const cartTotalUsd = cartItemsList.reduce((sum, i) => {
     const modSum = i.selectedModifiers.reduce((mSum, m) => mSum + m.price_extra, 0);
-    return sum + (i.item.price_usd + modSum) * i.quantity;
+    const unitPrice = getMenuItemPrice(i.item, orderType);
+    return sum + (unitPrice + modSum) * i.quantity;
   }, 0);
 
   const handleCheckoutSubmit = async () => {
@@ -173,7 +174,7 @@ export default function CustomerTakeoutPage() {
       menuItemId: ci.item.id,
       itemName: ci.item.name,
       quantity: ci.quantity,
-      unitPriceUsd: ci.item.price_usd,
+      unitPriceUsd: getMenuItemPrice(ci.item, orderType),
       station: ci.item.station,
       selectedModifiers: ci.selectedModifiers,
       specialNotes: ci.specialNotes,
@@ -512,7 +513,10 @@ export default function CustomerTakeoutPage() {
 
                         <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-[#1c3a1e]/10">
                           <span className="text-xs font-black text-[#1c3a1e]">
-                            ${Number(item.price_usd).toFixed(2)}
+                            ${getMenuItemPrice(item, orderType).toFixed(2)}
+                            {orderType === 'camping' && (
+                              <span className="ml-1 text-[9px] text-emerald-800 font-bold bg-emerald-100 px-1 py-0.5 rounded">Camping</span>
+                            )}
                           </span>
 
                           <div className="bg-[#eaf2eb] group-hover:bg-[#1c3a1e] group-hover:text-white text-[#1c3a1e] h-8 px-3 rounded-xl flex items-center gap-1 text-xs font-bold transition-all shadow-xs">
@@ -573,7 +577,7 @@ export default function CustomerTakeoutPage() {
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1c3a1e]/15">
               <div>
                 <h3 className="text-lg font-black">{activeModalItem.name}</h3>
-                <span className="text-xs font-bold text-gray-500">${Number(activeModalItem.price_usd).toFixed(2)}</span>
+                <span className="text-xs font-bold text-gray-500">${getMenuItemPrice(activeModalItem, orderType).toFixed(2)}</span>
               </div>
               <button
                 onClick={() => setActiveModalItem(null)}

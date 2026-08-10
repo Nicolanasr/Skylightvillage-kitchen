@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MenuCategory, MenuItem } from '@/lib/types';
+import { MenuCategory, MenuItem, getMenuItemPrice } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { Search, ImageIcon, Plus, Loader2 } from 'lucide-react';
 
@@ -10,6 +10,7 @@ interface POSMenuGridProps {
     menuItems: MenuItem[];
     onSelectItemForCart: (item: MenuItem) => void;
     addingItemId?: string | null;
+    activeOrderType?: string;
 }
 
 export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
@@ -17,6 +18,7 @@ export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
     menuItems,
     onSelectItemForCart,
     addingItemId = null,
+    activeOrderType,
 }) => {
     const [selectedCatFilter, setSelectedCatFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState<string>('');
@@ -35,7 +37,7 @@ export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
         <div className="space-y-4">
             {/* Category Pills Bar & Search Input */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none max-w-full pb-1 whitespace-nowrap">
                     <button
                         onClick={() => setSelectedCatFilter('all')}
                         className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border flex items-center gap-1.5 ${selectedCatFilter === 'all'
@@ -136,9 +138,12 @@ export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
                                 </span>
                             </div>
 
-                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-[#1c3a1e]/10">
+                             <div className="flex justify-between items-center mt-2 pt-2 border-t border-[#1c3a1e]/10">
                                 <span className="font-black text-[#1c3a1e]">
-                                    ${Number(item.price_usd).toFixed(2)}
+                                    ${getMenuItemPrice(item, activeOrderType).toFixed(2)}
+                                    {activeOrderType === 'camping' && (
+                                        <span className="ml-1 text-[9px] text-emerald-800 font-bold bg-emerald-100 px-1 py-0.5 rounded">Camping</span>
+                                    )}
                                 </span>
                                 <button className="bg-[#1c3a1e] group-hover:bg-[#d4af37] group-hover:text-[#1c3a1e] text-white p-1.5 rounded-lg transition-colors flex items-center justify-center">
                                     {isAddingThis ? (

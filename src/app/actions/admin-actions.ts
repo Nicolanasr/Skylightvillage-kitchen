@@ -51,6 +51,7 @@ export async function createMenuItem(data: {
   name: string;
   description?: string;
   priceUsd: number;
+  priceCampingUsd?: number;
   station: StationType;
   imageUrl?: string;
   isStaffOnly?: boolean;
@@ -66,6 +67,7 @@ export async function createMenuItem(data: {
     name: data.name,
     description: data.description || '',
     price_usd: Number(data.priceUsd),
+    price_camping_usd: data.priceCampingUsd !== undefined ? Number(data.priceCampingUsd) : Number(data.priceUsd),
     image_url: data.imageUrl || '',
     station: data.station,
     available: true,
@@ -80,16 +82,18 @@ export async function createMenuItem(data: {
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_camping_usd NUMERIC(10,2)');
 
     await pool.query(
-      `INSERT INTO menu_items (id, category_id, name, description, price_usd, station, available, image_url, is_staff_only, sort_order, is_bestseller, modifier_groups)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      `INSERT INTO menu_items (id, category_id, name, description, price_usd, price_camping_usd, station, available, image_url, is_staff_only, sort_order, is_bestseller, modifier_groups)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         newItem.id,
         newItem.category_id,
         newItem.name,
         newItem.description,
         newItem.price_usd,
+        newItem.price_camping_usd,
         newItem.station,
         newItem.available,
         newItem.image_url,
@@ -117,6 +121,7 @@ export async function updateMenuItem(
     name?: string;
     description?: string;
     priceUsd?: number;
+    priceCampingUsd?: number;
     station?: StationType;
     imageUrl?: string;
     available?: boolean;
@@ -133,6 +138,7 @@ export async function updateMenuItem(
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_camping_usd NUMERIC(10,2)');
 
     const itemRes = await pool.query('SELECT * FROM menu_items WHERE id = $1', [menuItemId]);
     if (itemRes.rows.length === 0) return { success: false, error: 'Item not found' };
@@ -141,6 +147,9 @@ export async function updateMenuItem(
     const name = data.name !== undefined ? data.name : item.name;
     const description = data.description !== undefined ? data.description : item.description;
     const price_usd = data.priceUsd !== undefined ? Number(data.priceUsd) : Number(item.price_usd);
+    const price_camping_usd = data.priceCampingUsd !== undefined
+      ? Number(data.priceCampingUsd)
+      : (item.price_camping_usd !== undefined && item.price_camping_usd !== null ? Number(item.price_camping_usd) : price_usd);
     const station = data.station !== undefined ? data.station : item.station;
     const image_url = data.imageUrl !== undefined ? data.imageUrl : item.image_url;
     const available = data.available !== undefined ? data.available : item.available;
@@ -150,8 +159,8 @@ export async function updateMenuItem(
     const modifier_groups = data.modifierGroups !== undefined ? data.modifierGroups : (item.modifier_groups || []);
 
     await pool.query(
-      `UPDATE menu_items SET name = $1, description = $2, price_usd = $3, station = $4, image_url = $5, available = $6, is_staff_only = $7, sort_order = $8, is_bestseller = $9, modifier_groups = $10 WHERE id = $11`,
-      [name, description, price_usd, station, image_url, available, is_staff_only, sort_order, is_bestseller, JSON.stringify(modifier_groups), menuItemId]
+      `UPDATE menu_items SET name = $1, description = $2, price_usd = $3, price_camping_usd = $4, station = $5, image_url = $6, available = $7, is_staff_only = $8, sort_order = $9, is_bestseller = $10, modifier_groups = $11 WHERE id = $12`,
+      [name, description, price_usd, price_camping_usd, station, image_url, available, is_staff_only, sort_order, is_bestseller, JSON.stringify(modifier_groups), menuItemId]
     );
   } catch (e: any) {
     console.error('Neon updateMenuItem error:', e);

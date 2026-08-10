@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRealtimePOS } from '@/hooks/useRealtimePOS';
-import { Table, TableSession, MenuItem, OrderItem } from '@/lib/types';
+import { Table, TableSession, MenuItem, OrderItem, getMenuItemPrice } from '@/lib/types';
 import { calculateBillTotals, formatLbp } from '@/lib/currency';
 import { addWaiterManualOrderItem, addBatchWaiterManualOrderItems } from '../actions/order-actions';
 import { ThermalReceipt } from '@/components/pos/invoice-receipt';
@@ -129,7 +129,7 @@ function POSContent() {
         tableNumber: selectedTable.table_number,
         menuItemId: menuItem.id,
         itemName: menuItem.name,
-        unitPriceUsd: Number(menuItem.price_usd),
+        unitPriceUsd: getMenuItemPrice(menuItem, activeSession?.order_type),
         quantity: 1,
         station: menuItem.station,
         selectedModifiers: modifiers,
@@ -243,6 +243,7 @@ function POSContent() {
                 categories={categories}
                 menuItems={menuItems}
                 addingItemId={addingItemId}
+                activeOrderType={activeSession?.order_type}
                 onSelectItemForCart={(item) => {
                   if (item.modifier_groups && item.modifier_groups.length > 0) {
                     handleSelectItemForCart(item);
@@ -266,7 +267,6 @@ function POSContent() {
                 onOpenAddItemModal={() => setIsAddItemModalOpen(true)}
                 onOpenDiscountModal={() => setIsDiscountModalOpen(true)}
                 onOpenPreviewReceipt={() => setIsPreviewReceiptModalOpen(true)}
-                onOpenPrintReceipt={() => window.print()}
                 onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
                 onOpenMergeModal={() => setIsMergeModalOpen(true)}
               />

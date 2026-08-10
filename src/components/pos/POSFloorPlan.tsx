@@ -83,13 +83,9 @@ export const POSFloorPlan: React.FC<POSFloorPlanProps> = ({
           const isMergedSession = mergedTblNums.length > 0;
           const isPrimaryTable = activeSess ? activeSess.primary_table_id === tbl.id : true;
 
-          // Find combined items for this merged session
+          // Find items for this active session
           const tblItems = activeSess
-            ? orderItems.filter(
-                (i) =>
-                  (i.session_id === activeSess.id || allTableNums.includes(i.table_number as number)) &&
-                  i.status !== 'cancelled'
-              )
+            ? orderItems.filter((i) => i.session_id === activeSess.id && i.status !== 'cancelled')
             : [];
 
           const tblDiscounts = activeSess ? discounts.filter((d) => d.session_id === activeSess.id) : [];

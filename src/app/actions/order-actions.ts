@@ -279,6 +279,18 @@ export async function submitCustomerOrder(data: {
   const effCustName = data.customerName || activeSession?.customer_name || '';
   const effCustPhone = data.customerPhone || activeSession?.customer_phone || '';
 
+  // Update session with customer phone/name if provided for loyalty tracking
+  if ((data.customerPhone && data.customerPhone.trim()) || (data.customerName && data.customerName.trim())) {
+    try {
+      await pool.query(
+        'UPDATE table_sessions SET customer_phone = COALESCE(NULLIF($1, \'\'), customer_phone), customer_name = COALESCE(NULLIF($2, \'\'), customer_name) WHERE id = $3',
+        [data.customerPhone || '', data.customerName || '', finalSessionId]
+      );
+    } catch (e) {
+      console.error('Error updating customer phone on session:', e);
+    }
+  }
+
   if (primaryTable && primaryTable.status === 'bill_requested' && !isTakeoutOrCamping) {
     return { success: false, error: 'Pre-bill has been printed. Cart is locked. Please contact your waiter.' };
   }
@@ -325,7 +337,7 @@ export async function submitCustomerOrder(data: {
     let pIdx = 1;
 
     for (const newItem of itemsToInsert) {
-      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14})`);
+      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14}, $${pIdx+15})`);
       params.push(
         newItem.id,
         newItem.order_id,
@@ -341,14 +353,15 @@ export async function submitCustomerOrder(data: {
         newItem.special_notes || '',
         effOrderType,
         effCustName,
-        effCustPhone
+        effCustPhone,
+        effCustPhone || null  // loyalty_phone: auto-assign from customer phone
       );
-      pIdx += 15;
+      pIdx += 16;
     }
 
     if (valuePlaceholders.length > 0) {
       await pool.query(
-        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone)
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone, loyalty_phone)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
@@ -423,11 +436,24 @@ export async function addWaiterManualOrderItem(data: {
     const params: any[] = [];
     let pIdx = 1;
 
+    let basePrice = Number(data.unitPriceUsd);
+    if (effOrderType === 'camping' && data.menuItemId) {
+      try {
+        const mRes = await pool.query('SELECT price_usd, price_camping_usd FROM menu_items WHERE id = $1', [data.menuItemId]);
+        if (mRes.rows.length > 0) {
+          const mRow = mRes.rows[0];
+          if (mRow.price_camping_usd !== null && mRow.price_camping_usd !== undefined && Number(mRow.price_camping_usd) > 0) {
+            basePrice = Number(mRow.price_camping_usd);
+          }
+        }
+      } catch (e) {}
+    }
+
     const modifiersExtraSum = (data.selectedModifiers || []).reduce(
       (sum: number, mod: any) => sum + Number(mod.price_extra || mod.price_extra_usd || 0),
       0
     );
-    const effectiveUnitPriceUsd = Number(data.unitPriceUsd) + modifiersExtraSum;
+    const effectiveUnitPriceUsd = basePrice + modifiersExtraSum;
 
     for (let i = 0; i < data.quantity; i++) {
       valuePlaceholders.push(

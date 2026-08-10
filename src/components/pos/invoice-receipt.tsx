@@ -94,11 +94,6 @@ export function ThermalReceipt({
                     className="w-36 h-auto mx-auto mb-1 object-contain brightness-0 filter"
                 />
                 <p className="text-[10px] text-black font-bold m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>
-                {splitPaymentDetails && (
-                    <span className="inline-block mt-1 bg-black text-white text-[10px] font-black uppercase px-2 py-0.5 rounded">
-                        SPLIT GUEST INVOICE
-                    </span>
-                )}
             </header>
 
             {/* Bill Details */}
@@ -126,8 +121,8 @@ export function ThermalReceipt({
                                 {items[0]?.customer_name
                                     ? `CUSTOMER: ${items[0].customer_name.toUpperCase()} ${items[0]?.customer_phone ? `(${items[0].customer_phone})` : ''}`
                                     : guestName
-                                    ? `GUEST CHECK: ${guestName.toUpperCase()}`
-                                    : splitPaymentDetails?.splitTypeLabel}
+                                        ? `GUEST CHECK: ${guestName.toUpperCase()}`
+                                        : splitPaymentDetails?.splitTypeLabel}
                             </td>
                         </tr>
                     )}

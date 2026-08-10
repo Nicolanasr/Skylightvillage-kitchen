@@ -198,6 +198,55 @@ CREATE TABLE IF NOT EXISTS inventory_deductions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 17. Customer Loyalty Profiles
+CREATE TABLE IF NOT EXISTS customer_loyalty (
+  id TEXT PRIMARY KEY,
+  phone_number TEXT UNIQUE,
+  vip_code TEXT UNIQUE,
+  customer_name TEXT DEFAULT 'Valued Guest',
+  points_balance NUMERIC(10,2) NOT NULL DEFAULT 0,
+  total_spent_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+  total_visits INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 18. Loyalty Reward Tiers (Admin Configurable)
+CREATE TABLE IF NOT EXISTS loyalty_reward_tiers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  points_required INT NOT NULL,
+  reward_type TEXT NOT NULL CHECK (reward_type IN ('free_item', 'discount_usd')),
+  discount_value NUMERIC(10,2) DEFAULT 0,
+  menu_item_id TEXT,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 19. Anonymous Receipt Claim Tokens
+CREATE TABLE IF NOT EXISTS loyalty_claim_tokens (
+  token TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  points_value NUMERIC(10,2) NOT NULL,
+  claimed BOOLEAN DEFAULT false,
+  claimed_by_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days')
+);
+
+-- 20. Loyalty Audit Logs
+CREATE TABLE IF NOT EXISTS loyalty_audit_logs (
+  id TEXT PRIMARY KEY,
+  customer_phone TEXT,
+  action_type TEXT NOT NULL,
+  points_amount NUMERIC(10,2) NOT NULL,
+  session_id TEXT,
+  reward_name TEXT,
+  logged_by TEXT DEFAULT 'System',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ====================================================================
 -- SAFE COLUMN MIGRATION PATCHES (For Existing Live Tables)
 -- ====================================================================

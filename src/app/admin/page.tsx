@@ -22,6 +22,7 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminMenuManager } from '@/components/admin/AdminMenuManager';
 import { AdminCategoryManager } from '@/components/admin/AdminCategoryManager';
 import { AdminInventoryManager } from '@/components/admin/AdminInventoryManager';
+import { AdminLoyaltyManager } from '@/components/admin/AdminLoyaltyManager';
 import { AdminTableManager } from '@/components/admin/AdminTableManager';
 import { OrderHistoryTracker } from '@/components/admin/OrderHistoryTracker';
 import { OdooAnalyticsReports } from '@/components/admin/OdooAnalyticsReports';
@@ -39,7 +40,7 @@ export default function AdminPage() {
 function AdminContent() {
   const { categories, menuItems, orderItems, tables, sessions, discounts, payments, refreshPOSData } =
     useRealtimePOS();
-  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'inventory' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
   // Database Action Banners
@@ -67,6 +68,7 @@ function AdminContent() {
   const [newItemCatId, setNewItemCatId] = useState('');
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemPriceCamping, setNewItemPriceCamping] = useState('');
   const [newItemStation, setNewItemStation] = useState<StationType>('mezza');
   const [newItemDesc, setNewItemDesc] = useState('');
   const [newItemImage, setNewItemImage] = useState('');
@@ -78,6 +80,7 @@ function AdminContent() {
   const [editName, setEditName] = useState('');
   const [editCatId, setEditCatId] = useState('');
   const [editPrice, setEditPrice] = useState('');
+  const [editPriceCamping, setEditPriceCamping] = useState('');
   const [editStation, setEditStation] = useState<StationType>('mezza');
   const [editDesc, setEditDesc] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
@@ -172,10 +175,7 @@ function AdminContent() {
     ];
 
     const sessItems = orderItems.filter(
-      (i) =>
-        (validSessionIds.includes(i.session_id || '') ||
-          allTableNums.includes(i.table_number as number)) &&
-        i.status !== 'cancelled'
+      (i) => validSessionIds.includes(i.session_id || '') && i.status !== 'cancelled'
     );
     const sessDiscounts = discounts.filter((d) => validSessionIds.includes(d.session_id || ''));
     const sessPayments = payments.filter((p) => validSessionIds.includes(p.session_id || ''));
@@ -238,6 +238,7 @@ function AdminContent() {
     setEditName(item.name);
     setEditCatId(item.category_id);
     setEditPrice(String(item.price_usd));
+    setEditPriceCamping(String(item.price_camping_usd ?? item.price_usd));
     setEditStation(item.station);
     setEditDesc(item.description || '');
     setEditImageUrl(item.image_url || '');
@@ -251,10 +252,12 @@ function AdminContent() {
     if (!editingItem) return;
     const priceNum = parseFloat(editPrice);
     if (isNaN(priceNum)) return alert('Invalid price');
+    const priceCampingNum = parseFloat(editPriceCamping);
 
     await updateMenuItem(editingItem.id, {
       name: editName.trim(),
       priceUsd: priceNum,
+      priceCampingUsd: !isNaN(priceCampingNum) ? priceCampingNum : priceNum,
       station: editStation,
       description: editDesc.trim(),
       imageUrl: editImageUrl.trim(),
@@ -272,11 +275,13 @@ function AdminContent() {
     if (!newItemName.trim() || !newItemPrice || !newItemCatId) return;
     const priceNum = parseFloat(newItemPrice);
     if (isNaN(priceNum)) return alert('Invalid price');
+    const priceCampingNum = parseFloat(newItemPriceCamping);
 
     await createMenuItem({
       name: newItemName.trim(),
       categoryId: newItemCatId,
       priceUsd: priceNum,
+      priceCampingUsd: !isNaN(priceCampingNum) ? priceCampingNum : priceNum,
       station: newItemStation,
       description: newItemDesc.trim(),
       imageUrl: newItemImage.trim(),
@@ -287,6 +292,7 @@ function AdminContent() {
 
     setNewItemName('');
     setNewItemPrice('');
+    setNewItemPriceCamping('');
     setNewItemDesc('');
     setNewItemImage('');
     setNewItemSortOrder('0');
@@ -350,6 +356,11 @@ function AdminContent() {
         {/* TAB 3: INVENTORY & RECIPE BOM MANAGER */}
         {activeTab === 'inventory' && (
           <AdminInventoryManager />
+        )}
+
+        {/* TAB 4: LOYALTY & VIP REWARDS MANAGER */}
+        {activeTab === 'loyalty' && (
+          <AdminLoyaltyManager />
         )}
 
         {/* TAB 4: TABLES & QR CODES */}
@@ -532,24 +543,24 @@ function AdminContent() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
+                <select
+                  value={editCatId}
+                  onChange={(e) => setEditCatId(e.target.value)}
+                  className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
-                  <select
-                    value={editCatId}
-                    onChange={(e) => setEditCatId(e.target.value)}
-                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-extrabold focus:outline-none focus:border-[#1c3a1e]"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Price USD ($)</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Dine-In Price ($)</label>
                   <input
                     type="number"
                     step="0.5"
@@ -557,6 +568,18 @@ function AdminContent() {
                     onChange={(e) => setEditPrice(e.target.value)}
                     className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                     required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-800 mb-1">Camping Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editPriceCamping}
+                    onChange={(e) => setEditPriceCamping(e.target.value)}
+                    placeholder={editPrice || '0.00'}
+                    className="w-full bg-emerald-50/50 border border-emerald-600/30 rounded-xl p-3 text-xs text-emerald-900 font-black focus:outline-none focus:border-emerald-700"
                   />
                 </div>
 
@@ -707,7 +730,7 @@ function AdminContent() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Price USD ($)</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Dine-In Price ($)</label>
                   <input
                     type="number"
                     step="0.5"
@@ -715,6 +738,18 @@ function AdminContent() {
                     onChange={(e) => setNewItemPrice(e.target.value)}
                     className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                     required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-800 mb-1">Camping Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={newItemPriceCamping}
+                    onChange={(e) => setNewItemPriceCamping(e.target.value)}
+                    placeholder={newItemPrice || '0.00'}
+                    className="w-full bg-emerald-50/50 border border-emerald-600/30 rounded-xl p-3 text-xs text-emerald-900 font-black focus:outline-none focus:border-emerald-700"
                   />
                 </div>
 
@@ -729,6 +764,7 @@ function AdminContent() {
                     className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-black focus:outline-none focus:border-[#1c3a1e]"
                   />
                 </div>
+              </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Kitchen Station</label>
@@ -745,7 +781,6 @@ function AdminContent() {
                     <option value="shisha">Shisha Lounge</option>
                   </select>
                 </div>
-              </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Description (Optional)</label>

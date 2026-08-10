@@ -74,6 +74,7 @@ export const POSModals: React.FC<POSModalsProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [guestName, setGuestName] = useState<string>('');
   const [dishSearchTerm, setDishSearchTerm] = useState<string>('');
+  const [modalError, setModalError] = useState<string>('');
 
   // Handle Merge Submission
   const handleMergeSubmit = async () => {
@@ -81,10 +82,11 @@ export const POSModals: React.FC<POSModalsProps> = ({
     const res = await mergeTables(selectedTable.id, selectedSecondaryTableIds);
     if (res.success) {
       setSelectedSecondaryTableIds([]);
+      setModalError('');
       onCloseMergeModal();
       refreshPOSData();
     } else {
-      alert(res.error);
+      setModalError(res.error || 'Failed to merge tables');
     }
   };
 
@@ -97,9 +99,10 @@ export const POSModals: React.FC<POSModalsProps> = ({
     refreshPOSData();
   };
 
-  // Helper to calculate current draft split check
+  // Calculate Draft Split Check Amounts
   const getDraftSplitDetails = () => {
     if (!selectedTable || !activeSession) return null;
+
     const tblItems = orderItems.filter(
       (i) => i.session_id === activeSession.id && i.status !== 'cancelled'
     );
@@ -108,14 +111,15 @@ export const POSModals: React.FC<POSModalsProps> = ({
     const bill = calculateBillTotals(tblItems, tblDiscounts, tblPayments, 89500);
 
     let payAmt = bill.remainingUsd;
-    let splitItems = tblItems;
-    let label = `FULL TABLE CHECK: TABLE #${selectedTable.table_number}`;
+    let splitItems = tblItems.filter((i) => !i.is_paid);
+    let label = 'FULL TABLE CHECK';
 
     if (paymentType === 'equal_split') {
-      payAmt = bill.remainingUsd / Math.max(1, splitCount);
-      label = `GUEST CHECK: ${guestName.trim() || `EQUAL SPLIT (1/${splitCount})`}`;
+      const count = Math.max(1, splitCount);
+      payAmt = bill.remainingUsd / count;
+      label = `EQUAL SPLIT (1/${count})`;
     } else if (paymentType === 'split_items') {
-      splitItems = tblItems.filter((i) => selectedSplitItemIds.includes(i.id));
+      splitItems = tblItems.filter((i) => selectedSplitItemIds.includes(i.id) && !i.is_paid);
       payAmt = splitItems.reduce(
         (sum, i) => sum + (i.is_comped ? 0 : Number(i.unit_price_usd) * i.quantity),
         0
@@ -135,16 +139,15 @@ export const POSModals: React.FC<POSModalsProps> = ({
     if (!draft) return;
 
     if (paymentType === 'split_items' && draft.splitItems.length === 0) {
-      return alert('Select at least one dish item to print guest invoice');
+      return setModalError('Select at least one dish item to print guest invoice');
     }
-    if (draft.payAmt <= 0) {
-      return alert('Payment amount must be greater than $0.00 to print invoice');
-    }
+
+    setModalError('');
 
     if (onPrintSplitInvoice) {
       onPrintSplitInvoice({
         items: draft.splitItems,
-        amountUsd: draft.payAmt,
+        amountUsd: Math.max(0, draft.payAmt),
         guestName: guestName.trim() || undefined,
         splitTypeLabel: draft.label,
         paymentMethod,
@@ -155,36 +158,42 @@ export const POSModals: React.FC<POSModalsProps> = ({
     }, 100);
   };
 
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+
   // Handle Payment Submission (Complete Payment)
   const handlePaymentCheckoutSubmit = async (shouldPrintReceipt: boolean = false) => {
-    if (!selectedTable || !activeSession) return;
+    if (!selectedTable || !activeSession || isProcessingPayment) return;
     const draft = getDraftSplitDetails();
     if (!draft) return;
 
     if (paymentType === 'split_items') {
-      if (draft.splitItems.length === 0) return alert('Select at least one dish item to pay');
+      if (draft.splitItems.length === 0) return setModalError('Select at least one dish item to pay');
     } else if (paymentType === 'partial') {
-      if (isNaN(draft.payAmt) || draft.payAmt <= 0) return alert('Enter a valid custom payment amount');
+      if (isNaN(draft.payAmt) || draft.payAmt <= 0) return setModalError('Enter a valid custom payment amount');
     }
 
-    if (draft.payAmt <= 0) return alert('Payment amount must be greater than $0.00');
+    setModalError('');
+    setIsProcessingPayment(true);
+    const finalPayAmt = Math.max(0, draft.payAmt);
 
     const res = await processSplitPayment({
       sessionId: activeSession.id,
       paymentType: paymentType === 'split_items' ? 'item_split' : paymentType,
-      amountUsd: draft.payAmt,
+      amountUsd: finalPayAmt,
       currency: 'USD',
       paymentMethod,
       itemIdsPaid: paymentType === 'split_items' ? selectedSplitItemIds : undefined,
       guestName: guestName.trim() || undefined,
     });
 
+    setIsProcessingPayment(false);
+
     if (res.success) {
       if (shouldPrintReceipt) {
         if (onPrintSplitInvoice) {
           onPrintSplitInvoice({
             items: draft.splitItems,
-            amountUsd: draft.payAmt,
+            amountUsd: finalPayAmt,
             guestName: guestName.trim() || undefined,
             splitTypeLabel: draft.label,
             paymentMethod,
@@ -197,10 +206,11 @@ export const POSModals: React.FC<POSModalsProps> = ({
       setSelectedSplitItemIds([]);
       setGuestName('');
       setPartialAmount('');
+      setModalError('');
       onClosePaymentModal();
       refreshPOSData();
     } else {
-      alert((res as any).error || 'Payment failed');
+      setModalError((res as any).error || 'Payment failed');
     }
   };
 
@@ -689,10 +699,18 @@ export const POSModals: React.FC<POSModalsProps> = ({
 
               <button
                 onClick={() => handlePaymentCheckoutSubmit(false)}
-                className="bg-[#1c3a1e] hover:bg-[#2b542e] text-white font-black py-3.5 rounded-2xl text-xs cursor-pointer shadow-xs transition-all"
+                disabled={isProcessingPayment}
+                className="bg-[#1c3a1e] hover:bg-[#2b542e] text-white font-black py-3.5 rounded-2xl text-xs cursor-pointer shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                 title="Complete payment only in database"
               >
-                <span>Complete Payment Only</span>
+                {isProcessingPayment ? (
+                  <>
+                    <span className="animate-spin text-xs">⏳</span>
+                    <span>Processing Payment…</span>
+                  </>
+                ) : (
+                  <span>Complete Payment Only</span>
+                )}
               </button>
             </div>
           </div>

@@ -15,8 +15,11 @@ export function useRealtimePOS() {
   const [categories, setCategories] = useState<MenuCategory[]>([]);
 
   const prevPendingCallsCount = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
 
   const refreshPOSData = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const data = await getPOSData();
       const pendingCalls = data.serviceCalls.filter((c) => c.status === 'pending');
@@ -48,6 +51,8 @@ export function useRealtimePOS() {
       if (data.categories) setCategories(data.categories);
     } catch (e) {
       console.error('POS fetch error:', e);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 

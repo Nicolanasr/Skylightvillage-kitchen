@@ -8,8 +8,11 @@ export function useRealtimeKDS(stationFilter: string) {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const prevCountRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
 
   const refreshKDSData = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const data = await getKDSData(stationFilter);
 
@@ -34,6 +37,8 @@ export function useRealtimeKDS(stationFilter: string) {
       setMenuItems(data.menuItems);
     } catch (e) {
       console.error('KDS Fetch error:', e);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 

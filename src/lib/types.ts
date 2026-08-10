@@ -54,6 +54,7 @@ export interface MenuItem {
   name: string;
   description?: string;
   price_usd: number;
+  price_camping_usd?: number; // Dual pricing for Camping & Picnic orders
   image_url?: string;
   station: StationType;
   available: boolean;
@@ -61,6 +62,13 @@ export interface MenuItem {
   sort_order?: number;
   is_bestseller?: boolean;
   modifier_groups: ModifierGroup[];
+}
+
+export function getMenuItemPrice(item: MenuItem, orderType?: string | null): number {
+  if (orderType === 'camping' && item.price_camping_usd !== undefined && item.price_camping_usd !== null && Number(item.price_camping_usd) > 0) {
+    return Number(item.price_camping_usd);
+  }
+  return Number(item.price_usd || 0);
 }
 
 export interface OrderItem {
@@ -84,6 +92,7 @@ export interface OrderItem {
   is_comped?: boolean;
   is_paid?: boolean;
   is_printed?: boolean;
+  loyalty_phone?: string;  // Per-item VIP loyalty assignment
   created_at: string;
 }
 

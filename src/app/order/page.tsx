@@ -11,9 +11,11 @@ import {
     Table,
     TableSession,
     MenuCategory,
+    getMenuItemPrice,
 } from '@/lib/types';
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
 import { getOrderPageData, submitCustomerOrder, triggerServiceCall } from '../actions/order-actions';
+import { lookupOrCreateCustomerLoyalty, redeemLoyaltyRewardAction } from '../actions/loyalty-actions';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import {
     Bell,
@@ -97,6 +99,71 @@ function CustomerOrderContent() {
     const [orderSuccessMsg, setOrderSuccessMsg] = useState<string | null>(null);
     const [addedToastMsg, setAddedToastMsg] = useState<string | null>(null);
 
+    // Optional Customer Phone & VIP Loyalty State
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [customerName, setCustomerName] = useState('');
+    const [loyaltyProfile, setLoyaltyProfile] = useState<any>(null);
+    const [rewardTiers, setRewardTiers] = useState<any[]>([]);
+    const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false);
+    const [tempPhoneInput, setTempPhoneInput] = useState('');
+    const [tempNameInput, setTempNameInput] = useState('');
+    const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+
+    // Auto-lookup loyalty profile when phone number changes
+    useEffect(() => {
+        if (customerPhone.trim().length >= 6) {
+            lookupOrCreateCustomerLoyalty(customerPhone, customerName).then((res) => {
+                if (res.success && res.customer) {
+                    setLoyaltyProfile(res.customer);
+                    setRewardTiers(res.rewardTiers || []);
+                } else {
+                    setLoyaltyProfile(null);
+                }
+            });
+        } else {
+            setLoyaltyProfile(null);
+        }
+    }, [customerPhone, customerName]);
+
+    const handleSaveLoyaltyProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!tempPhoneInput.trim()) return;
+        setLoyaltyLoading(true);
+        const res = await lookupOrCreateCustomerLoyalty(tempPhoneInput, tempNameInput);
+        if (res.success && res.customer) {
+            setCustomerPhone(tempPhoneInput.trim());
+            if (tempNameInput.trim()) setCustomerName(tempNameInput.trim());
+            setLoyaltyProfile(res.customer);
+            setRewardTiers(res.rewardTiers || []);
+            setAddedToastMsg(`🌟 Welcome ${res.customer.customer_name}! VIP Points linked.`);
+            setTimeout(() => setAddedToastMsg(null), 4000);
+            setIsLoyaltyModalOpen(false); // Close after save
+        }
+        setLoyaltyLoading(false);
+    };
+
+    const [redeemingTierId, setRedeemingTierId] = useState<string | null>(null);
+
+    const handleRedeemCustomerReward = async (tierId: string) => {
+        if (!session || !customerPhone) return;
+        setRedeemingTierId(tierId);
+        const res = await redeemLoyaltyRewardAction(session.id, customerPhone, tierId, 'Customer App');
+        setRedeemingTierId(null);
+        if (res.success) {
+            setOrderSuccessMsg(`🎁 Reward Redeemed! ${res.rewardName} applied to your bill.`);
+            setIsLoyaltyModalOpen(false); // Auto-close window once redeemed!
+            await refreshPageData(); // Auto-update UI!
+            // Refresh customer balance
+            const updated = await lookupOrCreateCustomerLoyalty(customerPhone, customerName);
+            if (updated.success && updated.customer) {
+                setLoyaltyProfile(updated.customer);
+            }
+            setTimeout(() => setOrderSuccessMsg(null), 5000);
+        } else {
+            alert(res.error || 'Failed to redeem reward');
+        }
+    };
+
     // Self-Ordering Welcome Notice & Visual Guide States
     const [isWelcomeNoticeOpen, setIsWelcomeNoticeOpen] = useState(false);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -164,6 +231,30 @@ function CustomerOrderContent() {
         const interval = setInterval(refreshPageData, 2000);
         return () => clearInterval(interval);
     }, [tableParam, tokenParam]);
+
+    // Restore customerPhone from localStorage (keyed per table)
+    useEffect(() => {
+        try {
+            const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
+            const savedPhone = localStorage.getItem(`skylight_loyalty_phone_t${tableNum}`);
+            const savedName = localStorage.getItem(`skylight_loyalty_name_t${tableNum}`);
+            if (savedPhone) {
+                setCustomerPhone(savedPhone);
+                if (savedName) setCustomerName(savedName);
+            }
+        } catch (e) {}
+    }, [tableParam]);
+
+    // Persist customerPhone to localStorage whenever it changes
+    useEffect(() => {
+        try {
+            const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
+            if (customerPhone) {
+                localStorage.setItem(`skylight_loyalty_phone_t${tableNum}`, customerPhone);
+                if (customerName) localStorage.setItem(`skylight_loyalty_name_t${tableNum}`, customerName);
+            }
+        } catch (e) {}
+    }, [customerPhone, customerName, tableParam]);
 
     // Restoring cart from localStorage on initial load
     useEffect(() => {
@@ -247,7 +338,8 @@ function CustomerOrderContent() {
 
         const modifierList = Object.values(selectedModifiers);
         const extraTotal = modifierList.reduce((acc, m) => acc + m.price_extra, 0);
-        const itemTotalUsd = Number(selectedItemForModifier.price_usd) + extraTotal;
+        const basePrice = getMenuItemPrice(selectedItemForModifier, session?.order_type);
+        const itemTotalUsd = basePrice + extraTotal;
 
         setCart((prev) => [
             ...prev,
@@ -289,7 +381,7 @@ function CustomerOrderContent() {
             menuItemId: c.menuItem.id,
             itemName: c.menuItem.name,
             quantity: c.quantity,
-            unitPriceUsd: Number(c.menuItem.price_usd),
+            unitPriceUsd: getMenuItemPrice(c.menuItem, session?.order_type),
             station: c.menuItem.station,
             selectedModifiers: c.selectedModifiers,
             specialNotes: c.specialNotes,
@@ -298,6 +390,8 @@ function CustomerOrderContent() {
         const res = await submitCustomerOrder({
             sessionId: session.id,
             items: itemsToSubmit,
+            customerPhone: customerPhone.trim() || undefined,
+            customerName: customerName.trim() || undefined,
         });
 
         setOrderSubmitting(false);
@@ -419,6 +513,30 @@ function CustomerOrderContent() {
                     </button>
                 </div>
             </header>
+
+            {/* VIP Loyalty Points Top Banner */}
+            <div className="bg-[#1c3a1e] text-white px-4 py-2.5 text-xs font-bold flex justify-between items-center border-b border-[#d4af37]/30 shadow-xs">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-[#d4af37] shrink-0" />
+                    <span className="truncate">🌟 VIP Rewards: Earn 1 Pt per $1 Spent</span>
+                </div>
+                {loyaltyProfile ? (
+                    <button
+                        onClick={() => setIsLoyaltyModalOpen(true)}
+                        className="bg-[#d4af37] text-[#1c3a1e] font-black px-3 py-1 rounded-xl text-xs shrink-0 cursor-pointer shadow-xs hover:scale-105 transition-all flex items-center gap-1"
+                    >
+                        <span>🌟 {loyaltyProfile.customer_name}: {loyaltyProfile.points_balance} PTS</span>
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => setIsLoyaltyModalOpen(true)}
+                        className="bg-[#d4af37]/20 hover:bg-[#d4af37]/30 text-[#d4af37] border border-[#d4af37]/40 px-3 py-1 rounded-xl text-xs font-black shrink-0 cursor-pointer transition-all flex items-center gap-1"
+                    >
+                        <span>{customerPhone ? `Phone: ${customerPhone}` : 'Join VIP Rewards'}</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                )}
+            </div>
 
             {/* Live Order Status Tracker Banner */}
             {(() => {
@@ -607,10 +725,13 @@ function CustomerOrderContent() {
                                                 <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-[#1c3a1e]/10">
                                                     <div className="flex flex-col">
                                                         <span className="text-xs font-black text-[#1c3a1e]">
-                                                            {formatUsd(Number(item.price_usd))}
+                                                            {formatUsd(getMenuItemPrice(item, session?.order_type))}
+                                                            {session?.order_type === 'camping' && (
+                                                                <span className="ml-1 text-[9px] text-emerald-800 font-bold bg-emerald-100 px-1 py-0.5 rounded">Camping</span>
+                                                            )}
                                                         </span>
                                                         <span className="text-[10px] text-gray-500 font-medium">
-                                                            {formatLbp(Number(item.price_usd), exchangeRate)}
+                                                            {formatLbp(getMenuItemPrice(item, session?.order_type), exchangeRate)}
                                                         </span>
                                                     </div>
 
@@ -652,8 +773,8 @@ function CustomerOrderContent() {
                                 <div>
                                     <h3 className="text-xl font-extrabold text-[#1c3a1e]">{selectedItemForModifier.name}</h3>
                                     <p className="text-sm text-[#d4af37] font-extrabold mt-0.5">
-                                        {formatUsd(Number(selectedItemForModifier.price_usd))} &bull;{' '}
-                                        {formatLbp(Number(selectedItemForModifier.price_usd), exchangeRate)}
+                                        {formatUsd(getMenuItemPrice(selectedItemForModifier, session?.order_type))} &bull;{' '}
+                                        {formatLbp(getMenuItemPrice(selectedItemForModifier, session?.order_type), exchangeRate)}
                                     </p>
                                 </div>
                                 <button
@@ -1335,6 +1456,135 @@ function CustomerOrderContent() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CUSTOM MOBILE-FRIENDLY VIP LOYALTY MODAL */}
+            {isLoyaltyModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-md rounded-3xl p-6 shadow-2xl text-[#1c3a1e] space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-[#d4af37]" />
+                                <h3 className="text-base font-black text-[#1c3a1e]">VIP Loyalty Rewards</h3>
+                            </div>
+                            <button onClick={() => setIsLoyaltyModalOpen(false)} className="text-gray-400 font-bold p-1">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {loyaltyProfile ? (
+                            <div className="space-y-4">
+                                <div className="bg-[#eaf2eb] border border-[#1c3a1e]/20 rounded-2xl p-4 text-center space-y-2 shadow-xs">
+                                    <span className="text-[10px] font-black text-emerald-900 uppercase tracking-wider block">Recognized VIP Profile</span>
+                                    <h4 className="text-lg font-black text-[#1c3a1e]">{loyaltyProfile.customer_name}</h4>
+                                    <p className="text-xs font-bold text-gray-600">{loyaltyProfile.phone_number}</p>
+                                    
+                                    <div className="bg-white border border-amber-300 rounded-xl p-3 inline-block shadow-xs">
+                                        <span className="text-xs text-gray-500 font-bold block">Current Points Balance</span>
+                                        <strong className="text-2xl font-black text-amber-800">🌟 {loyaltyProfile.points_balance} PTS</strong>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-black text-[#1c3a1e] uppercase tracking-wider">Eligible Rewards</h4>
+                                    {rewardTiers.length === 0 ? (
+                                        <p className="text-xs text-gray-500 italic">No reward tiers available.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {rewardTiers.map((tier) => {
+                                                const canAfford = loyaltyProfile.points_balance >= tier.points_required;
+                                                return (
+                                                    <div key={tier.id} className="bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-2xl p-3 flex justify-between items-center">
+                                                        <div>
+                                                            <strong className="text-xs font-extrabold text-[#1c3a1e] block">{tier.name}</strong>
+                                                            <span className="text-[10px] text-gray-500 font-bold">{tier.points_required} pts required (${tier.discount_value.toFixed(2)} Off)</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleRedeemCustomerReward(tier.id)}
+                                                            disabled={!canAfford || redeemingTierId === tier.id}
+                                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                                canAfford
+                                                                    ? 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white shadow-xs'
+                                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                            }`}
+                                                        >
+                                                            {redeemingTierId === tier.id ? (
+                                                                <>
+                                                                    <span className="animate-spin text-xs">⏳</span>
+                                                                    <span>Redeeming…</span>
+                                                                </>
+                                                            ) : canAfford ? (
+                                                                'Redeem'
+                                                            ) : (
+                                                                'Need Pts'
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        try {
+                                            const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
+                                            localStorage.removeItem(`skylight_loyalty_phone_t${tableNum}`);
+                                            localStorage.removeItem(`skylight_loyalty_name_t${tableNum}`);
+                                        } catch (e) {}
+                                        setCustomerPhone('');
+                                        setCustomerName('');
+                                        setLoyaltyProfile(null);
+                                        setTempPhoneInput('');
+                                        setTempNameInput('');
+                                        setIsLoyaltyModalOpen(false);
+                                    }}
+                                    className="w-full bg-gray-100 hover:bg-red-50 hover:border-red-200 hover:text-red-700 border border-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                    <span>🚪</span> Log Out / Switch Number
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSaveLoyaltyProfile} className="space-y-3">
+                                <p className="text-xs text-gray-600 font-medium">
+                                    Enter your mobile number to earn 1 Point for every $1 spent. Points can be redeemed for free Shisha, Tawook, or discounts!
+                                </p>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-[#1c3a1e] mb-1">Mobile Phone Number *</label>
+                                    <input
+                                        type="tel"
+                                        required
+                                        placeholder="e.g. 70 123 456"
+                                        value={tempPhoneInput}
+                                        onChange={(e) => setTempPhoneInput(e.target.value)}
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs font-black text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e]"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-[#1c3a1e] mb-1">Your Name (Optional)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Nicola Nasr"
+                                        value={tempNameInput}
+                                        onChange={(e) => setTempNameInput(e.target.value)}
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-bold focus:outline-none focus:border-[#1c3a1e]"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loyaltyLoading}
+                                    className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer mt-2"
+                                >
+                                    {loyaltyLoading ? 'Linking VIP Profile...' : 'Save & Link VIP Profile 🚀'}
+                                </button>
+                            </form>
+                        )}
                     </div>
                 </div>
             )}
