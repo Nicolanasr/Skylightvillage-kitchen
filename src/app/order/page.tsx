@@ -497,15 +497,17 @@ function CustomerOrderContent() {
                         <span className="hidden sm:inline">Guide</span>
                     </button>
 
-                    {/* Google & In-App Review Button */}
-                    <button
-                        onClick={() => setIsRatingModalOpen(true)}
-                        className="flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all cursor-pointer"
-                        title="Leave us a Review & Rating!"
+                    {/* Google Review Button */}
+                    <a
+                        href="https://g.page/r/CVjTZaAHNiz0EAI/review"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all"
+                        title="Leave us a Google Review!"
                     >
                         <Star className="h-4 w-4 fill-[#d4af37] text-[#d4af37]" />
                         <span className="hidden sm:inline">Review Us</span>
-                    </button>
+                    </a>
 
                     {/* Running Bill Button */}
                     <button
