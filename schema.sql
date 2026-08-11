@@ -253,25 +253,45 @@ CREATE TABLE IF NOT EXISTS loyalty_audit_logs (
 -- Run these statements whenever new columns are added to existing live tables.
 -- They will NOT delete any data and will safely add new columns if missing.
 
--- 20. System Global Settings Table
-CREATE TABLE IF NOT EXISTS system_settings (
-  key TEXT PRIMARY KEY,
-  value JSONB NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+-- 21. Cashier Shift Float & Z-Report Reconciliation
+CREATE TABLE IF NOT EXISTS cashier_shifts (
+  id TEXT PRIMARY KEY,
+  cashier_name TEXT NOT NULL,
+  opening_float_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+  opening_float_lbp NUMERIC(15,2) NOT NULL DEFAULT 0,
+  cash_drops_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+  cash_drops_lbp NUMERIC(15,2) NOT NULL DEFAULT 0,
+  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  opened_at TIMESTAMPTZ DEFAULT NOW(),
+  closed_at TIMESTAMPTZ,
+  actual_cash_usd NUMERIC(10,2),
+  actual_cash_lbp NUMERIC(15,2),
+  expected_cash_usd NUMERIC(10,2),
+  expected_cash_lbp NUMERIC(15,2),
+  variance_usd NUMERIC(10,2),
+  variance_lbp NUMERIC(15,2),
+  notes TEXT DEFAULT ''
 );
 
-ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
-ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in';
+CREATE TABLE IF NOT EXISTS cash_drops (
+  id TEXT PRIMARY KEY,
+  shift_id TEXT NOT NULL REFERENCES cashier_shifts(id) ON DELETE CASCADE,
+  amount_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+  amount_lbp NUMERIC(15,2) NOT NULL DEFAULT 0,
+  dropped_by TEXT NOT NULL,
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_comped BOOLEAN DEFAULT false;
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false;
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_printed BOOLEAN DEFAULT false;
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS selected_modifiers JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS special_notes TEXT DEFAULT '';
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS guest_name TEXT DEFAULT '';
-
-ALTER TABLE payments ADD COLUMN IF NOT EXISTS amount_lbp NUMERIC(15,2) DEFAULT 0;
-ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cash';
-ALTER TABLE payments ADD COLUMN IF NOT EXISTS exchange_rate_used INT DEFAULT 89500;
+-- 22. Customer Mobile Post-Meal Rating & Feedback Widget
+CREATE TABLE IF NOT EXISTS customer_feedback (
+  id TEXT PRIMARY KEY,
+  session_id TEXT,
+  table_number INT,
+  rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  tags JSONB DEFAULT '[]'::jsonb,
+  comment TEXT DEFAULT '',
+  customer_phone TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 

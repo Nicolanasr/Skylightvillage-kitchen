@@ -16,6 +16,7 @@ import {
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
 import { getOrderPageData, submitCustomerOrder, triggerServiceCall } from '../actions/order-actions';
 import { lookupOrCreateCustomerLoyalty, redeemLoyaltyRewardAction } from '../actions/loyalty-actions';
+import { submitCustomerFeedbackAction } from '../actions/report-actions';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import {
     Bell,
@@ -37,6 +38,7 @@ import {
     HelpCircle,
     Image as ImageIcon,
     Search,
+    DollarSign,
 } from 'lucide-react';
 
 export default function CustomerOrderPage() {
@@ -108,6 +110,20 @@ function CustomerOrderContent() {
     const [tempPhoneInput, setTempPhoneInput] = useState('');
     const [tempNameInput, setTempNameInput] = useState('');
     const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+
+    // Post-Meal 5-Star Rating & Feedback State
+    const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+    const [ratingValue, setRatingValue] = useState(5);
+    const [ratingTags, setRatingTags] = useState<string[]>(['Fast Service', 'Delicious Food']);
+    const [ratingComment, setRatingComment] = useState('');
+    const [hasSubmittedFeedback, setHasSubmittedFeedback] = useState(false);
+    const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+    // Pay My Share Mobile Drawer State
+    const [isPayMyShareOpen, setIsPayMyShareOpen] = useState(false);
+    const [selectedShareItemIds, setSelectedShareItemIds] = useState<string[]>([]);
+    const [payShareSplitCount, setPayShareSplitCount] = useState<number>(1);
+    const [isSubmittingSharePay, setIsSubmittingSharePay] = useState(false);
 
     // Auto-lookup loyalty profile when phone number changes
     useEffect(() => {
@@ -481,17 +497,15 @@ function CustomerOrderContent() {
                         <span className="hidden sm:inline">Guide</span>
                     </button>
 
-                    {/* Google Review Button */}
-                    <a
-                        href="https://g.page/r/CVjTZaAHNiz0EAI/review"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all"
-                        title="Leave us a Google Review!"
+                    {/* Google & In-App Review Button */}
+                    <button
+                        onClick={() => setIsRatingModalOpen(true)}
+                        className="flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all cursor-pointer"
+                        title="Leave us a Review & Rating!"
                     >
                         <Star className="h-4 w-4 fill-[#d4af37] text-[#d4af37]" />
                         <span className="hidden sm:inline">Review Us</span>
-                    </a>
+                    </button>
 
                     {/* Running Bill Button */}
                     <button
@@ -1062,14 +1076,157 @@ function CustomerOrderContent() {
                                 <span>{liveBill.finalTotalLbp}</span>
                             </div>
 
-                            <button
-                                onClick={() => handleCallWaiter('bill')}
-                                className="w-full mt-4 bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-all shadow-md"
-                            >
-                                <Receipt className="h-4 w-4" />
-                                <span>Request Final Check from Waiter</span>
+                            <div className="grid grid-cols-2 gap-2 mt-4">
+                                <button
+                                    onClick={() => {
+                                        setIsBillOpen(false);
+                                        setIsPayMyShareOpen(true);
+                                    }}
+                                    className="bg-[#d4af37] text-[#1c3a1e] font-black py-3 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs shadow-md transition-all hover:scale-102 cursor-pointer"
+                                >
+                                    <DollarSign className="h-4 w-4" />
+                                    <span>Pay My Share</span>
+                                </button>
+                                <button
+                                    onClick={() => handleCallWaiter('bill')}
+                                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold py-3 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all shadow-md cursor-pointer"
+                                >
+                                    <Receipt className="h-4 w-4" />
+                                    <span>Request Check</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PAY MY SHARE MOBILE DRAWER */}
+            {isPayMyShareOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-[#1c3a1e] max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15">
+                            <div className="flex items-center gap-2">
+                                <div className="h-9 w-9 bg-[#eaf2eb] rounded-xl flex items-center justify-center text-[#1c3a1e]">
+                                    <DollarSign className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-[#1c3a1e]">Pay My Share</h3>
+                                    <p className="text-xs text-gray-500 font-medium">Select dishes or split table total equally</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsPayMyShareOpen(false)} className="text-gray-400 hover:text-black">
+                                <X className="h-5 w-5" />
                             </button>
                         </div>
+
+                        {/* Split Type Toggles */}
+                        <div className="space-y-3">
+                            <label className="block text-xs font-bold text-gray-700">Quick Equal Split:</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {[1, 2, 3, 4].map((count) => (
+                                    <button
+                                        key={count}
+                                        onClick={() => setPayShareSplitCount(count)}
+                                        className={`py-2 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                                            payShareSplitCount === count
+                                                ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                                : 'bg-[#fafbfa] text-[#1c3a1e] border-gray-200 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {count === 1 ? 'Full' : `1/${count} Split`}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-200 pt-3 space-y-2">
+                            <label className="block text-xs font-bold text-gray-700">Or Pick Specific Dishes You Ate:</label>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                {liveOrderItems.filter((i) => i.status !== 'cancelled').map((item) => {
+                                    const isChecked = selectedShareItemIds.includes(item.id);
+                                    const itemPrice = Number(item.unit_price_usd) * item.quantity;
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => {
+                                                if (isChecked) {
+                                                    setSelectedShareItemIds((prev) => prev.filter((id) => id !== item.id));
+                                                } else {
+                                                    setSelectedShareItemIds((prev) => [...prev, item.id]);
+                                                }
+                                            }}
+                                            className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                                                isChecked
+                                                    ? 'bg-emerald-50 border-emerald-500/40 text-emerald-950 font-bold'
+                                                    : 'bg-[#fafbfa] border-gray-200 text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    className="h-4 w-4 rounded accent-[#1c3a1e]"
+                                                />
+                                                <span className="text-xs">
+                                                    {item.quantity}x {item.item_name}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs font-black">{formatUsd(itemPrice)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Calculated Share Total */}
+                        {(() => {
+                            let shareUsd = 0;
+                            if (selectedShareItemIds.length > 0) {
+                                const selectedItems = liveOrderItems.filter((i) => selectedShareItemIds.includes(i.id));
+                                shareUsd = selectedItems.reduce((acc, i) => acc + Number(i.unit_price_usd) * i.quantity, 0);
+                            } else {
+                                shareUsd = liveBill.finalTotalUsd / payShareSplitCount;
+                            }
+                            const shareLbp = formatLbp(shareUsd, exchangeRate);
+
+                            return (
+                                <div className="bg-[#1c3a1e] text-white p-4 rounded-2xl space-y-2 shadow-md">
+                                    <div className="flex justify-between text-xs text-gray-300">
+                                        <span>Your Individual Share Total:</span>
+                                        <span className="font-extrabold text-[#d4af37]">
+                                            {selectedShareItemIds.length > 0 ? `${selectedShareItemIds.length} items picked` : `1/${payShareSplitCount} of Table Bill`}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-xl font-black text-[#d4af37]">{formatUsd(shareUsd)}</span>
+                                        <span className="text-xs font-bold">{shareLbp}</span>
+                                    </div>
+
+                                    <button
+                                        onClick={async () => {
+                                            setIsSubmittingSharePay(true);
+                                            // Call waiter with custom share note
+                                            await triggerServiceCall(
+                                                session?.id || '',
+                                                table?.table_number || 1,
+                                                'bill',
+                                                `Guest requested individual check share: ${formatUsd(shareUsd)} (${shareLbp})`
+                                            );
+                                            setIsSubmittingSharePay(false);
+                                            setIsPayMyShareOpen(false);
+                                            setAddedToastMsg(`✅ Share calculation of ${formatUsd(shareUsd)} sent to waiter!`);
+                                            setTimeout(() => setAddedToastMsg(null), 4000);
+                                        }}
+                                        disabled={isSubmittingSharePay}
+                                        className="w-full mt-2 bg-[#d4af37] hover:bg-[#c29f2f] text-[#1c3a1e] font-black py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                                    >
+                                        <Receipt className="h-4 w-4" />
+                                        <span>{isSubmittingSharePay ? 'Sending...' : 'Request Server for My Share ($' + shareUsd.toFixed(2) + ')'}</span>
+                                    </button>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
@@ -1589,6 +1746,136 @@ function CustomerOrderContent() {
                                     {loyaltyLoading ? 'Linking VIP Profile...' : 'Save & Link VIP Profile 🚀'}
                                 </button>
                             </form>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* SLEEK 5-STAR RATING & REVIEW MODAL */}
+            {isRatingModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-[#1c3a1e]">
+                        <div className="flex justify-between items-center pb-3 border-b border-[#1c3a1e]/15">
+                            <div className="flex items-center gap-2">
+                                <div className="h-9 w-9 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
+                                    <Star className="h-5 w-5 fill-amber-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black">Rate Your Dining Experience</h3>
+                                    <p className="text-xs text-gray-500 font-medium">Skylight Village Guest Review</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsRatingModalOpen(false)} className="text-gray-400 hover:text-black">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {hasSubmittedFeedback ? (
+                            <div className="py-8 text-center space-y-3">
+                                <div className="h-16 w-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                                    <CheckCircle2 className="h-8 w-8" />
+                                </div>
+                                <h4 className="text-base font-black">Thank you for your rating!</h4>
+                                <p className="text-xs text-gray-600">Your feedback helps us continuously elevate our service.</p>
+                                <a
+                                    href="https://g.page/r/CVjTZaAHNiz0EAI/review"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 bg-[#d4af37] text-[#1c3a1e] font-black px-4 py-2.5 rounded-xl text-xs shadow-xs hover:scale-105 transition-all mt-2"
+                                >
+                                    <span>Also Leave a Google Review ⭐</span>
+                                </a>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="flex justify-center items-center gap-2 py-2">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            onClick={() => setRatingValue(star)}
+                                            className="p-1 transition-transform hover:scale-125 cursor-pointer"
+                                        >
+                                            <Star
+                                                className={`h-7 w-7 ${
+                                                    star <= ratingValue ? 'text-amber-500 fill-amber-400' : 'text-gray-300'
+                                                }`}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5">What did you love most?</label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {['Fast Service', 'Delicious Food', 'Friendly Staff', 'Great Vibes', 'Clean Tables'].map((tag) => {
+                                            const isSelected = ratingTags.includes(tag);
+                                            return (
+                                                <button
+                                                    key={tag}
+                                                    onClick={() => {
+                                                        if (isSelected) {
+                                                            setRatingTags((prev) => prev.filter((t) => t !== tag));
+                                                        } else {
+                                                            setRatingTags((prev) => [...prev, tag]);
+                                                        }
+                                                    }}
+                                                    className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                                                        isSelected
+                                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                                            : 'bg-[#fafbfa] text-gray-700 border-gray-300 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    {isSelected ? '✓ ' : '+ '}{tag}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Comments or suggestions (Optional):</label>
+                                    <textarea
+                                        rows={2}
+                                        value={ratingComment}
+                                        onChange={(e) => setRatingComment(e.target.value)}
+                                        placeholder="Tell us what you liked..."
+                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-2.5 text-xs text-[#1c3a1e] font-medium"
+                                    />
+                                </div>
+
+                                <button
+                                    disabled={isSubmittingFeedback}
+                                    onClick={async () => {
+                                        setIsSubmittingFeedback(true);
+                                        const res = await submitCustomerFeedbackAction({
+                                            sessionId: session?.id,
+                                            tableNumber: table?.table_number || 1,
+                                            rating: ratingValue,
+                                            tags: ratingTags,
+                                            comment: ratingComment,
+                                            customerPhone: customerPhone,
+                                        });
+                                        setIsSubmittingFeedback(false);
+                                        if (res.success) {
+                                            setHasSubmittedFeedback(true);
+                                        }
+                                    }}
+                                    className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs shadow-md transition-all cursor-pointer"
+                                >
+                                    {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback ⭐'}
+                                </button>
+
+                                <div className="text-center pt-1 border-t border-gray-100">
+                                    <a
+                                        href="https://g.page/r/CVjTZaAHNiz0EAI/review"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[11px] font-bold text-[#997a15] hover:underline"
+                                    >
+                                        Or click here to review us on Google Maps ↗
+                                    </a>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>

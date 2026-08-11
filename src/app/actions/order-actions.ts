@@ -615,15 +615,16 @@ export async function addBatchWaiterManualOrderItems(data: {
   return { success: true };
 }
 
-export async function triggerServiceCall(sessionId: string, tableNumber: number, type: 'waiter' | 'charcoal' | 'bill') {
+export async function triggerServiceCall(sessionId: string, tableNumber: number, type: 'waiter' | 'charcoal' | 'bill', details?: string) {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   const callId = randomUUID();
   try {
+    await pool.query('ALTER TABLE service_calls ADD COLUMN IF NOT EXISTS details TEXT DEFAULT \'\'');
     await pool.query(
-      `INSERT INTO service_calls (id, session_id, table_number, type, status)
-       VALUES ($1, $2, $3, $4, 'pending')`,
-      [callId, sessionId, tableNumber, type]
+      `INSERT INTO service_calls (id, session_id, table_number, type, status, details)
+       VALUES ($1, $2, $3, $4, 'pending', $5)`,
+      [callId, sessionId, tableNumber, type, details || '']
     );
 
     if (type === 'bill') {
