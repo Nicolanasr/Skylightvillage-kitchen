@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
+import { transformGoogleDriveUrl } from '@/lib/drive';
 import { useRealtimePOS } from '@/hooks/useRealtimePOS';
 import {
   createCategory,
@@ -624,15 +625,44 @@ function AdminContent() {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Image URL (Direct or Google Drive share link)
+                  Item Image (Upload File or Paste Google Drive / Web Link)
                 </label>
-                <input
-                  type="text"
-                  value={editImageUrl}
-                  onChange={(e) => setEditImageUrl(e.target.value)}
-                  placeholder="Paste https://drive.google.com/... or image link"
-                  className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-bold focus:outline-none focus:border-[#1c3a1e]"
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setEditImageUrl(ev.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="text-xs text-[#1c3a1e] font-bold file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#1c3a1e] file:text-white hover:file:bg-[#d4af37] hover:file:text-[#1c3a1e] file:cursor-pointer cursor-pointer"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    value={editImageUrl}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    placeholder="Or paste https://drive.google.com/... or web image link"
+                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-bold focus:outline-none focus:border-[#1c3a1e]"
+                  />
+
+                  {editImageUrl && (
+                    <div className="flex items-center gap-3 pt-1 bg-emerald-50/60 p-2 rounded-xl border border-emerald-500/20">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden border border-emerald-500/30 shrink-0 bg-white">
+                        <img src={transformGoogleDriveUrl(editImageUrl)} alt="Preview" className="h-full w-full object-cover" />
+                      </div>
+                      <span className="text-[11px] font-extrabold text-emerald-950">✅ Image Linked & Ready</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2 pt-1">
@@ -794,14 +824,45 @@ function AdminContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Image URL / Drive Link (Optional)</label>
-                <input
-                  type="text"
-                  value={newItemImage}
-                  onChange={(e) => setNewItemImage(e.target.value)}
-                  placeholder="https://drive.google.com/... or image link"
-                  className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-bold focus:outline-none focus:border-[#1c3a1e]"
-                />
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Item Image (Upload File or Paste Google Drive / Web Link)
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setNewItemImage(ev.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="text-xs text-[#1c3a1e] font-bold file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#1c3a1e] file:text-white hover:file:bg-[#d4af37] hover:file:text-[#1c3a1e] file:cursor-pointer cursor-pointer"
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    value={newItemImage}
+                    onChange={(e) => setNewItemImage(e.target.value)}
+                    placeholder="Or paste https://drive.google.com/... or web image link"
+                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs text-[#1c3a1e] font-bold focus:outline-none focus:border-[#1c3a1e]"
+                  />
+
+                  {newItemImage && (
+                    <div className="flex items-center gap-3 pt-1 bg-emerald-50/60 p-2 rounded-xl border border-emerald-500/20">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden border border-emerald-500/30 shrink-0 bg-white">
+                        <img src={transformGoogleDriveUrl(newItemImage)} alt="Preview" className="h-full w-full object-cover" />
+                      </div>
+                      <span className="text-[11px] font-extrabold text-emerald-950">✅ Image Linked & Ready</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2 pt-1">
