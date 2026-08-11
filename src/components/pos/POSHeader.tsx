@@ -3,7 +3,7 @@
 import React from 'react';
 import { ServiceCall } from '@/lib/types';
 import { resolveServiceCall } from '@/app/actions/payment-actions';
-import { Bell, Monitor, ChefHat, Shield, ArrowLeft } from 'lucide-react';
+import { Bell, Monitor, ChefHat, Shield, ArrowLeft, Flame } from 'lucide-react';
 
 interface POSHeaderProps {
     serviceCalls: ServiceCall[];
@@ -12,6 +12,7 @@ interface POSHeaderProps {
     setShowAllFloorTables: (val: boolean) => void;
     posViewMode?: 'tables' | 'takeout';
     setPosViewMode?: (mode: 'tables' | 'takeout') => void;
+    orderItems?: any[];
 }
 
 export const POSHeader: React.FC<POSHeaderProps> = ({
@@ -21,11 +22,45 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
     setShowAllFloorTables,
     posViewMode = 'tables',
     setPosViewMode,
+    orderItems = [],
 }) => {
     const pendingCalls = serviceCalls.filter((c) => c.status === 'pending');
 
+    // Calculate overdue kitchen items (pending or preparing for > 12 minutes)
+    const now = Date.now();
+    const overdueItems = orderItems.filter((i) => {
+        if (i.status !== 'pending' && i.status !== 'preparing') return false;
+        const elapsedMins = Math.floor((now - new Date(i.created_at).getTime()) / 60000);
+        return elapsedMins >= 12;
+    });
+
+    const overdueTableNums = Array.from(new Set(overdueItems.map((i) => i.table_number || 1))).sort((a, b) => a - b);
+
     return (
         <div className="space-y-4">
+            {/* Kitchen Overdue Prep Alert Banner */}
+            {overdueItems.length > 0 && (
+                <div className="bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-lg font-black flex items-center justify-between animate-pulse">
+                    <div className="flex items-center gap-3">
+                        <Flame className="h-5 w-5 text-amber-300" />
+                        <span className="text-sm">
+                            🔥 KITCHEN PREP DELAY ALERT ({overdueItems.length} items overdue): Table #{overdueTableNums.join(', #')}{' '}
+                            waiting &gt; 12 mins in kitchen!
+                        </span>
+                    </div>
+
+                    <a
+                        href="/kds"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-white text-rose-900 text-xs font-black px-4 py-2 rounded-xl hover:bg-amber-100 transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                    >
+                        <ChefHat className="h-4 w-4" />
+                        <span>Open KDS Screen</span>
+                    </a>
+                </div>
+            )}
+
             {/* Pending Waiter Service Calls Banner */}
             {pendingCalls.length > 0 && (
                 <div className="bg-amber-500 text-slate-950 px-6 py-3 rounded-2xl shadow-lg font-black flex items-center justify-between animate-bounce">

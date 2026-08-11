@@ -101,6 +101,14 @@ async function ensureLoyaltyTables() {
         notes TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
     `);
 
     // Migrate: add loyalty_phone column to order_items if it doesn't exist
@@ -133,17 +141,17 @@ export async function seedDefaultRewardTiers() {
   await ensureLoyaltyTables();
 
   try {
-    await pool.query(`
-      INSERT INTO loyalty_reward_tiers (id, name, points_required, reward_type, discount_value, active) VALUES
-      ('tier-5-off', '$5 Off Total Bill', 50, 'discount_usd', 5.00, true),
-      ('tier-10-off', '$10 Off Total Bill', 100, 'discount_usd', 10.00, true),
-      ('tier-20-off', '$20 Off Total Bill', 200, 'discount_usd', 20.00, true)
-      ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        reward_type = EXCLUDED.reward_type,
-        discount_value = EXCLUDED.discount_value,
-        points_required = EXCLUDED.points_required;
-    `);
+    // await pool.query(`
+    //   INSERT INTO loyalty_reward_tiers (id, name, points_required, reward_type, discount_value, active) VALUES
+    //   ('tier-5-off', '$5 Off Total Bill', 50, 'discount_usd', 5.00, true),
+    //   ('tier-10-off', '$10 Off Total Bill', 100, 'discount_usd', 10.00, true),
+    //   ('tier-20-off', '$20 Off Total Bill', 200, 'discount_usd', 20.00, true)
+    //   ON CONFLICT (id) DO UPDATE SET
+    //     name = EXCLUDED.name,
+    //     reward_type = EXCLUDED.reward_type,
+    //     discount_value = EXCLUDED.discount_value,
+    //     points_required = EXCLUDED.points_required;
+    // `);
 
     // Migrate any legacy database records from free_item to discount_usd
     await pool.query(`
@@ -305,6 +313,9 @@ export async function awardLoyaltyPointsForSession(
   if (!pool) return { success: false };
   await ensureLoyaltyTables();
 
+  const isEnabled = await getLoyaltyEnabledSetting();
+  if (!isEnabled) return { success: true, pointsEarned: 0, disabled: true };
+
   try {
     // 1. Fetch all non-cancelled, non-comped items for this session with their per-item loyalty_phone
     const itemsRes = await pool.query(
@@ -462,6 +473,9 @@ export async function redeemLoyaltyRewardAction(
 ) {
   if (!pool || !sessionId || !customerPhone || !rewardTierId) return { success: false, error: 'Missing required parameters' };
   await ensureLoyaltyTables();
+
+  const isEnabled = await getLoyaltyEnabledSetting();
+  if (!isEnabled) return { success: false, error: 'The Loyalty Program is currently disabled by management.' };
 
   const cleanPhone = customerPhone.trim();
   try {
@@ -809,6 +823,52 @@ export async function searchLoyaltyCustomers(query: string) {
   } catch (e) {
     console.error('Error searching loyalty customers:', e);
     return { success: true, customers: [] };
+  }
+}
+
+/**
+ * Get system setting for Loyalty Program enabled state
+ */
+export async function getLoyaltyEnabledSetting(): Promise<boolean> {
+  if (!pool) return true;
+  await ensureLoyaltyTables();
+  try {
+    const res = await pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'");
+    if (res.rows.length > 0) {
+      const val = res.rows[0].value;
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'object' && val !== null && 'enabled' in val) return !!val.enabled;
+    }
+  } catch (e) {
+    console.error('Error reading loyalty setting:', e);
+  }
+  return true;
+}
+
+/**
+ * Update system setting for Loyalty Program enabled state
+ */
+export async function setLoyaltyEnabledSetting(enabled: boolean) {
+  if (!pool) return { success: false, error: 'Database connection error' };
+  await ensureLoyaltyTables();
+
+  try {
+    await pool.query(
+      `INSERT INTO system_settings (key, value, updated_at)
+       VALUES ('loyalty_program_enabled', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [JSON.stringify({ enabled })]
+    );
+
+    revalidatePath('/pos');
+    revalidatePath('/order');
+    revalidatePath('/claim');
+    revalidatePath('/admin');
+
+    return { success: true, enabled };
+  } catch (e: any) {
+    console.error('Error updating loyalty setting:', e);
+    return { success: false, error: e.message || 'Failed to update setting' };
   }
 }
 

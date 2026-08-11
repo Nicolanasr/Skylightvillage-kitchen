@@ -198,6 +198,7 @@ function POSContent() {
           setShowAllFloorTables={setShowAllFloorTables}
           posViewMode={posViewMode}
           setPosViewMode={setPosViewMode}
+          orderItems={orderItems}
         />
 
         {/* Main Content Layout */}

@@ -73,6 +73,12 @@ export async function getPOSData() {
     return tbl;
   });
 
+  let loyaltyEnabled = true;
+  try {
+    const { getLoyaltyEnabledSetting } = await import('./loyalty-actions');
+    loyaltyEnabled = await getLoyaltyEnabledSetting();
+  } catch (e) {}
+
   return {
     tables,
     sessions,
@@ -82,6 +88,7 @@ export async function getPOSData() {
     payments,
     menuItems,
     categories,
+    loyaltyEnabled,
   };
 }
 

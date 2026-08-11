@@ -39,7 +39,7 @@ npm run build
 
 ### 2. Database Schema & Architecture Data Model
 
-The application uses 16 interconnected Neon PostgreSQL tables defined in `schema.sql`:
+The application uses 19 interconnected Neon PostgreSQL tables defined in `schema.sql`:
 
 ```mermaid
 erDiagram
@@ -55,6 +55,8 @@ erDiagram
     raw_ingredients ||--o{ inventory_waste : "logs spoilage"
     raw_ingredients ||--o{ inventory_audits : "tracks variance"
     raw_ingredients ||--o{ inventory_deductions : "logs deductions"
+    loyalty_customers ||--o{ loyalty_redemptions : "redeems"
+    loyalty_reward_tiers ||--o{ loyalty_redemptions : "applies"
 ```
 
 #### Table Specifications:
@@ -62,9 +64,9 @@ erDiagram
 1. **`tables`**: Table matrix (`id`, `table_number`, `qr_code_token`, `status: available | occupied | merged | bill_requested`).
 2. **`table_sessions`**: Active table visits (`id`, `primary_table_id`, `merged_table_ids`, `status: active | closed`, `order_type: dine_in | takeout | camping | event_voucher`, `customer_name`, `customer_phone`, `closed_at`).
 3. **`menu_categories`**: Category navigation (`id`, `name`, `sort_order`).
-4. **`menu_items`**: Menu catalog (`id`, `category_id`, `name`, `description`, `price_usd`, `image_url`, `station`, `available`, `is_staff_only`, `sort_order`, `is_bestseller`, `modifier_groups`).
+4. **`menu_items`**: Menu catalog (`id`, `category_id`, `name`, `description`, `price_usd`, `price_camping_usd`, `image_url`, `station`, `available`, `is_staff_only`, `sort_order`, `is_bestseller`, `modifier_groups`).
 5. **`orders`**: Order grouping header (`id`, `session_id`, `created_at`).
-6. **`order_items`**: Individual dish items (`id`, `order_id`, `session_id`, `table_number`, `menu_item_id`, `item_name`, `quantity`, `unit_price_usd`, `station`, `status: pending | preparing | ready | delivered | cancelled`, `selected_modifiers`, `special_notes`, `is_comped`, `is_paid`, `is_printed`).
+6. **`order_items`**: Individual dish items (`id`, `order_id`, `session_id`, `table_number`, `menu_item_id`, `item_name`, `quantity`, `unit_price_usd`, `station`, `status: pending | preparing | ready | delivered | cancelled`, `selected_modifiers`, `special_notes`, `is_comped`, `is_paid`, `is_printed`, `loyalty_phone`).
 7. **`payments`**: Payment transactions (`id`, `session_id`, `amount_usd`, `payment_method: cash | lbp | card`, `created_at`).
 8. **`discounts`**: Discount adjustments (`id`, `session_id`, `type: percentage | fixed`, `value`, `reason`).
 9. **`staff_members`**: Staff authentication (`id`, `name`, `pin_code`, `role: Admin | Waiter | Kitchen | Cashier`, `created_at`).
@@ -75,22 +77,44 @@ erDiagram
 14. **`inventory_waste`**: Spoilage loss log (`id`, `ingredient_id`, `quantity_wasted`, `total_cost_usd`, `reason`, `logged_by`).
 15. **`inventory_audits`**: Physical audit counts (`id`, `ingredient_id`, `expected_stock`, `actual_stock`, `variance`, `notes`).
 16. **`inventory_deductions`**: Real-time sales stock deduction audit log (`id`, `order_reference`, `dish_name`, `ingredient_id`, `ingredient_name`, `quantity_deducted`, `unit`, `remaining_stock`).
+17. **`loyalty_customers`**: VIP Customer profile (`id`, `phone_number`, `full_name`, `points_balance`, `total_visits`, `total_spent_usd`).
+18. **`loyalty_reward_tiers`**: Seeding reward tiers (`id`, `tier_name`, `points_required`, `discount_value`, `reward_type: discount_usd`).
+19. **`loyalty_redemptions`**: VIP redemption audit log (`id`, `customer_id`, `tier_id`, `discount_amount_usd`, `session_id`).
 
 ---
 
 ### 3. Detailed Application Modules & Features
 
-#### 3.1 🖥️ POS Waiter Terminal (`/pos`)
+#### 3.1 🏷️ Dual Pricing Architecture (Restaurant vs. Camping / Picnic)
+- **Dual Price Support**: Every dish supports independent **Dine-In Price ($ USD)** and **Camping Price ($ USD)**.
+- **Dynamic Price Resolution**: Standardized `getMenuItemPrice(item, orderType)` helper resolves prices dynamically based on the active session order type (`dine_in` vs `camping`).
+- **Side-by-Side Admin Controls**: Configure both prices side-by-side in the Admin Menu Catalog Manager.
+- **Seamless Frontend Switching**: Automatically renders and calculates cart subtotals with Camping prices on Camping POS tabs, Takeout/Camping workbench, and Customer QR Ordering.
+
+---
+
+#### 3.2 🌟 VIP Loyalty Program & Customer Claim Portal (`/claim` & `/admin` Loyalty)
+- **Automatic Points Accrual**: Customers automatically earn **1 Loyalty Point per $1 USD spent** upon table session settlement.
+- **Reward Discount Tiers**: Built-in default tiers ($5 Off for 50 pts, $10 Off for 100 pts, $20 Off for 200 pts).
+- **Customer QR Claim Portal (`/claim`)**: Customer-facing mobile portal to check points balance, view eligible rewards, and claim discount codes.
+- **Per-Item VIP Assignment in POS**: Assign customer mobile numbers to individual dish items or entire table sessions (`🌟 Name (Phone)`).
+- **Clickable Customer VIP Badges**: Clicking any customer badge in POS opens their VIP profile modal displaying points balance, total visits, and available rewards.
+- **Instant POS Reward Redemption**: Staff can redeem rewards directly inside POS with animated loading spinners (`⏳ Redeeming...`).
+
+---
+
+#### 3.3 🖥️ POS Waiter Terminal (`/pos`)
 - **Interactive Floor Plan**: Grid layout of table cards displaying real-time status badges (`Available`, `Occupied`, `Bill Requested`, `Merged`).
 - **Table Merging & Unmerging**: Join multiple physical tables under 1 primary session for large group parties.
 - **Seat / Guest Line-Item Tagging**: Tag items per guest (e.g. `Guest #1: Tawook`, `Guest #2: Kafta`) for seamless split checks.
 - **Multi-Currency Settlement**: Fixed exchange rate at **89,500 LBP / USD**. Displays bill total in both `$ USD` and `LBP`. Supports dual cash (`USD` + `LBP`) and credit card payments.
+- **$0.00 Total Checkout Support**: Complete payment and close table sessions even when the total is `$0.00` (e.g., comped items or 100% covered by VIP discount rewards).
 - **Item Comping & Discounts**: Mark items as `🎁 Comped (Free)` or apply percentage/fixed dollar discounts.
 - **Thermal Invoice Receipt Printer**: Formatted print receipt layout with barcode/invoice reference, tax break, and payment breakdown.
 
 ---
 
-#### 3.2 👨‍🍳 Kitchen Display System KDS (`/kds`)
+#### 3.4 👨‍🍳 Kitchen Display System KDS (`/kds`)
 - **Station-Filtered Dispatch**: Filter live orders by kitchen station (`mezza`, `sajj`, `grill`, `subs_sandwiches`, `bar`, `shisha`).
 - **Interactive Lifecycle Buttons**:
   - `pending` -> Tap to start `preparing`.
@@ -101,7 +125,7 @@ erDiagram
 
 ---
 
-#### 3.3 🎟️ Event Voucher Terminal (`/events`)
+#### 3.5 🎟️ Event Voucher Terminal (`/events`)
 - **PIN Auth Protection**: Wrapped with `<StaffAuthGuard pageTitle="Event Voucher Terminal">` requiring staff PIN.
 - **Rapid Voucher Issuance**: Enter customer name / ticket tag (e.g. `EVT-101`), select items, choose payment method, and submit in 1 click.
 - **Last-Added-First Cart**: Cart entries ordered descending by `addedAt` timestamp so last added items show at top.
@@ -111,48 +135,35 @@ erDiagram
 
 ---
 
-#### 3.4 📦 Enterprise Recipe BOM & Portion Inventory System (`/admin/inventory`)
+#### 3.6 📦 Enterprise Recipe BOM & Portion Inventory System (`/admin/inventory`)
 - **Direct Route & Query Sync**: Dedicated route `/admin/inventory` with URL query state persistence (`/admin/inventory?sub=recipes`, `/admin/inventory?sub=deductions`).
 - **Raw Ingredients Library**: Track stock counts in `kg`, `g`, `pcs`, `liter`, `ml` with reorder alert thresholds and unit costs.
 - **Recipe BOM & Food Costing (COGS)**:
   - Link dishes to portion gram weights (e.g. `130g Tawook`, `30g Garlic Mayo`, `1 pc Bread`, `100g Fries`).
   - **Gross Profit Margin % Calculator**: Calculates recipe cost vs menu selling price in real-time.
-  - **Optional Stock Items**: Menu items can have `0 stock items` by default (no forced dummy recipes).
-- **Fast Interactive Dish Search**: Search input with live dish cards showing price and ingredient count badges.
 - **Real-Time Live Order Stock Auto-Deduction**:
   - Automatically deducts portion weights on POS, Takeout, QR, and Event Voucher orders.
   - **Auto Out-of-Stock Locking**: Automatically locks dishes as `Out of Stock` (`available = false`) when any required raw ingredient hits `0`.
 - **Automatic Cancellation Restocking**:
   - When an order item is cancelled or voided (`status = 'cancelled'`), raw ingredient portion weights are **automatically refunded** back into stock.
-  - Re-enables linked menu items (`available = true`) if stock rises back above 0.
-- **Grouped Sales Deduction Log Feed**:
-  - Summarizes deductions **1 single line per transaction**.
-  - Includes collapsible `[👁️ View Details]` drawers showing full ingredient subtractions and remaining stock.
-- **Supplier Receiving (Stock In)**: Log supplier delivery quantities and update average unit costs.
-- **Kitchen Waste & Spoilage Log**: Log spoiled or dropped ingredients with financial loss calculations.
-- **Weekly Stock Variance Audit**: Compare system expected stock vs physical count with shortage/surplus badges.
+- **Grouped Sales Deduction Log Feed**: Summarizes deductions **1 single line per transaction** with collapsible details.
+- **Supplier Receiving, Waste Logging & Stock Variance Audit**.
 
 ---
 
-#### 3.5 🛍️ Takeout & Camping Workbench (`/takeout`)
-- Dedicated phone order workbench for takeout & camping reservations.
-- Customer phone number lookup to resume active open orders.
-
----
-
-#### 3.6 📱 Customer QR Code Ordering (`/order` & `/qr`)
+#### 3.7 📱 Customer QR Code Ordering (`/order` & `/qr`)
 - Contactless table ordering interface validated by table QR token.
-- Customers select item modifiers and special instructions.
+- Customers select item modifiers, special instructions, and redeem loyalty discount rewards.
 - Digital service call buttons (`Call Waiter`, `Request Charcoal`, `Request Bill`).
 
 ---
 
-#### 3.7 🛡️ Admin Portal & Odoo Analytics (`/admin`)
-- **Menu Catalog Manager**: Add, edit, sort, toggle bestsellers, or hide staff-only dishes.
-- **Menu Categories Manager**: Reorder and create menu categories with non-scrollable `flex-wrap` navigation bar.
+#### 3.8 🛡️ Admin Portal & Odoo Analytics (`/admin`)
+- **Menu Catalog Manager**: Add, edit, sort, toggle bestsellers, or set dual Dine-In / Camping pricing.
+- **VIP Loyalty Manager**: Track registered VIP customers, adjust points, view redemption logs, and seed reward tiers.
+- **Strict Session History Isolation**: Scopes order history and status timelines strictly to `session_id`, preventing past items from bleeding into new orders.
 - **Tables & QR Generator**: Create tables and generate downloadable QR code tokens.
 - **Staff Roster & PIN Codes**: Manage staff accounts and 4-digit PIN access.
-- **Order History & Invoices**: Search past closed table sessions, view item breakdowns, and issue refunds.
 - **Odoo Analytics Reports**: Export Odoo-compatible CSV reports, status transition logs, and financial totals.
 
 ---

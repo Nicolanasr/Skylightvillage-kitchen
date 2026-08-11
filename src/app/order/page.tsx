@@ -206,6 +206,8 @@ function CustomerOrderContent() {
     const [livePayments, setLivePayments] = useState<any[]>([]);
     const [exchangeRate, setExchangeRate] = useState<number>(89500);
 
+    const [loyaltyEnabled, setLoyaltyEnabled] = useState(true);
+
     // Fetch Order Page Data via Server Action
     const refreshPageData = async () => {
         const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
@@ -221,6 +223,7 @@ function CustomerOrderContent() {
             setLiveDiscounts(data.discounts);
             setLivePayments(data.payments);
             setExchangeRate(data.exchangeRate);
+            setLoyaltyEnabled(data.loyaltyEnabled !== false);
         } catch (e) {
             console.error('Error fetching order page data:', e);
         }
@@ -515,28 +518,30 @@ function CustomerOrderContent() {
             </header>
 
             {/* VIP Loyalty Points Top Banner */}
-            <div className="bg-[#1c3a1e] text-white px-4 py-2.5 text-xs font-bold flex justify-between items-center border-b border-[#d4af37]/30 shadow-xs">
-                <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#d4af37] shrink-0" />
-                    <span className="truncate">🌟 VIP Rewards: Earn 1 Pt per $1 Spent</span>
+            {loyaltyEnabled && (
+                <div className="bg-[#1c3a1e] text-white px-4 py-2.5 text-xs font-bold flex justify-between items-center border-b border-[#d4af37]/30 shadow-xs">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-[#d4af37] shrink-0" />
+                        <span className="truncate">🌟 VIP Rewards: Earn 1 Pt per $1 Spent</span>
+                    </div>
+                    {loyaltyProfile ? (
+                        <button
+                            onClick={() => setIsLoyaltyModalOpen(true)}
+                            className="bg-[#d4af37] text-[#1c3a1e] font-black px-3 py-1 rounded-xl text-xs shrink-0 cursor-pointer shadow-xs hover:scale-105 transition-all flex items-center gap-1"
+                        >
+                            <span>🌟 {loyaltyProfile.customer_name}: {loyaltyProfile.points_balance} PTS</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setIsLoyaltyModalOpen(true)}
+                            className="bg-[#d4af37]/20 hover:bg-[#d4af37]/30 text-[#d4af37] border border-[#d4af37]/40 px-3 py-1 rounded-xl text-xs font-black shrink-0 cursor-pointer transition-all flex items-center gap-1"
+                        >
+                            <span>{customerPhone ? `Phone: ${customerPhone}` : 'Join VIP Rewards'}</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                    )}
                 </div>
-                {loyaltyProfile ? (
-                    <button
-                        onClick={() => setIsLoyaltyModalOpen(true)}
-                        className="bg-[#d4af37] text-[#1c3a1e] font-black px-3 py-1 rounded-xl text-xs shrink-0 cursor-pointer shadow-xs hover:scale-105 transition-all flex items-center gap-1"
-                    >
-                        <span>🌟 {loyaltyProfile.customer_name}: {loyaltyProfile.points_balance} PTS</span>
-                    </button>
-                ) : (
-                    <button
-                        onClick={() => setIsLoyaltyModalOpen(true)}
-                        className="bg-[#d4af37]/20 hover:bg-[#d4af37]/30 text-[#d4af37] border border-[#d4af37]/40 px-3 py-1 rounded-xl text-xs font-black shrink-0 cursor-pointer transition-all flex items-center gap-1"
-                    >
-                        <span>{customerPhone ? `Phone: ${customerPhone}` : 'Join VIP Rewards'}</span>
-                        <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                )}
-            </div>
+            )}
 
             {/* Live Order Status Tracker Banner */}
             {(() => {

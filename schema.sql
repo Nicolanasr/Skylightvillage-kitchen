@@ -253,6 +253,14 @@ CREATE TABLE IF NOT EXISTS loyalty_audit_logs (
 -- Run these statements whenever new columns are added to existing live tables.
 -- They will NOT delete any data and will safely add new columns if missing.
 
+-- 20. System Global Settings Table
+CREATE TABLE IF NOT EXISTS system_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
 ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in';
 

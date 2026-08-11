@@ -94,6 +94,12 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       console.error('Neon nextEventTicketNumber query error:', e);
     }
 
+    let loyaltyEnabled = true;
+    try {
+      const { getLoyaltyEnabledSetting } = await import('./loyalty-actions');
+      loyaltyEnabled = await getLoyaltyEnabledSetting();
+    } catch (e) {}
+
     return {
       table,
       session,
@@ -104,6 +110,7 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       payments: livePayments,
       exchangeRate: 89500,
       nextEventTicketNumber,
+      loyaltyEnabled,
     };
   } catch (e) {
     console.error('Neon getOrderPageData error:', e);

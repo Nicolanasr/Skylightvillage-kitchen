@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { claimReceiptPointsAction, lookupCustomerLoyalty } from '@/app/actions/loyalty-actions';
-import { Gift, Sparkles, CheckCircle2, Phone, User, Award, ArrowRight } from 'lucide-react';
+import { claimReceiptPointsAction, lookupCustomerLoyalty, getLoyaltyEnabledSetting } from '@/app/actions/loyalty-actions';
+import { Gift, Sparkles, CheckCircle2, Phone, User, Award, ArrowRight, AlertCircle } from 'lucide-react';
 
 function ClaimFormContent() {
   const searchParams = useSearchParams();
@@ -15,6 +15,11 @@ function ClaimFormContent() {
   const [loading, setLoading] = useState(false);
   const [claimedResult, setClaimedResult] = useState<{ points: number; totalBalance?: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState(true);
+
+  useEffect(() => {
+    getLoyaltyEnabledSetting().then((enabled) => setLoyaltyEnabled(enabled));
+  }, []);
 
   useEffect(() => {
     if (tokenParam) {
@@ -57,7 +62,17 @@ function ClaimFormContent() {
 
       {/* Main Container Card */}
       <div className="w-full max-w-md my-auto bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-        {claimedResult ? (
+        {!loyaltyEnabled ? (
+          <div className="text-center py-6 space-y-4">
+            <div className="h-16 w-16 bg-amber-500/20 border border-amber-400/40 rounded-3xl flex items-center justify-center mx-auto text-amber-300">
+              <AlertCircle className="h-8 w-8" />
+            </div>
+            <h2 className="text-xl font-black">Loyalty Program Paused</h2>
+            <p className="text-xs text-emerald-100/90 leading-relaxed font-medium">
+              The Skylight Village VIP Loyalty Rewards Program is currently offline or paused by management. Please check back later!
+            </p>
+          </div>
+        ) : claimedResult ? (
           <div className="text-center space-y-5 animate-in fade-in zoom-in duration-300">
             <div className="h-20 w-20 bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle2 className="h-10 w-10" />
