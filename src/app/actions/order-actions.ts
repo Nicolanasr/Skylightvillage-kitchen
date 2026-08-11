@@ -982,3 +982,38 @@ export async function getEventVouchersReport() {
     };
   }
 }
+
+/**
+ * Fetch Public View-Only Menu Data (No ordering sessions required)
+ */
+export async function getPublicViewOnlyMenuData() {
+  if (!pool) return { categories: [], menuItems: [], exchangeRate: 89500 };
+
+  try {
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
+    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
+
+    const [catRes, itemRes] = await Promise.all([
+      pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
+      pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+    ]);
+
+    const liveCategories = catRes.rows;
+    const liveMenuItems = itemRes.rows
+      .filter((m: any) => !m.is_staff_only)
+      .map((m: any) => ({
+        ...m,
+        modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
+      }));
+
+    return {
+      categories: liveCategories,
+      menuItems: liveMenuItems,
+      exchangeRate: 89500,
+    };
+  } catch (e) {
+    console.error('Error fetching public view-only menu data:', e);
+    return { categories: [], menuItems: [], exchangeRate: 89500 };
+  }
+}
