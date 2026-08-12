@@ -10,11 +10,12 @@ export async function createCategory(name: string) {
 
   const id = `cat-${randomUUID().slice(0, 8)}`;
   try {
+    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
     const countRes = await pool.query('SELECT COUNT(*)::int as count FROM menu_categories');
     const sortOrder = (countRes.rows[0]?.count || 0) + 1;
-    const newCat: MenuCategory = { id, name, sort_order: sortOrder };
+    const newCat: MenuCategory = { id, name, sort_order: sortOrder, available: true };
 
-    await pool.query('INSERT INTO menu_categories (id, name, sort_order) VALUES ($1, $2, $3)', [
+    await pool.query('INSERT INTO menu_categories (id, name, sort_order, available) VALUES ($1, $2, $3, true)', [
       id,
       name,
       sortOrder,
@@ -23,9 +24,30 @@ export async function createCategory(name: string) {
     revalidatePath('/pos');
     revalidatePath('/order');
     revalidatePath('/admin');
+    revalidatePath('/menu');
     return { success: true, category: newCat };
   } catch (e: any) {
     console.error('Neon createCategory error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function toggleCategoryAvailabilityAction(categoryId: string, available: boolean) {
+  if (!pool) return { success: false, error: 'DB connection error' };
+
+  try {
+    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
+    await pool.query('UPDATE menu_categories SET available = $1 WHERE id = $2', [available, categoryId]);
+
+    revalidatePath('/pos');
+    revalidatePath('/order');
+    revalidatePath('/admin');
+    revalidatePath('/menu');
+    revalidatePath('/takeout');
+    revalidatePath('/camping');
+    return { success: true };
+  } catch (e: any) {
+    console.error('toggleCategoryAvailabilityAction error:', e);
     return { success: false, error: e.message };
   }
 }
@@ -43,6 +65,7 @@ export async function deleteCategory(categoryId: string) {
   revalidatePath('/pos');
   revalidatePath('/order');
   revalidatePath('/admin');
+  revalidatePath('/menu');
   return { success: true };
 }
 

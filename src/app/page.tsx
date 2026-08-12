@@ -121,18 +121,20 @@ function ViewOnlyHomeContent() {
                     >
                         All Items
                     </button>
-                    {categories.map((cat) => (
-                        <button
-                            key={cat.id}
-                            onClick={() => handleCategoryClick(cat.id)}
-                            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeCategory === cat.id
-                                    ? 'bg-[#1c3a1e] text-white shadow-md'
-                                    : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                }`}
-                        >
-                            {cat.name}
-                        </button>
-                    ))}
+                    {categories
+                        .filter((cat) => cat.available !== false && menuItems.some((m) => m.category_id === cat.id))
+                        .map((cat) => (
+                            <button
+                                key={cat.id}
+                                onClick={() => handleCategoryClick(cat.id)}
+                                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeCategory === cat.id
+                                        ? 'bg-[#1c3a1e] text-white shadow-md'
+                                        : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    }`}
+                            >
+                                {cat.name}
+                            </button>
+                        ))}
                 </div>
 
                 {/* Loading Spinner */}

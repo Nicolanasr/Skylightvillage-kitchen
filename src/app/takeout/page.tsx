@@ -6,7 +6,12 @@ import { MenuItem, MenuCategory, SelectedModifier, getMenuItemPrice } from '@/li
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { ShoppingBag, CheckCircle, Search, Sparkles, User, Phone, MapPin, PackageCheck, AlertCircle, ArrowRight, Edit3, Plus } from 'lucide-react';
 
-export default function CustomerTakeoutPage() {
+import { useSearchParams } from 'next/navigation';
+
+function TakeoutContent({ forcedOrderType }: { forcedOrderType?: 'takeout' | 'camping' }) {
+  const searchParams = useSearchParams();
+  const initialType = forcedOrderType || (searchParams.get('type') === 'camping' ? 'camping' : 'takeout');
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +19,7 @@ export default function CustomerTakeoutPage() {
   const [takeoutStep, setTakeoutStep] = useState<1 | 2>(1);
 
   // Takeout & Camping Customer State
-  const [orderType, setOrderType] = useState<'takeout' | 'camping'>('takeout');
+  const [orderType, setOrderType] = useState<'takeout' | 'camping'>(initialType);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [campingLocation, setCampingLocation] = useState('');
@@ -263,33 +268,21 @@ export default function CustomerTakeoutPage() {
           </div>
 
           <form onSubmit={handleStep1Submit} className="space-y-4">
-            {/* Order Type Toggle */}
-            <div className="bg-white/10 p-1.5 rounded-2xl border border-white/15 grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setOrderType('takeout')}
-                className={`py-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  orderType === 'takeout'
-                    ? 'bg-[#d4af37] text-[#1c3a1e] shadow-md'
-                    : 'text-white/80 hover:bg-white/5'
-                }`}
-              >
-                <ShoppingBag className="h-4 w-4" />
-                <span>🛍️ Takeout / Pick-Up</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOrderType('camping')}
-                className={`py-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  orderType === 'camping'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-white/80 hover:bg-white/5'
-                }`}
-              >
-                <MapPin className="h-4 w-4" />
-                <span>🏕️ Camping / Outdoor</span>
-              </button>
+            {/* Dedicated Locked Mode Badge */}
+            <div className="bg-white/10 p-3 rounded-2xl border border-white/15 text-center">
+              <span className="text-xs font-black text-[#d4af37] flex items-center justify-center gap-2">
+                {orderType === 'camping' ? (
+                  <>
+                    <MapPin className="h-4 w-4 text-[#d4af37]" />
+                    <span>🏕️ CAMPING & PICNIC ORDERING</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="h-4 w-4 text-[#d4af37]" />
+                    <span>🛍️ TAKEOUT & PICK-UP ORDERING</span>
+                  </>
+                )}
+              </span>
             </div>
 
             {/* Input Fields */}
@@ -416,19 +409,21 @@ export default function CustomerTakeoutPage() {
             >
               All Items
             </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === cat.id
-                    ? 'bg-[#1c3a1e] text-white shadow-md'
-                    : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
+            {categories
+              .filter((cat) => cat.available !== false && menuItems.some((m) => m.category_id === cat.id))
+              .map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                    selectedCategory === cat.id
+                      ? 'bg-[#1c3a1e] text-white shadow-md'
+                      : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
           </div>
         </div>
       </div>
@@ -652,5 +647,20 @@ export default function CustomerTakeoutPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CustomerTakeoutPage({ forcedOrderType }: { forcedOrderType?: 'takeout' | 'camping' }) {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen bg-[#1c3a1e] flex flex-col items-center justify-center text-white p-4">
+          <div className="h-10 w-10 border-4 border-[#d4af37] border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="font-extrabold text-sm tracking-wider uppercase">Loading Skylight Menu...</p>
+        </div>
+      }
+    >
+      <TakeoutContent forcedOrderType={forcedOrderType} />
+    </React.Suspense>
   );
 }

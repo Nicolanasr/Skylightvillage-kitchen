@@ -46,6 +46,7 @@ export interface MenuCategory {
   id: string;
   name: string;
   sort_order: number;
+  available?: boolean;
 }
 
 export interface MenuItem {

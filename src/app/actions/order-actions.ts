@@ -47,15 +47,22 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       }
     }
 
+    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
+
     const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
-    liveCategories = catRes.rows;
+    liveCategories = catRes.rows.filter((c: any) => c.available !== false);
+
+    // Set of disabled category IDs
+    const disabledCatIds = new Set(
+      catRes.rows.filter((c: any) => c.available === false).map((c: any) => c.id)
+    );
 
     const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC');
     liveMenuItems = itemRes.rows
-      .filter((m: any) => !m.is_staff_only)
+      .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
@@ -990,6 +997,7 @@ export async function getPublicViewOnlyMenuData() {
   if (!pool) return { categories: [], menuItems: [], exchangeRate: 89500 };
 
   try {
+    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
     await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
@@ -999,9 +1007,13 @@ export async function getPublicViewOnlyMenuData() {
       pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
     ]);
 
-    const liveCategories = catRes.rows;
+    const liveCategories = catRes.rows.filter((c: any) => c.available !== false);
+    const disabledCatIds = new Set(
+      catRes.rows.filter((c: any) => c.available === false).map((c: any) => c.id)
+    );
+
     const liveMenuItems = itemRes.rows
-      .filter((m: any) => !m.is_staff_only)
+      .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
