@@ -31,8 +31,10 @@ CREATE TABLE IF NOT EXISTS menu_categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   sort_order INT DEFAULT 0,
+  available BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true;
 
 -- 4. Menu Items & Modifiers
 CREATE TABLE IF NOT EXISTS menu_items (
