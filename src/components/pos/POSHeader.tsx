@@ -75,6 +75,8 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
 
     const overdueTableNums = Array.from(new Set(overdueItems.map((i) => i.table_number || 1))).sort((a, b) => a - b);
 
+    const [showToolsMenu, setShowToolsMenu] = useState(false);
+
     return (
         <div className="space-y-4">
             {/* Kitchen Overdue Prep Alert Banner */}
@@ -126,7 +128,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
             )}
 
             {/* Main Navigation Header */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-[#1c3a1e]/15 gap-4">
+            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center pb-4 border-b border-[#1c3a1e]/15 gap-4">
                 <div className="flex items-center gap-3">
                     {!showAllFloorTables && (
                         <button
@@ -149,70 +151,101 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Quick Action Navigation Links & Mode Selector */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 bg-[#eaf2eb] p-1 rounded-xl border border-[#1c3a1e]/15">
+                {/* Streamlined Action Toolbar */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Primary Floor Mode Switcher Pill */}
+                    <div className="flex items-center gap-1 bg-[#eaf2eb] p-1 rounded-2xl border border-[#1c3a1e]/15 shadow-xs">
                         <button
                             onClick={() => {
                                 setPosViewMode?.('tables');
                                 setShowAllFloorTables(true);
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                posViewMode === 'tables' && showAllFloorTables
-                                    ? 'bg-[#1c3a1e] text-white shadow-xs'
-                                    : 'text-[#1c3a1e] hover:bg-white/50'
-                            }`}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${posViewMode === 'tables' && showAllFloorTables
+                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
+                                    : 'text-[#1c3a1e] hover:bg-white/60'
+                                }`}
                         >
-                            🍽️ Tables
+                            📋 Floor Plan
                         </button>
                         <button
                             onClick={() => {
                                 setPosViewMode?.('takeout');
                                 setShowAllFloorTables(true);
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                posViewMode === 'takeout' && showAllFloorTables
-                                    ? 'bg-amber-600 text-white shadow-xs'
-                                    : 'text-[#1c3a1e] hover:bg-white/50'
-                            }`}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${posViewMode === 'takeout' && showAllFloorTables
+                                    ? 'bg-amber-600 text-white shadow-sm'
+                                    : 'text-[#1c3a1e] hover:bg-white/60'
+                                }`}
                         >
                             🛍️ Takeout & Camping
                         </button>
                     </div>
 
+                    {/* Shift Z-Report Control Button */}
                     <button
                         onClick={async () => {
                             setShowShiftModal(true);
                             loadShiftData();
                         }}
-                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer"
                     >
                         <DollarSign className="h-4 w-4" />
                         <span>{activeShift ? '🟢 Shift Z-Report' : '💵 Open Shift Float'}</span>
                     </button>
 
-                    <a
-                        href="/events"
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-xs"
-                    >
-                        <span>🎟️ Event Vouchers</span>
-                    </a>
+                    {/* Compact Tools Dropdown Popover */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowToolsMenu(!showToolsMenu)}
+                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                        >
+                            <span>⚡ Quick Apps</span>
+                            <span className="text-[10px] text-gray-500">▼</span>
+                        </button>
 
-                    <a
-                        href="/kds"
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-xs"
-                    >
-                        <ChefHat className="h-4 w-4 text-[#1c3a1e]" />
-                        <span>Kitchen KDS</span>
-                    </a>
-
-                    <a
-                        href="/admin"
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-xs"
-                    >
-                        <Shield className="h-4 w-4 text-[#1c3a1e]" />
-                        <span>Admin Manager</span>
-                    </a>
+                        {showToolsMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setShowToolsMenu(false)}
+                                />
+                                <div className="absolute right-0 mt-2 w-56 bg-white border border-[#1c3a1e]/15 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+                                    <a
+                                        href="/kds"
+                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        onClick={() => setShowToolsMenu(false)}
+                                    >
+                                        <ChefHat className="h-4 w-4 text-[#1c3a1e]" />
+                                        <span>Kitchen KDS Display</span>
+                                    </a>
+                                    <a
+                                        href="/events"
+                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        onClick={() => setShowToolsMenu(false)}
+                                    >
+                                        <span>🎟️ Event Vouchers Desk</span>
+                                    </a>
+                                    <a
+                                        href="/pos/reports"
+                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        onClick={() => setShowToolsMenu(false)}
+                                    >
+                                        <TrendingUp className="h-4 w-4 text-[#1c3a1e]" />
+                                        <span>Shift & Odoo Reports</span>
+                                    </a>
+                                    <div className="border-t border-gray-100 my-1" />
+                                    <a
+                                        href="/admin"
+                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        onClick={() => setShowToolsMenu(false)}
+                                    >
+                                        <Shield className="h-4 w-4 text-[#1c3a1e]" />
+                                        <span>Admin Control Center</span>
+                                    </a>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -282,9 +315,8 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                                         <span>Actual Cash Counted:</span>
                                         <span>${zReportResult.actualCashUsd.toFixed(2)} USD</span>
                                     </div>
-                                    <div className={`flex justify-between font-black text-sm pt-1 ${
-                                        zReportResult.varianceUsd >= 0 ? 'text-emerald-800' : 'text-rose-700'
-                                    }`}>
+                                    <div className={`flex justify-between font-black text-sm pt-1 ${zReportResult.varianceUsd >= 0 ? 'text-emerald-800' : 'text-rose-700'
+                                        }`}>
                                         <span>Variance (Over / Short):</span>
                                         <span>
                                             {zReportResult.varianceUsd === 0

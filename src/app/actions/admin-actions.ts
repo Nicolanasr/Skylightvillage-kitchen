@@ -10,7 +10,6 @@ export async function createCategory(name: string) {
 
   const id = `cat-${randomUUID().slice(0, 8)}`;
   try {
-    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
     const countRes = await pool.query('SELECT COUNT(*)::int as count FROM menu_categories');
     const sortOrder = (countRes.rows[0]?.count || 0) + 1;
     const newCat: MenuCategory = { id, name, sort_order: sortOrder, available: true };
@@ -36,7 +35,6 @@ export async function toggleCategoryAvailabilityAction(categoryId: string, avail
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
     await pool.query('UPDATE menu_categories SET available = $1 WHERE id = $2', [available, categoryId]);
 
     revalidatePath('/pos');
@@ -101,12 +99,6 @@ export async function createMenuItem(data: {
   };
 
   try {
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_camping_usd NUMERIC(10,2)');
-
     await pool.query(
       `INSERT INTO menu_items (id, category_id, name, description, price_usd, price_camping_usd, station, available, image_url, is_staff_only, sort_order, is_bestseller, modifier_groups)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
@@ -157,12 +149,6 @@ export async function updateMenuItem(
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_camping_usd NUMERIC(10,2)');
-
     const itemRes = await pool.query('SELECT * FROM menu_items WHERE id = $1', [menuItemId]);
     if (itemRes.rows.length === 0) return { success: false, error: 'Item not found' };
 

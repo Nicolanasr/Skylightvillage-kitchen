@@ -44,8 +44,18 @@ export function useRealtimeKDS(stationFilter: string) {
 
   useEffect(() => {
     refreshKDSData();
-    const interval = setInterval(refreshKDSData, 1500); // 1.5-second polling
-    return () => clearInterval(interval);
+
+    // Low-bandwidth adaptive polling: 3.5s active, 12s when tab is hidden
+    let timer: NodeJS.Timeout;
+
+    const poll = () => {
+      refreshKDSData();
+      const delay = typeof document !== 'undefined' && document.hidden ? 12000 : 3500;
+      timer = setTimeout(poll, delay);
+    };
+
+    timer = setTimeout(poll, 3500);
+    return () => clearTimeout(timer);
   }, [stationFilter]);
 
   return { items, menuItems, refreshKDSData };

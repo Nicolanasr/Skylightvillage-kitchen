@@ -9,15 +9,10 @@ import { deductRecipeStockForItems } from './inventory-actions';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
-  if (!pool) return { table: null, session: null, categories: [], menuItems: [], orderItems: [], discounts: [], payments: [], exchangeRate: 89500 };
+  if (!pool) return { table: null, session: null, categories: [], menuItems: [], orderItems: [], discounts: [], payments: [], exchangeRate: 89500, loyaltyEnabled: true };
 
   let table: any = null;
   let session: any = null;
-  let liveItems: any[] = [];
-  let liveCategories: any[] = [];
-  let liveMenuItems: any[] = [];
-  let liveDiscounts: any[] = [];
-  let livePayments: any[] = [];
 
   try {
     const numTbl = Number(tableNumber);
@@ -47,65 +42,60 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       }
     }
 
-    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
+    const hasRealSession = session && !session.is_virtual && !session.id.startsWith('virtual-');
 
-    const catRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
-    liveCategories = catRes.rows.filter((c: any) => c.available !== false);
+    // Run ALL independent queries in PARALLEL via Promise.all
+    const [
+      catRes,
+      itemRes,
+      ordItemsRes,
+      discRes,
+      payRes,
+      evtRes,
+      loyaltySettingRes
+    ] = await Promise.all([
+      pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
+      pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+      hasRealSession ? pool.query('SELECT * FROM order_items WHERE session_id = $1 ORDER BY created_at ASC', [session.id]) : Promise.resolve({ rows: [] }),
+      hasRealSession ? pool.query('SELECT * FROM discounts WHERE session_id = $1', [session.id]) : Promise.resolve({ rows: [] }),
+      hasRealSession ? pool.query('SELECT * FROM payments WHERE session_id = $1', [session.id]) : Promise.resolve({ rows: [] }),
+      pool.query("SELECT customer_name FROM table_sessions WHERE order_type = 'event_voucher' ORDER BY created_at DESC LIMIT 100"),
+      pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_enabled'").catch(() => ({ rows: [] }))
+    ]);
 
-    // Set of disabled category IDs
+    const liveCategories = catRes.rows.filter((c: any) => c.available !== false);
     const disabledCatIds = new Set(
       catRes.rows.filter((c: any) => c.available === false).map((c: any) => c.id)
     );
 
-    const itemRes = await pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC');
-    liveMenuItems = itemRes.rows
+    const liveMenuItems = itemRes.rows
       .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 
-    if (session && !session.is_virtual && !session.id.startsWith('virtual-')) {
-      const ordItemsRes = await pool.query('SELECT * FROM order_items WHERE session_id = $1 ORDER BY created_at ASC', [session.id]);
-      liveItems = ordItemsRes.rows;
-
-      const discRes = await pool.query('SELECT * FROM discounts WHERE session_id = $1', [session.id]);
-      liveDiscounts = discRes.rows;
-
-    const payRes = await pool.query('SELECT * FROM payments WHERE session_id = $1', [session.id]);
-      livePayments = payRes.rows;
-    }
+    const liveItems = ordItemsRes.rows;
+    const liveDiscounts = discRes.rows;
+    const livePayments = payRes.rows;
 
     let nextEventTicketNumber = 101;
-    try {
-      const evtRes = await pool.query(
-        `SELECT customer_name FROM table_sessions 
-         WHERE order_type = 'event_voucher' 
-         ORDER BY created_at DESC LIMIT 100`
-      );
-      let maxNum = 100;
-      for (const row of evtRes.rows) {
-        if (row.customer_name) {
-          const match = row.customer_name.match(/EVT-(\d+)/i);
-          if (match && match[1]) {
-            const num = parseInt(match[1], 10);
-            if (num > maxNum) maxNum = num;
-          }
+    let maxNum = 100;
+    for (const row of evtRes.rows) {
+      if (row.customer_name) {
+        const match = row.customer_name.match(/EVT-(\d+)/i);
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
         }
       }
-      nextEventTicketNumber = maxNum + 1;
-    } catch (e) {
-      console.error('Neon nextEventTicketNumber query error:', e);
     }
+    nextEventTicketNumber = maxNum + 1;
 
     let loyaltyEnabled = true;
-    try {
-      const { getLoyaltyEnabledSetting } = await import('./loyalty-actions');
-      loyaltyEnabled = await getLoyaltyEnabledSetting();
-    } catch (e) {}
+    if (loyaltySettingRes.rows.length > 0 && loyaltySettingRes.rows[0].value) {
+      loyaltyEnabled = loyaltySettingRes.rows[0].value.enabled !== false;
+    }
 
     return {
       table,
@@ -120,20 +110,20 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       loyaltyEnabled,
     };
   } catch (e) {
-    console.error('Neon getOrderPageData error:', e);
+    console.error('Error in getOrderPageData:', e);
+    return {
+      table,
+      session,
+      categories: [],
+      menuItems: [],
+      orderItems: [],
+      discounts: [],
+      payments: [],
+      exchangeRate: 89500,
+      nextEventTicketNumber: 101,
+      loyaltyEnabled: true,
+    };
   }
-
-  return {
-    table,
-    session,
-    categories: liveCategories,
-    menuItems: liveMenuItems,
-    orderItems: liveItems,
-    discounts: liveDiscounts,
-    payments: livePayments,
-    exchangeRate: 89500,
-    nextEventTicketNumber: 101,
-  };
 }
 
 export async function createTakeoutOrCampingSession(data: {
@@ -144,16 +134,6 @@ export async function createTakeoutOrCampingSession(data: {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query("ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
-    await pool.query('ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT');
-    await pool.query('ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_phone TEXT');
-
-    await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_name TEXT');
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_phone TEXT');
-
-    await pool.query('ALTER TABLE table_sessions ALTER COLUMN primary_table_id DROP NOT NULL').catch(() => {});
-
     // Check if there is already an active session for the same mobile number
     const cleanPhone = data.customerPhone ? data.customerPhone.trim() : '';
     if (cleanPhone) {
@@ -655,11 +635,6 @@ export async function getKDSData(stationFilter?: string) {
   let menuItems: any[] = [];
 
   try {
-    // DB Normalization & Cleanup: cancel lingering pending items from closed sessions
-    await pool.query("UPDATE order_items SET station = 'mezza' WHERE station IN ('cold_mezza', 'hot_mezza')").catch(() => {});
-    await pool.query("UPDATE menu_items SET station = 'mezza' WHERE station IN ('cold_mezza', 'hot_mezza')").catch(() => {});
-    await pool.query("UPDATE order_items SET status = 'cancelled' WHERE session_id IN (SELECT id FROM table_sessions WHERE status = 'closed') AND status IN ('pending', 'preparing')").catch(() => {});
-
     const query = `
       SELECT oi.*, COALESCE(mi.station, oi.station) AS station, ts.primary_table_id, ts.merged_table_ids
       FROM order_items oi
@@ -846,13 +821,6 @@ export async function submitEventVoucherOrder(data: {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query("ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
-    await pool.query('ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT');
-    await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in'");
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_name TEXT');
-
-    await pool.query('ALTER TABLE table_sessions ALTER COLUMN primary_table_id DROP NOT NULL').catch(() => {});
-
     const sessionId = randomUUID();
     const tag = data.ticketTag || `EVT-${Math.floor(100 + Math.random() * 900)}`;
     const fullCustomerName = `${tag}${data.guestName ? ` (${data.guestName})` : ''}`;
@@ -997,11 +965,6 @@ export async function getPublicViewOnlyMenuData() {
   if (!pool) return { categories: [], menuItems: [], exchangeRate: 89500 };
 
   try {
-    await pool.query('ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
-    await pool.query('ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT \'[]\'::jsonb');
-
     const [catRes, itemRes] = await Promise.all([
       pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
       pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
