@@ -22,10 +22,10 @@ export async function getPOSData() {
     try {
       const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes] = await Promise.all([
         pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
-        pool.query('SELECT * FROM table_sessions ORDER BY created_at DESC LIMIT 500'),
-        pool.query("SELECT * FROM order_items WHERE status != 'cancelled' ORDER BY created_at DESC LIMIT 2000"),
-        pool.query('SELECT * FROM payments ORDER BY created_at DESC LIMIT 1000'),
-        pool.query('SELECT * FROM discounts ORDER BY created_at DESC LIMIT 1000'),
+        pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 100"),
+        pool.query("SELECT * FROM order_items WHERE (status != 'cancelled' AND (created_at > NOW() - INTERVAL '12 hours' OR session_id IN (SELECT id FROM table_sessions WHERE status = 'active'))) ORDER BY created_at ASC"),
+        pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 200"),
+        pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 200"),
         pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
         pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
         pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),

@@ -539,62 +539,20 @@ function KDSContent() {
                     })}
                 </div>
 
-                {/* Sort Mode & Filter Toggle Controls */}
+                {/* Combined Unified Sort & Filter Control Popover Button */}
                 {activeTab === 'tickets' && (
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl shrink-0">
-                            <span className="text-[10px] font-extrabold text-[#1c3a1e] uppercase px-2">Sort By:</span>
-                            <button
-                                onClick={() => setSortBy('received')}
-                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'received'
-                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                    }`}
-                                title="Cards stay fixed in received order (Changing status does NOT move card position)"
-                            >
-                                As Received
-                            </button>
-                            <button
-                                onClick={() => setSortBy('status')}
-                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'status'
-                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                    }`}
-                            >
-                                By Status
-                            </button>
-                            <button
-                                onClick={() => setSortBy('time')}
-                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'time'
-                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                    }`}
-                            >
-                                By Time
-                            </button>
-                            <button
-                                onClick={() => setSortBy('alphabet')}
-                                className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all ${sortBy === 'alphabet'
-                                    ? 'bg-[#1c3a1e] text-white shadow-sm'
-                                    : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
-                                    }`}
-                            >
-                                Alphabetical
-                            </button>
-                        </div>
-
+                    <div className="relative">
                         <button
                             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                            className={`px-3.5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-1.5 cursor-pointer border ${
-                                showAdvancedFilters || searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0
-                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-sm'
+                            className={`px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 cursor-pointer border ${
+                                showAdvancedFilters || searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received' || showPrintedItems
+                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
                                     : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
                             }`}
-                            title="Toggle Search and Multi-Filters"
                         >
-                            <Search className="h-4 w-4" />
-                            <span>Filters & Search</span>
-                            {(searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0) && (
+                            <Filter className="h-4 w-4" />
+                            <span>⚡ Sort & Display Options</span>
+                            {(searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received' || showPrintedItems) && (
                                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                             )}
                         </button>
@@ -602,7 +560,134 @@ function KDSContent() {
                 )}
             </div>
 
-            {/* SEARCH & MULTI-FILTER CONTROL SUITE (Collapsible) */}
+            {/* UNIFIED SORT & MULTI-FILTER CONTROL POPOVER SUITE */}
+            {activeTab === 'tickets' && showAdvancedFilters && (
+                <div className="bg-white p-5 rounded-3xl border border-[#1c3a1e]/20 shadow-lg mb-6 space-y-4 print:hidden animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                        <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-[#1c3a1e]" />
+                            <h3 className="text-sm font-black text-[#1c3a1e]">KDS Display Options & Sort Menu</h3>
+                        </div>
+                        <button
+                            onClick={() => setShowAdvancedFilters(false)}
+                            className="p-1 rounded-lg text-gray-400 hover:text-[#1c3a1e] hover:bg-gray-100 transition-colors"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {/* 1. Sort Order Control */}
+                        <div>
+                            <label className="text-[11px] font-extrabold text-[#1c3a1e] uppercase tracking-wider block mb-2">
+                                ↕️ Ticket Sort Order
+                            </label>
+                            <div className="grid grid-cols-2 gap-1.5 bg-[#eaf2eb] p-1.5 rounded-2xl border border-[#1c3a1e]/15">
+                                {[
+                                    { id: 'received', label: 'As Received (FIFO)' },
+                                    { id: 'status', label: 'By Cooking Status' },
+                                    { id: 'time', label: 'By Prep Elapsed Time' },
+                                    { id: 'alphabet', label: 'Alphabetical' },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setSortBy(opt.id as any)}
+                                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-center transition-all ${
+                                            sortBy === opt.id
+                                                ? 'bg-[#1c3a1e] text-white shadow-xs'
+                                                : 'text-[#1c3a1e] hover:bg-white/60'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 2. Search Bar */}
+                        <div>
+                            <label className="text-[11px] font-extrabold text-[#1c3a1e] uppercase tracking-wider block mb-2">
+                                🔍 Search Item, Note, or Table #
+                            </label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search dish or table #..."
+                                    className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 focus:border-[#1c3a1e] rounded-2xl pl-9 pr-8 py-2 text-xs font-bold text-[#1c3a1e] focus:outline-none"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 3. Printed Items Toggle */}
+                        <div>
+                            <label className="text-[11px] font-extrabold text-[#1c3a1e] uppercase tracking-wider block mb-2">
+                                🖨️ Chit Print Visibility
+                            </label>
+                            <button
+                                onClick={() => setShowPrintedItems(!showPrintedItems)}
+                                className={`w-full py-2 px-3 rounded-2xl text-xs font-black transition-all border flex items-center justify-between ${
+                                    showPrintedItems
+                                        ? 'bg-purple-50 text-purple-900 border-purple-300'
+                                        : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <CheckSquare className="h-4 w-4 text-purple-700" />
+                                    <span>{showPrintedItems ? 'Showing ALL Items (Including Printed)' : 'Unprinted Items Only'}</span>
+                                </div>
+                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white border border-gray-200">
+                                    {showPrintedItems ? 'ALL' : 'UNPRINTED'}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 4. Table Filter Pills & Reset Bar */}
+                    {availableTableNumbers.length > 0 && (
+                        <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-extrabold text-[#1c3a1e] uppercase">Filter Tables:</span>
+                                {availableTableNumbers.map((tbl) => {
+                                    const isSelected = selectedTables.includes(tbl);
+                                    return (
+                                        <button
+                                            key={tbl}
+                                            onClick={() => toggleTableSelection(tbl)}
+                                            className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold transition-all border ${
+                                                isSelected
+                                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                                    : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#eaf2eb]'
+                                            }`}
+                                        >
+                                            Tbl #{tbl}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {(searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received') && (
+                                <button
+                                    onClick={resetAllFilters}
+                                    className="text-xs font-bold text-red-600 hover:text-red-700 underline cursor-pointer shrink-0"
+                                >
+                                    Reset All Options
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
             {activeTab === 'tickets' && (showAdvancedFilters || searchQuery !== '' || selectedTables.length > 0 || selectedStatuses.length > 0) && (
                 <div className="bg-white p-4 rounded-3xl border border-[#1c3a1e]/15 shadow-sm mb-6 space-y-3.5 print:hidden">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -644,80 +729,6 @@ function KDSContent() {
                                 🍽️ Group by Table ({Object.keys(itemsGroupedByCard).length})
                             </button>
                         </div>
-
-                        {(selectedTables.length > 0 || selectedStatuses.length > 0 || searchQuery !== '' || stationFilter !== 'all') && (
-                            <button
-                                onClick={resetAllFilters}
-                                className="text-xs font-black text-red-600 hover:text-red-800 underline transition-colors cursor-pointer self-end lg:self-center"
-                            >
-                                Reset All Filters ↺
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3 border-t border-[#1c3a1e]/10">
-                        {/* Multi-Select Status Pills */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-black text-[#1c3a1e] mr-1">Status:</span>
-                            {[
-                                { id: 'pending' as ItemStatus, label: '🟡 Pending (Received)', color: 'bg-amber-500 text-white' },
-                                { id: 'preparing' as ItemStatus, label: '🔵 Preparing (Cooking)', color: 'bg-blue-600 text-white' },
-                                { id: 'ready' as ItemStatus, label: '🟢 Ready (Pass)', color: 'bg-emerald-600 text-white' },
-                            ].map((st) => {
-                                const isSelected = selectedStatuses.includes(st.id);
-                                return (
-                                    <button
-                                        key={st.id}
-                                        onClick={() => toggleStatusSelection(st.id)}
-                                        className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${isSelected
-                                                ? `${st.color} border-transparent shadow-xs scale-105`
-                                                : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
-                                            }`}
-                                    >
-                                        {st.label}
-                                    </button>
-                                );
-                            })}
-                            {selectedStatuses.length > 0 && (
-                                <button
-                                    onClick={() => setSelectedStatuses([])}
-                                    className="text-[10px] font-extrabold text-gray-500 hover:text-black ml-1 underline cursor-pointer"
-                                >
-                                    Clear Statuses
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Multi-Select Table Pills */}
-                        {availableTableNumbers.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-xs font-black text-[#1c3a1e] mr-1">Tables:</span>
-                                <button
-                                    onClick={() => setSelectedTables([])}
-                                    className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${selectedTables.length === 0
-                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-xs'
-                                            : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
-                                        }`}
-                                >
-                                    All ({availableTableNumbers.length})
-                                </button>
-                                {availableTableNumbers.map((tbl) => {
-                                    const isSelected = selectedTables.includes(tbl);
-                                    return (
-                                        <button
-                                            key={tbl}
-                                            onClick={() => toggleTableSelection(tbl)}
-                                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all border cursor-pointer ${isSelected
-                                                    ? 'bg-[#d4af37] text-[#1c3a1e] border-[#d4af37] shadow-xs scale-105'
-                                                    : 'bg-[#fafbfa] text-[#1c3a1e] border-[#1c3a1e]/20 hover:bg-[#eaf2eb]'
-                                                }`}
-                                        >
-                                            #{tbl}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
