@@ -15,6 +15,7 @@ import {
 } from '@/lib/types';
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
 import { getOrderPageData, submitCustomerOrder, triggerServiceCall } from '../actions/order-actions';
+import { assignGuestNameToOrderItems } from '../actions/payment-actions';
 import { lookupOrCreateCustomerLoyalty, redeemLoyaltyRewardAction } from '../actions/loyalty-actions';
 import { submitCustomerFeedbackAction } from '../actions/report-actions';
 import { transformGoogleDriveUrl } from '@/lib/drive';
@@ -124,6 +125,7 @@ function CustomerOrderContent() {
     const [selectedShareItemIds, setSelectedShareItemIds] = useState<string[]>([]);
     const [payShareSplitCount, setPayShareSplitCount] = useState<number>(1);
     const [isSubmittingSharePay, setIsSubmittingSharePay] = useState(false);
+    const [shareCustomerName, setShareCustomerName] = useState<string>('');
 
     // Auto-lookup loyalty profile when phone number changes
     useEffect(() => {
@@ -193,14 +195,14 @@ function CustomerOrderContent() {
             if (!hasSeenNotice) {
                 setIsWelcomeNoticeOpen(true);
             }
-        } catch (e) {}
+        } catch (e) { }
     }, []);
 
     const handleCloseWelcomeNotice = () => {
         setIsWelcomeNoticeOpen(false);
         try {
             localStorage.setItem('skylight_has_seen_welcome_notice', 'true');
-        } catch (e) {}
+        } catch (e) { }
     };
 
     const handleOpenGuideFromNotice = () => {
@@ -213,7 +215,7 @@ function CustomerOrderContent() {
         setIsGuideOpen(false);
         try {
             localStorage.setItem('skylight_has_seen_guide', 'true');
-        } catch (e) {}
+        } catch (e) { }
     };
 
     // Live order items for active session
@@ -222,7 +224,7 @@ function CustomerOrderContent() {
     const [livePayments, setLivePayments] = useState<any[]>([]);
     const [exchangeRate, setExchangeRate] = useState<number>(89500);
 
-    const [loyaltyEnabled, setLoyaltyEnabled] = useState(true);
+    const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
 
     // Fetch Order Page Data via Server Action
     const refreshPageData = async () => {
@@ -247,8 +249,17 @@ function CustomerOrderContent() {
 
     useEffect(() => {
         refreshPageData();
-        const interval = setInterval(refreshPageData, 2000);
-        return () => clearInterval(interval);
+
+        let eventSource: EventSource | null = null;
+        try {
+            eventSource = new EventSource('/api/events');
+            eventSource.addEventListener('pos_update', () => refreshPageData());
+            eventSource.addEventListener('kds_update', () => refreshPageData());
+        } catch (e) {}
+
+        return () => {
+            if (eventSource) eventSource.close();
+        };
     }, [tableParam, tokenParam]);
 
     // Restore customerPhone from localStorage (keyed per table)
@@ -261,7 +272,7 @@ function CustomerOrderContent() {
                 setCustomerPhone(savedPhone);
                 if (savedName) setCustomerName(savedName);
             }
-        } catch (e) {}
+        } catch (e) { }
     }, [tableParam]);
 
     // Persist customerPhone to localStorage whenever it changes
@@ -272,7 +283,7 @@ function CustomerOrderContent() {
                 localStorage.setItem(`skylight_loyalty_phone_t${tableNum}`, customerPhone);
                 if (customerName) localStorage.setItem(`skylight_loyalty_name_t${tableNum}`, customerName);
             }
-        } catch (e) {}
+        } catch (e) { }
     }, [customerPhone, customerName, tableParam]);
 
     // Restoring cart from localStorage on initial load
@@ -419,6 +430,19 @@ function CustomerOrderContent() {
             setCart([]);
             setIsCartOpen(false);
             setOrderSuccessMsg('Order submitted successfully! Sending to kitchen.');
+
+            // 0ms Instant Broadcast to KDS and POS tabs
+            try {
+                const bc = new BroadcastChannel('skylight_events');
+                bc.postMessage({ event: 'kds_update' });
+                bc.postMessage({ event: 'pos_update' });
+                bc.close();
+            } catch (e) {}
+            try {
+                localStorage.setItem('skylight_event_kds', Date.now().toString());
+                localStorage.setItem('skylight_event_pos', Date.now().toString());
+            } catch (e) {}
+
             await refreshPageData();
             setTimeout(() => setOrderSuccessMsg(null), 4000);
         } else {
@@ -1123,6 +1147,21 @@ function CustomerOrderContent() {
                             </button>
                         </div>
 
+                        {/* Customer Name Input for Share Identification */}
+                        <div className="space-y-1.5 border-b border-gray-200 pb-3">
+                            <label className="block text-xs font-bold text-[#1c3a1e] flex items-center justify-between">
+                                <span>Your Name:</span>
+                                <span className="text-[10px] text-amber-700 font-extrabold">* Used to tag your bill share on POS</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={shareCustomerName}
+                                onChange={(e) => setShareCustomerName(e.target.value)}
+                                placeholder="Enter your name (e.g. Nicolas, Sarah)..."
+                                className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e]"
+                            />
+                        </div>
+
                         {/* Split Type Toggles */}
                         <div className="space-y-3">
                             <label className="block text-xs font-bold text-gray-700">Quick Equal Split:</label>
@@ -1131,11 +1170,10 @@ function CustomerOrderContent() {
                                     <button
                                         key={count}
                                         onClick={() => setPayShareSplitCount(count)}
-                                        className={`py-2 rounded-xl text-xs font-black border transition-all cursor-pointer ${
-                                            payShareSplitCount === count
+                                        className={`py-2 rounded-xl text-xs font-black border transition-all cursor-pointer ${payShareSplitCount === count
                                                 ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
                                                 : 'bg-[#fafbfa] text-[#1c3a1e] border-gray-200 hover:bg-gray-100'
-                                        }`}
+                                            }`}
                                     >
                                         {count === 1 ? 'Full' : `1/${count} Split`}
                                     </button>
@@ -1159,17 +1197,16 @@ function CustomerOrderContent() {
                                                     setSelectedShareItemIds((prev) => [...prev, item.id]);
                                                 }
                                             }}
-                                            className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
-                                                isChecked
+                                            className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isChecked
                                                     ? 'bg-emerald-50 border-emerald-500/40 text-emerald-950 font-bold'
                                                     : 'bg-[#fafbfa] border-gray-200 text-gray-700'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="checkbox"
                                                     checked={isChecked}
-                                                    onChange={() => {}}
+                                                    onChange={() => { }}
                                                     className="h-4 w-4 rounded accent-[#1c3a1e]"
                                                 />
                                                 <span className="text-xs">
@@ -1209,17 +1246,30 @@ function CustomerOrderContent() {
 
                                     <button
                                         onClick={async () => {
+                                            const nameToUse = shareCustomerName.trim() || customerName.trim() || 'Guest Share';
+                                            if (!nameToUse) {
+                                                alert('Please enter your name to request your share.');
+                                                return;
+                                            }
+
                                             setIsSubmittingSharePay(true);
-                                            // Call waiter with custom share note
+
+                                            // 1. Permanently tag selected items in CockroachDB with guest name
+                                            if (selectedShareItemIds.length > 0) {
+                                                await assignGuestNameToOrderItems(selectedShareItemIds, nameToUse);
+                                            }
+
+                                            // 2. Call waiter with custom share note including guest name
                                             await triggerServiceCall(
                                                 session?.id || '',
                                                 table?.table_number || 1,
                                                 'bill',
-                                                `Guest requested individual check share: ${formatUsd(shareUsd)} (${shareLbp})`
+                                                `${nameToUse} requested individual check share: ${formatUsd(shareUsd)} (${shareLbp})`
                                             );
+
                                             setIsSubmittingSharePay(false);
                                             setIsPayMyShareOpen(false);
-                                            setAddedToastMsg(`✅ Share calculation of ${formatUsd(shareUsd)} sent to waiter!`);
+                                            setAddedToastMsg(`✅ Share of ${formatUsd(shareUsd)} for ${nameToUse} sent to waiter!`);
                                             setTimeout(() => setAddedToastMsg(null), 4000);
                                         }}
                                         disabled={isSubmittingSharePay}
@@ -1390,21 +1440,19 @@ function CustomerOrderContent() {
                                     <div className="flex items-center bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-full p-0.5 shadow-xs">
                                         <button
                                             onClick={() => setGuideLang('en')}
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
-                                                guideLang === 'en'
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${guideLang === 'en'
                                                     ? 'bg-[#1c3a1e] text-white shadow-xs'
                                                     : 'text-gray-500 hover:text-[#1c3a1e]'
-                                            }`}
+                                                }`}
                                         >
                                             EN
                                         </button>
                                         <button
                                             onClick={() => setGuideLang('ar')}
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
-                                                guideLang === 'ar'
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${guideLang === 'ar'
                                                     ? 'bg-[#1c3a1e] text-white shadow-xs'
                                                     : 'text-gray-500 hover:text-[#1c3a1e]'
-                                            }`}
+                                                }`}
                                         >
                                             عربي
                                         </button>
@@ -1576,11 +1624,10 @@ function CustomerOrderContent() {
                                     <button
                                         key={stepIdx}
                                         onClick={() => setGuideStep(stepIdx)}
-                                        className={`h-2 rounded-full transition-all ${
-                                            guideStep === stepIdx
+                                        className={`h-2 rounded-full transition-all ${guideStep === stepIdx
                                                 ? 'w-6 bg-[#d4af37]'
                                                 : 'w-2 bg-gray-300 hover:bg-gray-400'
-                                        }`}
+                                            }`}
                                     />
                                 ))}
                             </div>
@@ -1646,7 +1693,7 @@ function CustomerOrderContent() {
                                     <span className="text-[10px] font-black text-emerald-900 uppercase tracking-wider block">Recognized VIP Profile</span>
                                     <h4 className="text-lg font-black text-[#1c3a1e]">{loyaltyProfile.customer_name}</h4>
                                     <p className="text-xs font-bold text-gray-600">{loyaltyProfile.phone_number}</p>
-                                    
+
                                     <div className="bg-white border border-amber-300 rounded-xl p-3 inline-block shadow-xs">
                                         <span className="text-xs text-gray-500 font-bold block">Current Points Balance</span>
                                         <strong className="text-2xl font-black text-amber-800">🌟 {loyaltyProfile.points_balance} PTS</strong>
@@ -1670,11 +1717,10 @@ function CustomerOrderContent() {
                                                         <button
                                                             onClick={() => handleRedeemCustomerReward(tier.id)}
                                                             disabled={!canAfford || redeemingTierId === tier.id}
-                                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                                canAfford
+                                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${canAfford
                                                                     ? 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white shadow-xs'
                                                                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {redeemingTierId === tier.id ? (
                                                                 <>
@@ -1700,7 +1746,7 @@ function CustomerOrderContent() {
                                             const tableNum = tableParam ? parseInt(tableParam, 10) : 1;
                                             localStorage.removeItem(`skylight_loyalty_phone_t${tableNum}`);
                                             localStorage.removeItem(`skylight_loyalty_name_t${tableNum}`);
-                                        } catch (e) {}
+                                        } catch (e) { }
                                         setCustomerPhone('');
                                         setCustomerName('');
                                         setLoyaltyProfile(null);
@@ -1800,9 +1846,8 @@ function CustomerOrderContent() {
                                             className="p-1 transition-transform hover:scale-125 cursor-pointer"
                                         >
                                             <Star
-                                                className={`h-7 w-7 ${
-                                                    star <= ratingValue ? 'text-amber-500 fill-amber-400' : 'text-gray-300'
-                                                }`}
+                                                className={`h-7 w-7 ${star <= ratingValue ? 'text-amber-500 fill-amber-400' : 'text-gray-300'
+                                                    }`}
                                             />
                                         </button>
                                     ))}
@@ -1823,11 +1868,10 @@ function CustomerOrderContent() {
                                                             setRatingTags((prev) => [...prev, tag]);
                                                         }
                                                     }}
-                                                    className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                                                        isSelected
+                                                    className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${isSelected
                                                             ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
                                                             : 'bg-[#fafbfa] text-gray-700 border-gray-300 hover:bg-gray-100'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {isSelected ? '✓ ' : '+ '}{tag}
                                                 </button>

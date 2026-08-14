@@ -94,11 +94,81 @@ export async function logItemStatusChange(
   }
 }
 
-// 3. Batch Helper to log multiple items (e.g. KDS batch station ready)
+// 3. High-performance Batch Helper to update and log multiple items in single bulk queries
 export async function logBatchItemStatusChange(itemIds: string[], newStatus: ItemStatus) {
   if (!pool || !itemIds || itemIds.length === 0) return;
-  for (const id of itemIds) {
-    await logItemStatusChange(id, newStatus);
+
+  try {
+    const uniqueIds = Array.from(new Set(itemIds));
+
+    // 1. Single Bulk SELECT query for all items
+    const itemsRes = await pool.query(
+      'SELECT id, session_id, table_number, item_name, station, status, created_at, menu_item_id, quantity FROM order_items WHERE id = ANY($1)',
+      [uniqueIds]
+    );
+
+    if (itemsRes.rows.length === 0) return;
+    const itemsToUpdate = itemsRes.rows.filter((i: any) => i.status !== newStatus);
+    if (itemsToUpdate.length === 0) return;
+
+    const targetIds = itemsToUpdate.map((i: any) => i.id);
+
+    // 2. Single Bulk UPDATE query for all items
+    await pool.query(
+      `UPDATE order_items 
+       SET status = $1,
+           preparing_at = CASE WHEN $1 = 'preparing' THEN NOW() ELSE preparing_at END,
+           ready_at = CASE WHEN $1 = 'ready' THEN NOW() ELSE ready_at END,
+           delivered_at = CASE WHEN $1 = 'delivered' THEN NOW() ELSE delivered_at END,
+           cancelled_at = CASE WHEN $1 = 'cancelled' THEN NOW() ELSE cancelled_at END
+       WHERE id = ANY($2)`,
+      [newStatus, targetIds]
+    );
+
+    // 3. Single Bulk INSERT for status transition logs
+    const logValues: string[] = [];
+    const logParams: any[] = [];
+    let pIdx = 1;
+    const now = new Date();
+
+    for (const item of itemsToUpdate) {
+      const prevTimestamp = new Date(item.created_at);
+      const durationSeconds = Math.max(0, Math.floor((now.getTime() - prevTimestamp.getTime()) / 1000));
+
+      logValues.push(`($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7})`);
+      logParams.push(
+        item.id,
+        item.session_id,
+        item.table_number,
+        item.item_name,
+        item.station,
+        item.status,
+        newStatus,
+        durationSeconds
+      );
+      pIdx += 8;
+    }
+
+    if (logValues.length > 0) {
+      await pool.query(
+        `INSERT INTO order_item_status_logs (order_item_id, session_id, table_number, item_name, station, from_status, to_status, duration_seconds)
+         VALUES ${logValues.join(', ')}`,
+        logParams
+      );
+    }
+
+    // 4. Batch Restock Recipe Stock if items were cancelled
+    if (newStatus === 'cancelled') {
+      const cancelledItemsToRestock = itemsToUpdate
+        .filter((i: any) => i.menu_item_id)
+        .map((i: any) => ({ menuItemId: i.menu_item_id, quantity: Number(i.quantity || 1) }));
+
+      if (cancelledItemsToRestock.length > 0) {
+        await restockRecipeStockForItems(cancelledItemsToRestock, `Batch Cancelled (${cancelledItemsToRestock.length} items)`);
+      }
+    }
+  } catch (e) {
+    console.error('Error in logBatchItemStatusChange:', e);
   }
 }
 
@@ -210,12 +280,14 @@ export async function getActiveCashierShift() {
   await ensureShiftTables();
 
   try {
-    const activeRes = await pool.query(
-      "SELECT * FROM cashier_shifts WHERE status = 'open' ORDER BY opened_at DESC LIMIT 1"
-    );
-    const pastRes = await pool.query(
-      "SELECT * FROM cashier_shifts WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 50"
-    );
+    const multiRes: any = await pool.query(`
+      SELECT * FROM cashier_shifts WHERE status = 'open' ORDER BY opened_at DESC LIMIT 1;
+      SELECT * FROM cashier_shifts WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 50;
+    `);
+
+    const results = Array.isArray(multiRes) ? multiRes : [multiRes];
+    const activeRes = results[0] || { rows: [] };
+    const pastRes = results[1] || { rows: [] };
 
     let activeShift = activeRes.rows.length > 0 ? activeRes.rows[0] : null;
     let cashDrops: any[] = [];
@@ -242,7 +314,7 @@ export async function getActiveCashierShift() {
 
     return {
       activeShift,
-      pastShifts: pastRes.rows.map((s) => ({
+      pastShifts: pastRes.rows.map((s: any) => ({
         ...s,
         opening_float_usd: Number(s.opening_float_usd || 0),
         opening_float_lbp: Number(s.opening_float_lbp || 0),

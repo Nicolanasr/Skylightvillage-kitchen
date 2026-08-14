@@ -16,7 +16,7 @@ export function useRealtimeKDS(stationFilter: string) {
     try {
       const data = await getKDSData(stationFilter);
 
-      const pendingCount = data.items.filter((i) => i.status === 'pending').length;
+      const pendingCount = (data.items || []).filter((i: OrderItem) => i.status === 'pending').length;
       if (pendingCount > prevCountRef.current && prevCountRef.current !== 0) {
         try {
           const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -45,17 +45,74 @@ export function useRealtimeKDS(stationFilter: string) {
   useEffect(() => {
     refreshKDSData();
 
-    // Low-bandwidth adaptive polling: 3.5s active, 12s when tab is hidden
-    let timer: NodeJS.Timeout;
+    let eventSource: EventSource | null = null;
+    let ws: WebSocket | null = null;
+    let bc: BroadcastChannel | null = null;
 
-    const poll = () => {
-      refreshKDSData();
-      const delay = typeof document !== 'undefined' && document.hidden ? 12000 : 3500;
-      timer = setTimeout(poll, delay);
+    // 1. Instant 0ms Cross-Tab Broadcast Channel (Local Dev & Same Browser)
+    try {
+      bc = new BroadcastChannel('skylight_events');
+      bc.onmessage = (msg) => {
+        if (msg.data?.event === 'kds_update') {
+          console.log('⚡ Realtime Source: BroadcastChannel (0ms local cross-tab push)');
+          refreshKDSData();
+        }
+      };
+    } catch (e) {}
+
+    // 2. LocalStorage fallback listener
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'skylight_event_kds') {
+        console.log('⚡ Realtime Source: localStorage fallback event');
+        refreshKDSData();
+      }
     };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorage);
+    }
 
-    timer = setTimeout(poll, 3500);
-    return () => clearTimeout(timer);
+    // 3. Native SSE Server Stream (Always connected as primary/fallback)
+    try {
+      eventSource = new EventSource('/api/events');
+      eventSource.addEventListener('kds_update', () => {
+        console.log('⚡ Realtime Source: EventSource (SSE stream)');
+        refreshKDSData();
+      });
+      eventSource.onerror = () => {};
+    } catch (e) {}
+
+    // 4. External WebSocket Stream (if NEXT_PUBLIC_WEBSOCKET_URL or APINATOR_KEY configured)
+    const apiKey = process.env.NEXT_PUBLIC_APINATOR_KEY || process.env.APINATOR_KEY || '';
+    const cluster = process.env.NEXT_PUBLIC_APINATOR_CLUSTER || 'eu';
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (apiKey ? `wss://ws-${cluster}.apinator.io/app/${apiKey}?protocol=7&client=js` : '');
+
+    if (wsUrl) {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => console.log('⚡ Connected to Apinator WebSocket (Channel: skylight-kds)');
+        ws.onmessage = (msg) => {
+          try {
+            const data = JSON.parse(msg.data);
+            if (data.event === 'kds_update') {
+              console.log('⚡ Realtime Source: WebSocket (Apinator cloud push)');
+              refreshKDSData();
+            }
+          } catch (e) {}
+        };
+        ws.onerror = () => {
+          console.warn('⚠️ External WebSocket connection offline. Active on native SSE stream.');
+        };
+      } catch (e) {}
+    }
+
+    return () => {
+      if (bc) bc.close();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorage);
+      }
+      if (ws) ws.close();
+      if (eventSource) eventSource.close();
+    };
   }, [stationFilter]);
 
   return { items, menuItems, refreshKDSData };

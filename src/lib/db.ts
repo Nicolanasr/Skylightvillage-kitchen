@@ -78,6 +78,7 @@ export async function ensureDatabaseSchemaAndIndexes() {
         order_type TEXT DEFAULT 'dine_in',
         customer_name TEXT,
         customer_phone TEXT,
+        guest_name TEXT,
         preparing_at TIMESTAMPTZ,
         ready_at TIMESTAMPTZ,
         delivered_at TIMESTAMPTZ,
@@ -197,6 +198,68 @@ export async function ensureDatabaseSchemaAndIndexes() {
         from_status VARCHAR(20),
         to_status VARCHAR(20),
         duration_seconds INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS raw_ingredients (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT DEFAULT 'general',
+        unit TEXT NOT NULL CHECK (unit IN ('kg', 'g', 'pcs', 'liter', 'ml', 'pack')),
+        current_stock NUMERIC(12,3) NOT NULL DEFAULT 0,
+        reorder_level NUMERIC(12,3) NOT NULL DEFAULT 0,
+        cost_per_unit_usd NUMERIC(10,4) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS menu_item_recipes (
+        id TEXT PRIMARY KEY,
+        menu_item_id TEXT NOT NULL,
+        ingredient_id TEXT NOT NULL,
+        quantity_required NUMERIC(12,3) NOT NULL DEFAULT 0,
+        unit TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS inventory_receiving (
+        id TEXT PRIMARY KEY,
+        ingredient_id TEXT NOT NULL,
+        quantity_added NUMERIC(12,3) NOT NULL DEFAULT 0,
+        unit_cost_usd NUMERIC(10,4) NOT NULL DEFAULT 0,
+        supplier_name TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS inventory_waste (
+        id TEXT PRIMARY KEY,
+        ingredient_id TEXT NOT NULL,
+        quantity_wasted NUMERIC(12,3) NOT NULL DEFAULT 0,
+        total_cost_usd NUMERIC(10,4) NOT NULL DEFAULT 0,
+        reason TEXT DEFAULT '',
+        logged_by TEXT DEFAULT 'Staff',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS inventory_audits (
+        id TEXT PRIMARY KEY,
+        ingredient_id TEXT NOT NULL,
+        expected_stock NUMERIC(12,3) NOT NULL DEFAULT 0,
+        actual_stock NUMERIC(12,3) NOT NULL DEFAULT 0,
+        variance NUMERIC(12,3) NOT NULL DEFAULT 0,
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS inventory_deductions (
+        id TEXT PRIMARY KEY,
+        order_reference TEXT DEFAULT '',
+        dish_name TEXT DEFAULT '',
+        ingredient_id TEXT NOT NULL,
+        ingredient_name TEXT DEFAULT '',
+        quantity_deducted NUMERIC(12,3) NOT NULL DEFAULT 0,
+        unit TEXT DEFAULT '',
+        remaining_stock NUMERIC(12,3) NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 

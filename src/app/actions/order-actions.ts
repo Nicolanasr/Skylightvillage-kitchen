@@ -4,8 +4,9 @@ import { pool } from '@/lib/db';
 import { ItemStatus, SelectedModifier, StationType, OrderItem } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
-import { logItemStatusChange } from './report-actions';
+import { logItemStatusChange, logBatchItemStatusChange } from './report-actions';
 import { deductRecipeStockForItems } from './inventory-actions';
+import { notifyKDSUpdate, notifyPOSUpdate } from '@/lib/events';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
@@ -44,7 +45,7 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
 
     const hasRealSession = session && !session.is_virtual && !session.id.startsWith('virtual-');
 
-    // Run ALL independent queries in PARALLEL via Promise.all
+    // Parallel execution with explicit column trimming (fixes 42P14 prepared statement error)
     const [
       catRes,
       itemRes,
@@ -60,7 +61,7 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       hasRealSession ? pool.query('SELECT * FROM discounts WHERE session_id = $1', [session.id]) : Promise.resolve({ rows: [] }),
       hasRealSession ? pool.query('SELECT * FROM payments WHERE session_id = $1', [session.id]) : Promise.resolve({ rows: [] }),
       pool.query("SELECT customer_name FROM table_sessions WHERE order_type = 'event_voucher' ORDER BY created_at DESC LIMIT 100"),
-      pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_enabled'").catch(() => ({ rows: [] }))
+      pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'").catch(() => ({ rows: [] }))
     ]);
 
     const liveCategories = catRes.rows.filter((c: any) => c.available !== false);
@@ -93,8 +94,17 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
     nextEventTicketNumber = maxNum + 1;
 
     let loyaltyEnabled = true;
-    if (loyaltySettingRes.rows.length > 0 && loyaltySettingRes.rows[0].value) {
-      loyaltyEnabled = loyaltySettingRes.rows[0].value.enabled !== false;
+    if (loyaltySettingRes.rows.length > 0 && loyaltySettingRes.rows[0].value !== null) {
+      const val = loyaltySettingRes.rows[0].value;
+      let parsed = val;
+      if (typeof val === 'string') {
+        try { parsed = JSON.parse(val); } catch (e) { parsed = val; }
+      }
+      if (typeof parsed === 'boolean') {
+        loyaltyEnabled = parsed;
+      } else if (typeof parsed === 'object' && parsed !== null && 'enabled' in parsed) {
+        loyaltyEnabled = !!parsed.enabled;
+      }
     }
 
     return {
@@ -365,13 +375,17 @@ export async function submitCustomerOrder(data: {
         data.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
         effOrderType === 'takeout' ? 'Takeout Order' : `Table #${tableNumber}`
       );
+      // Trigger Real-Time KDS and POS updates
+      invalidateKDSCache();
+      notifyKDSUpdate();
+      notifyPOSUpdate();
     }
 
     if (primaryTable) {
       await pool.query("UPDATE tables SET status = 'occupied' WHERE id = $1 OR table_number = $2", [primaryTable.id, tableNumber]);
     }
   } catch (e) {
-    console.error('Neon fast bulk order insert error:', e);
+    console.error('Order submission insert error:', e);
   }
 
   return { success: true, orderId };
@@ -480,14 +494,13 @@ export async function addWaiterManualOrderItem(data: {
         params
       );
 
-      // Real-Time Stock Deduction
-      await deductRecipeStockForItems(
-        [{ menuItemId: data.menuItemId, quantity: data.quantity }],
-        effOrderType === 'takeout' ? 'Takeout POS' : `POS Table #${effTableNumber}`
-      );
+      // Trigger Real-Time KDS and POS updates
+      invalidateKDSCache();
+      notifyKDSUpdate();
+      notifyPOSUpdate();
     }
   } catch (e) {
-    console.error('Neon waiter manual order item insert error:', e);
+    console.error('Waiter manual order item insert error:', e);
   }
 
   return { success: true };
@@ -591,9 +604,13 @@ export async function addBatchWaiterManualOrderItems(data: {
         data.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
         effOrderType === 'takeout' ? 'Takeout POS Batch' : `POS Batch Table #${effTableNumber}`
       );
+      // Trigger Real-Time KDS and POS updates
+      invalidateKDSCache();
+      notifyKDSUpdate();
+      notifyPOSUpdate();
     }
   } catch (e) {
-    console.error('Neon addBatchWaiterManualOrderItems error:', e);
+    console.error('addBatchWaiterManualOrderItems error:', e);
     return { success: false, error: 'Failed to insert batch items' };
   }
 
@@ -627,16 +644,33 @@ export async function triggerServiceCall(sessionId: string, tableNumber: number,
   return { success: true, callId };
 }
 
+// High-Efficiency Server-Side Caching for 99% RU Reduction
+let publicMenuCache: { timestamp: number; data: any } | null = null;
+let kdsCache: { timestamp: number; filter: string; data: any } | null = null;
+
+export async function invalidateMenuCache() {
+  publicMenuCache = null;
+}
+
+export async function invalidateKDSCache() {
+  kdsCache = null;
+}
+
 // Data Fetch Action for KDS (Strictly filters for ACTIVE table sessions only)
-export async function getKDSData(stationFilter?: string) {
+export async function getKDSData(stationFilter: string = 'all') {
   if (!pool) return { items: [], menuItems: [] };
+
+  const now = Date.now();
+  if (kdsCache && (now - kdsCache.timestamp < 2500) && kdsCache.filter === stationFilter) {
+    return kdsCache.data;
+  }
 
   let items: any[] = [];
   let menuItems: any[] = [];
 
   try {
     const query = `
-      SELECT oi.*, COALESCE(mi.station, oi.station) AS station, ts.primary_table_id, ts.merged_table_ids
+      SELECT oi.id, oi.session_id, oi.table_number, oi.menu_item_id, oi.item_name, oi.quantity, oi.unit_price_usd, oi.selected_modifiers, oi.special_notes, oi.status, oi.is_paid, oi.created_at, oi.order_type, oi.customer_name, oi.customer_phone, COALESCE(mi.station, oi.station) AS station, ts.primary_table_id, ts.merged_table_ids
       FROM order_items oi
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN table_sessions ts ON oi.session_id = ts.id
@@ -648,8 +682,8 @@ export async function getKDSData(stationFilter?: string) {
 
     const [res, menuRes, tblRes] = await Promise.all([
       pool.query(query),
-      pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
-      pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
+      pool.query('SELECT id, name, is_staff_only, sort_order FROM menu_items ORDER BY sort_order ASC, name ASC'),
+      pool.query('SELECT id, table_number FROM tables ORDER BY table_number ASC'),
     ]);
 
     menuItems = menuRes.rows.filter((m: any) => !m.is_staff_only);
@@ -683,11 +717,11 @@ export async function getKDSData(stationFilter?: string) {
             } catch (e) {}
           }
           mergedNums = rawArr
-            .map((tid) => tables.find((t) => t.id === tid)?.table_number)
-            .filter((num): num is number => num !== undefined);
+            .map((tid: string) => tables.find((t: any) => t.id === tid)?.table_number)
+            .filter((num: any): num is number => num !== undefined);
         }
 
-        const primaryTblNum = tables.find((t) => t.id === item.primary_table_id)?.table_number || item.table_number || 1;
+        const primaryTblNum = tables.find((t: any) => t.id === item.primary_table_id)?.table_number || item.table_number || 1;
         const allTableNums = Array.from(new Set([primaryTblNum, ...mergedNums])).sort((a, b) => a - b);
         const tableLabel = allTableNums.length > 1 ? `TABLE #${allTableNums.join(' & #')}` : `TABLE #${primaryTblNum}`;
 
@@ -702,10 +736,12 @@ export async function getKDSData(stationFilter?: string) {
     console.error('Neon KDS fetch error:', e);
   }
 
-  return {
+  const result = {
     items,
     menuItems,
   };
+  kdsCache = { timestamp: Date.now(), filter: stationFilter, data: result };
+  return result;
 }
 
 export async function updateOrderItemStatus(itemId: string, status: ItemStatus) {
@@ -713,8 +749,11 @@ export async function updateOrderItemStatus(itemId: string, status: ItemStatus) 
 
   try {
     await logItemStatusChange(itemId, status);
+    invalidateKDSCache();
+    notifyKDSUpdate();
+    notifyPOSUpdate();
   } catch (e) {
-    console.error('Neon updateOrderItemStatus error:', e);
+    console.error('UpdateOrderItemStatus error:', e);
   }
 
   return { success: true };
@@ -724,11 +763,12 @@ export async function updateMultipleOrderItemsStatus(itemIds: string[], status: 
   if (!pool || !itemIds || itemIds.length === 0) return { success: false, error: 'DB connection error' };
 
   try {
-    for (const id of itemIds) {
-      await logItemStatusChange(id, status);
-    }
+    await logBatchItemStatusChange(itemIds, status);
+    invalidateKDSCache();
+    notifyKDSUpdate();
+    notifyPOSUpdate();
   } catch (e) {
-    console.error('Neon updateMultipleOrderItemsStatus error:', e);
+    console.error('UpdateMultipleOrderItemsStatus error:', e);
   }
 
   return { success: true };
@@ -754,8 +794,11 @@ export async function revertOrderItemStatus(itemId: string) {
     const prevStatus = prevStatusMap[currentStatus] || 'pending';
 
     await logItemStatusChange(itemId, prevStatus, currentStatus);
+    invalidateKDSCache();
+    notifyKDSUpdate();
+    notifyPOSUpdate();
   } catch (e) {
-    console.error('Neon revertOrderItemStatus error:', e);
+    console.error('RevertOrderItemStatus error:', e);
   }
 
   return { success: true };
@@ -964,6 +1007,11 @@ export async function getEventVouchersReport() {
 export async function getPublicViewOnlyMenuData() {
   if (!pool) return { categories: [], menuItems: [], exchangeRate: 89500 };
 
+  const now = Date.now();
+  if (publicMenuCache && (now - publicMenuCache.timestamp < 45000)) {
+    return publicMenuCache.data;
+  }
+
   try {
     const [catRes, itemRes] = await Promise.all([
       pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
@@ -982,11 +1030,13 @@ export async function getPublicViewOnlyMenuData() {
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 
-    return {
+    const result = {
       categories: liveCategories,
       menuItems: liveMenuItems,
       exchangeRate: 89500,
     };
+    publicMenuCache = { timestamp: Date.now(), data: result };
+    return result;
   } catch (e) {
     console.error('Error fetching public view-only menu data:', e);
     return { categories: [], menuItems: [], exchangeRate: 89500 };

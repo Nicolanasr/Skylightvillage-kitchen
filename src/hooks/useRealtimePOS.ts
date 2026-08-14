@@ -22,7 +22,7 @@ export function useRealtimePOS() {
     isFetchingRef.current = true;
     try {
       const data = await getPOSData();
-      const pendingCalls = data.serviceCalls.filter((c) => c.status === 'pending');
+      const pendingCalls = (data.serviceCalls || []).filter((c: any) => c.status === 'pending');
 
       if (pendingCalls.length > prevPendingCallsCount.current && prevPendingCallsCount.current !== 0) {
         try {
@@ -59,17 +59,74 @@ export function useRealtimePOS() {
   useEffect(() => {
     refreshPOSData();
 
-    // Low-bandwidth adaptive polling: 3.5s active, 12s when tab is hidden
-    let timer: NodeJS.Timeout;
+    let eventSource: EventSource | null = null;
+    let ws: WebSocket | null = null;
+    let bc: BroadcastChannel | null = null;
 
-    const poll = () => {
-      refreshPOSData();
-      const delay = typeof document !== 'undefined' && document.hidden ? 12000 : 3500;
-      timer = setTimeout(poll, delay);
+    // 1. Instant 0ms Cross-Tab Broadcast Channel
+    try {
+      bc = new BroadcastChannel('skylight_events');
+      bc.onmessage = (msg) => {
+        if (msg.data?.event === 'pos_update') {
+          console.log('⚡ Realtime Source: BroadcastChannel (0ms local cross-tab push)');
+          refreshPOSData();
+        }
+      };
+    } catch (e) {}
+
+    // 2. LocalStorage fallback listener
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'skylight_event_pos') {
+        console.log('⚡ Realtime Source: localStorage fallback event');
+        refreshPOSData();
+      }
     };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorage);
+    }
 
-    timer = setTimeout(poll, 3500);
-    return () => clearTimeout(timer);
+    // 3. Native SSE Server Stream (Always connected as primary/fallback)
+    try {
+      eventSource = new EventSource('/api/events');
+      eventSource.addEventListener('pos_update', () => {
+        console.log('⚡ Realtime Source: EventSource (SSE stream)');
+        refreshPOSData();
+      });
+      eventSource.onerror = () => {};
+    } catch (e) {}
+
+    // 4. External WebSocket Stream (if NEXT_PUBLIC_WEBSOCKET_URL or APINATOR_KEY configured)
+    const apiKey = process.env.NEXT_PUBLIC_APINATOR_KEY || process.env.APINATOR_KEY || '';
+    const cluster = process.env.NEXT_PUBLIC_APINATOR_CLUSTER || 'eu';
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (apiKey ? `wss://ws-${cluster}.apinator.io/app/${apiKey}?protocol=7&client=js` : '');
+
+    if (wsUrl) {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => console.log('⚡ Connected to Apinator WebSocket (Channel: skylight-pos)');
+        ws.onmessage = (msg) => {
+          try {
+            const data = JSON.parse(msg.data);
+            if (data.event === 'pos_update') {
+              console.log('⚡ Realtime Source: WebSocket (Apinator cloud push)');
+              refreshPOSData();
+            }
+          } catch (e) {}
+        };
+        ws.onerror = () => {
+          console.warn('⚠️ External WebSocket connection offline. Active on native SSE stream.');
+        };
+      } catch (e) {}
+    }
+
+    return () => {
+      if (bc) bc.close();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorage);
+      }
+      if (ws) ws.close();
+      if (eventSource) eventSource.close();
+    };
   }, []);
 
   return {

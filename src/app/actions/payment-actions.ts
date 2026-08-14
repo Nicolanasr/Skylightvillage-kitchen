@@ -7,6 +7,13 @@ import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 import { deductRecipeStockForItems, restockRecipeStockForItems } from './inventory-actions';
 import { awardLoyaltyPointsForSession } from './loyalty-actions';
+import { notifyPOSUpdate } from '@/lib/events';
+
+let posCache: { timestamp: number; data: any } | null = null;
+
+export async function invalidatePOSCache() {
+  posCache = null;
+}
 
 export async function getPOSData() {
   let tables: any[] = [];
@@ -17,6 +24,11 @@ export async function getPOSData() {
   let payments: any[] = [];
   let menuItems: any[] = [];
   let categories: any[] = [];
+
+  const now = Date.now();
+  if (posCache && (now - posCache.timestamp < 2500)) {
+    return posCache.data;
+  }
 
   if (pool) {
     try {
@@ -53,7 +65,7 @@ export async function getPOSData() {
       }));
       categories = catRes.rows;
     } catch (e) {
-      console.error('Neon getPOSData query error:', e);
+      console.error('POS fetch error:', e);
     }
   }
 
@@ -549,6 +561,8 @@ export async function requestPreBill(sessionId: string) {
     const sessRes = await pool.query('SELECT primary_table_id FROM table_sessions WHERE id = $1', [sessionId]);
     if (sessRes.rows.length > 0) {
       await pool.query("UPDATE tables SET status = 'bill_requested' WHERE id = $1", [sessRes.rows[0].primary_table_id]);
+      invalidatePOSCache();
+      notifyPOSUpdate();
     }
   } catch (e) {
     console.error('Neon error requesting prebill:', e);
@@ -562,9 +576,36 @@ export async function resolveServiceCall(callId: string) {
 
   try {
     await pool.query("UPDATE service_calls SET status = 'resolved' WHERE id = $1", [callId]);
+    invalidatePOSCache();
+    notifyPOSUpdate();
   } catch (e) {
     console.error('Neon error resolving service call:', e);
   }
 
   return { success: true };
+}
+
+/**
+ * Assign Guest Name (e.g. Person A, Person B, Customer Name) to Order Items permanently in DB
+ */
+export async function assignGuestNameToOrderItems(itemIds: string[], guestName: string) {
+  if (!pool || !itemIds || itemIds.length === 0) return { success: false, error: 'Missing item IDs' };
+
+  try {
+    const cleanName = guestName.trim();
+    await pool.query(
+      `UPDATE order_items 
+       SET guest_name = $1, 
+           customer_name = CASE WHEN $1 <> '' THEN $1 ELSE customer_name END 
+       WHERE id = ANY($2)`,
+      [cleanName, itemIds]
+    );
+
+    invalidatePOSCache();
+    notifyPOSUpdate();
+    return { success: true };
+  } catch (e) {
+    console.error('Error assigning guest name to order items:', e);
+    return { success: false, error: 'Failed to assign guest name' };
+  }
 }
