@@ -20,14 +20,13 @@ export async function logStaffActivity(data: {
 
   if (pool) {
     try {
-      await pool.query('CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, staff_name TEXT, staff_role TEXT, action_type TEXT, table_number INT, details TEXT, created_at TIMESTAMPTZ DEFAULT NOW())');
       await pool.query(
         `INSERT INTO activity_logs (id, staff_name, staff_role, action_type, table_number, details)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [logId, staffName, staffRole, data.actionType, tableNumber, data.details]
       );
     } catch (e) {
-      console.error('Neon activity log insert error:', e);
+      console.error('Activity log insert error:', e);
     }
   }
 

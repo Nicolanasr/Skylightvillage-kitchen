@@ -20,6 +20,112 @@ export async function ensureDatabaseSchemaAndIndexes() {
 
   try {
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS menu_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        sort_order INT DEFAULT 0,
+        available BOOLEAN DEFAULT true
+      );
+
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id TEXT PRIMARY KEY,
+        category_id TEXT REFERENCES menu_categories(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT,
+        price_usd NUMERIC(10,2) NOT NULL,
+        price_camping_usd NUMERIC(10,2),
+        station TEXT NOT NULL,
+        available BOOLEAN DEFAULT true,
+        image_url TEXT,
+        is_staff_only BOOLEAN DEFAULT false,
+        sort_order INT DEFAULT 0,
+        is_bestseller BOOLEAN DEFAULT false,
+        modifier_groups JSONB DEFAULT '[]'::jsonb
+      );
+
+      CREATE TABLE IF NOT EXISTS tables (
+        id TEXT PRIMARY KEY,
+        table_number INT UNIQUE NOT NULL,
+        qr_code_token TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'available'
+      );
+
+      CREATE TABLE IF NOT EXISTS table_sessions (
+        id TEXT PRIMARY KEY,
+        primary_table_id TEXT REFERENCES tables(id),
+        merged_table_ids JSONB DEFAULT '[]'::jsonb,
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        closed_at TIMESTAMPTZ,
+        order_type TEXT DEFAULT 'dine_in',
+        customer_name TEXT,
+        customer_phone TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS order_items (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES table_sessions(id) ON DELETE CASCADE,
+        table_number INT,
+        menu_item_id TEXT REFERENCES menu_items(id),
+        item_name TEXT NOT NULL,
+        unit_price_usd NUMERIC(10,2) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        selected_modifiers JSONB DEFAULT '[]'::jsonb,
+        special_notes TEXT,
+        status TEXT DEFAULT 'pending',
+        is_paid BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        order_type TEXT DEFAULT 'dine_in',
+        customer_name TEXT,
+        customer_phone TEXT,
+        preparing_at TIMESTAMPTZ,
+        ready_at TIMESTAMPTZ,
+        delivered_at TIMESTAMPTZ,
+        cancelled_at TIMESTAMPTZ,
+        loyalty_phone TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS service_calls (
+        id TEXT PRIMARY KEY,
+        table_number INT NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        resolved_at TIMESTAMPTZ,
+        details TEXT DEFAULT ''
+      );
+
+      CREATE TABLE IF NOT EXISTS discounts (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES table_sessions(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        value NUMERIC(10,2) NOT NULL,
+        amount_usd NUMERIC(10,2) NOT NULL,
+        reason TEXT,
+        applied_by_staff TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES table_sessions(id) ON DELETE CASCADE,
+        amount_usd NUMERIC(10,2) NOT NULL,
+        amount_lbp NUMERIC(15,2) NOT NULL,
+        exchange_rate NUMERIC(10,2) NOT NULL,
+        method TEXT NOT NULL,
+        staff_name TEXT NOT NULL,
+        receipt_number TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS staff_members (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        pin_code TEXT NOT NULL,
+        role TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS activity_logs (
         id TEXT PRIMARY KEY,
         staff_name TEXT,
@@ -30,37 +136,69 @@ export async function ensureDatabaseSchemaAndIndexes() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true;
-      ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true;
-      ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_staff_only BOOLEAN DEFAULT false;
-      ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0;
-      ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false;
-      ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS modifier_groups JSONB DEFAULT '[]'::jsonb;
-      ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_camping_usd NUMERIC(10,2);
-
-      ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in';
-      ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_name TEXT;
-      ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS customer_phone TEXT;
-      ALTER TABLE table_sessions ALTER COLUMN primary_table_id DROP NOT NULL;
-
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'dine_in';
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_name TEXT;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS customer_phone TEXT;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS preparing_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS loyalty_phone TEXT;
-
       CREATE TABLE IF NOT EXISTS system_settings (
         key TEXT PRIMARY KEY,
         value TEXT,
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      ALTER TABLE service_calls ADD COLUMN IF NOT EXISTS details TEXT DEFAULT '';
-      ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-      ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+      CREATE TABLE IF NOT EXISTS customer_loyalty (
+        id TEXT PRIMARY KEY,
+        phone_number TEXT UNIQUE,
+        vip_code TEXT UNIQUE,
+        customer_name TEXT DEFAULT 'Valued Guest',
+        points_balance NUMERIC(10,2) NOT NULL DEFAULT 0,
+        total_spent_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+        total_visits INT NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_reward_tiers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        points_required INT NOT NULL,
+        reward_type TEXT NOT NULL CHECK (reward_type IN ('free_item', 'discount_usd')),
+        discount_value NUMERIC(10,2) DEFAULT 0,
+        menu_item_id TEXT,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_claim_tokens (
+        token TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        points_value NUMERIC(10,2) NOT NULL,
+        claimed BOOLEAN DEFAULT false,
+        claimed_by_phone TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days')
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_audit_logs (
+        id TEXT PRIMARY KEY,
+        customer_phone TEXT,
+        action_type TEXT NOT NULL,
+        points_amount NUMERIC(10,2) NOT NULL,
+        session_id TEXT,
+        reward_name TEXT,
+        logged_by TEXT DEFAULT 'System',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS order_item_status_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_item_id TEXT REFERENCES order_items(id) ON DELETE CASCADE,
+        session_id TEXT REFERENCES table_sessions(id) ON DELETE SET NULL,
+        table_number INT,
+        item_name TEXT,
+        station VARCHAR(30),
+        from_status VARCHAR(20),
+        to_status VARCHAR(20),
+        duration_seconds INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
 
       CREATE INDEX IF NOT EXISTS idx_tables_number ON tables(table_number);
       CREATE INDEX IF NOT EXISTS idx_table_sessions_status ON table_sessions(status);
@@ -80,7 +218,7 @@ export async function ensureDatabaseSchemaAndIndexes() {
   }
 }
 
-// In-Memory Database Store & Neon Live Sync Connection Layer
+// In-Memory Database Cache Store Layer
 class SkylightStore {
   tables: Table[] = [];
   tableSessions: TableSession[] = [];
@@ -98,11 +236,11 @@ class SkylightStore {
     this.seedLocal();
     if (pool) {
       ensureDatabaseSchemaAndIndexes();
-      this.syncFromNeon();
+      this.syncFromDatabase();
     }
   }
 
-  async syncFromNeon() {
+  async syncFromDatabase() {
     if (!pool) return;
     try {
       const [
@@ -131,7 +269,7 @@ class SkylightStore {
       if (callsRes.rows.length > 0) this.serviceCalls = callsRes.rows;
       if (logsRes.rows.length > 0) this.activityLogs = logsRes.rows;
     } catch (e) {
-      console.warn('Neon Live Sync Fallback to Memory Store:', e);
+      console.warn('Database Live Sync Fallback to Memory Store:', e);
     }
   }
 
