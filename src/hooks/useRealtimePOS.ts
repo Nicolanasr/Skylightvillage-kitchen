@@ -97,7 +97,8 @@ export function useRealtimePOS() {
 
     // 4. External WebSocket Stream (if NEXT_PUBLIC_WEBSOCKET_URL or APINATOR_KEY configured)
     const apiKey = process.env.NEXT_PUBLIC_APINATOR_KEY || process.env.APINATOR_KEY || '';
-    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (apiKey ? `wss://rt.apinator.io/app/${apiKey}?protocol=7&client=js` : '');
+    const cluster = process.env.NEXT_PUBLIC_APINATOR_CLUSTER || 'eu';
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (apiKey ? `wss://ws-${cluster}.apinator.io/app/${apiKey}?protocol=7&client=js` : '');
 
     if (wsUrl) {
       try {
@@ -123,7 +124,15 @@ export function useRealtimePOS() {
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', handleStorage);
       }
-      if (ws) ws.close();
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try { ws.close(); } catch (e) {}
+          };
+        }
+      }
       if (eventSource) eventSource.close();
     };
   }, []);
