@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { MenuCategory, MenuItem, getMenuItemPrice } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { Search, ImageIcon, Plus, Loader2 } from 'lucide-react';
@@ -106,13 +107,12 @@ export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
                             <div>
                                 <div className="w-full h-24 rounded-xl bg-[#fafbfa] border border-[#1c3a1e]/10 overflow-hidden mb-2 relative flex items-center justify-center">
                                     {displayImage ? (
-                                        <img
+                                        <Image
                                             src={displayImage}
                                             alt={item.name}
+                                            fill
+                                            unoptimized
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                            onError={(e) => {
-                                                (e.target as HTMLElement).style.display = 'none';
-                                            }}
                                         />
                                     ) : (
                                         <div className="flex flex-col items-center justify-center text-gray-400">
