@@ -124,7 +124,15 @@ export function useRealtimePOS() {
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', handleStorage);
       }
-      if (ws) ws.close();
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try { ws.close(); } catch (e) {}
+          };
+        }
+      }
       if (eventSource) eventSource.close();
     };
   }, []);
