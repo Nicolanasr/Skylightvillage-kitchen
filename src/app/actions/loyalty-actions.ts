@@ -88,6 +88,12 @@ export async function seedDefaultRewardTiers() {
 /**
  * Fetch all loyalty data for admin dashboard & POS lookup
  */
+let loyaltyDataCache: { timestamp: number; data: any } | null = null;
+
+export async function invalidateLoyaltyCache() {
+  loyaltyDataCache = null;
+}
+
 export async function getLoyaltyData() {
   if (!pool) {
     return {
@@ -100,41 +106,54 @@ export async function getLoyaltyData() {
     };
   }
 
+  const now = Date.now();
+  if (loyaltyDataCache && (now - loyaltyDataCache.timestamp < 10000)) {
+    return loyaltyDataCache.data;
+  }
+
   await ensureLoyaltyTables();
-  await seedDefaultRewardTiers();
 
   try {
     const [custRes, tierRes, tokenRes, auditRes, menuRes] = await Promise.all([
-      pool.query('SELECT * FROM customer_loyalty ORDER BY total_spent_usd DESC LIMIT 500'),
+      pool.query('SELECT * FROM customer_loyalty ORDER BY total_spent_usd DESC LIMIT 300'),
       pool.query('SELECT * FROM loyalty_reward_tiers ORDER BY points_required ASC'),
-      pool.query('SELECT * FROM loyalty_claim_tokens ORDER BY created_at DESC LIMIT 200'),
-      pool.query('SELECT * FROM loyalty_audit_logs ORDER BY created_at DESC LIMIT 500'),
-      pool.query('SELECT id, name, price_usd FROM menu_items ORDER BY name ASC'),
+      pool.query('SELECT * FROM loyalty_claim_tokens ORDER BY created_at DESC LIMIT 100'),
+      pool.query('SELECT * FROM loyalty_audit_logs ORDER BY created_at DESC LIMIT 200'),
+      pool.query('SELECT * FROM menu_items ORDER BY name ASC'),
     ]);
 
-    return {
+    const custRows = custRes.rows;
+    const tierRows = tierRes.rows;
+    const tokenRows = tokenRes.rows;
+    const auditRows = auditRes.rows;
+    const menuRows = menuRes.rows;
+
+    const data = {
       success: true,
-      customers: custRes.rows.map((c) => ({
+      customers: custRows.map((c: any) => ({
         ...c,
         points_balance: Number(c.points_balance || 0),
         total_spent_usd: Number(c.total_spent_usd || 0),
         total_visits: Number(c.total_visits || 1),
       })) as CustomerLoyalty[],
-      rewardTiers: tierRes.rows.map((t) => ({
+      rewardTiers: tierRows.map((t: any) => ({
         ...t,
         points_required: Number(t.points_required || 0),
         discount_value: Number(t.discount_value || 0),
       })) as LoyaltyRewardTier[],
-      claimTokens: tokenRes.rows.map((tk) => ({
+      claimTokens: tokenRows.map((tk: any) => ({
         ...tk,
         points_value: Number(tk.points_value || 0),
       })) as LoyaltyClaimToken[],
-      auditLogs: auditRes.rows.map((a) => ({
+      auditLogs: auditRows.map((a: any) => ({
         ...a,
         points_amount: Number(a.points_amount || 0),
       })) as LoyaltyAuditLog[],
-      menuItems: menuRes.rows,
+      menuItems: menuRows,
     };
+
+    loyaltyDataCache = { timestamp: Date.now(), data };
+    return data;
   } catch (e) {
     console.error('Error fetching loyalty data:', e);
     return {
@@ -670,10 +689,11 @@ export async function assignLoyaltyPhoneToOrderItem(
       customer = insertRes.rows[0];
     }
 
-    // Assign phone and customer_name to the order item
+    // Assign phone, guest_name and customer_name to the order item
     await pool.query(
       `UPDATE order_items 
        SET loyalty_phone = $1, 
+           guest_name = $2,
            customer_name = CASE WHEN $2 <> 'Valued Guest' THEN $2 ELSE COALESCE(customer_name, $2) END 
        WHERE id = $3`,
       [cleanPhone, customerNameResolved, orderItemId]
@@ -754,13 +774,16 @@ export async function searchLoyaltyCustomers(query: string) {
  */
 export async function getLoyaltyEnabledSetting(): Promise<boolean> {
   if (!pool) return true;
-  await ensureLoyaltyTables();
   try {
     const res = await pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'");
-    if (res.rows.length > 0) {
+    if (res.rows.length > 0 && res.rows[0].value !== null) {
       const val = res.rows[0].value;
-      if (typeof val === 'boolean') return val;
-      if (typeof val === 'object' && val !== null && 'enabled' in val) return !!val.enabled;
+      let parsed = val;
+      if (typeof val === 'string') {
+        try { parsed = JSON.parse(val); } catch (e) { parsed = val; }
+      }
+      if (typeof parsed === 'boolean') return parsed;
+      if (typeof parsed === 'object' && parsed !== null && 'enabled' in parsed) return !!parsed.enabled;
     }
   } catch (e) {
     console.error('Error reading loyalty setting:', e);

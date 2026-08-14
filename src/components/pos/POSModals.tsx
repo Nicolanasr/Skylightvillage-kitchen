@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Table, TableSession, MenuItem, OrderItem } from '@/lib/types';
 import { calculateBillTotals, formatUsd, formatLbp } from '@/lib/currency';
-import { applyDiscount, mergeTables, unmergeSingleTable, unmergeAllTables, processSplitPayment, closeTableSessionAction } from '@/app/actions/payment-actions';
+import { applyDiscount, mergeTables, unmergeSingleTable, unmergeAllTables, processSplitPayment, closeTableSessionAction, assignGuestNameToOrderItems } from '@/app/actions/payment-actions';
 import { CreditCard, DollarSign, Users, Utensils, Check, Percent, Printer, Edit2, CheckSquare, Square, Search } from 'lucide-react';
 
 interface POSModalsProps {
@@ -134,7 +134,7 @@ export const POSModals: React.FC<POSModalsProps> = ({
   };
 
   // Handle Print Guest Invoice Alone
-  const handlePrintGuestInvoiceAlone = () => {
+  const handlePrintGuestInvoiceAlone = async () => {
     const draft = getDraftSplitDetails();
     if (!draft) return;
 
@@ -144,11 +144,18 @@ export const POSModals: React.FC<POSModalsProps> = ({
 
     setModalError('');
 
+    // Permanently save guest name assignment to database order_items table
+    const assignedTag = guestName.trim();
+    if (assignedTag && draft.splitItems.length > 0) {
+      await assignGuestNameToOrderItems(draft.splitItems.map((i) => i.id), assignedTag);
+      refreshPOSData();
+    }
+
     if (onPrintSplitInvoice) {
       onPrintSplitInvoice({
         items: draft.splitItems,
         amountUsd: Math.max(0, draft.payAmt),
-        guestName: guestName.trim() || undefined,
+        guestName: assignedTag || undefined,
         splitTypeLabel: draft.label,
         paymentMethod,
       });
@@ -541,26 +548,63 @@ export const POSModals: React.FC<POSModalsProps> = ({
                     {paymentType === 'split_items' && (
                       <div className="flex-1 flex flex-col overflow-hidden space-y-2">
                         {/* Header & Quick Action Buttons */}
-                        <div className="flex justify-between items-center bg-[#eaf2eb]/80 border border-[#1c3a1e]/15 px-3.5 py-1.5 rounded-2xl flex-shrink-0">
-                          <span className="text-xs font-black text-[#1c3a1e]">
-                            Tap dishes to assign ({selectedSplitItemIds.length}/{unpaidItems.length} selected):
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedSplitItemIds(unpaidItems.map((i) => i.id))}
-                              className="text-xs font-black text-[#1c3a1e] hover:underline cursor-pointer bg-white px-2.5 py-1 rounded-xl border border-[#1c3a1e]/15 shadow-xs"
-                            >
-                              Select All Unpaid
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedSplitItemIds([])}
-                              className="text-xs font-black text-red-700 hover:underline cursor-pointer bg-white px-2.5 py-1 rounded-xl border border-red-200 shadow-xs"
-                            >
-                              Clear Selection
-                            </button>
+                        <div className="flex flex-col gap-1.5 bg-[#eaf2eb]/80 border border-[#1c3a1e]/15 px-3.5 py-2 rounded-2xl flex-shrink-0">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-black text-[#1c3a1e]">
+                              Tap dishes to assign ({selectedSplitItemIds.length}/{unpaidItems.length} selected):
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSplitItemIds(unpaidItems.map((i) => i.id))}
+                                className="text-xs font-black text-[#1c3a1e] hover:underline cursor-pointer bg-white px-2.5 py-1 rounded-xl border border-[#1c3a1e]/15 shadow-xs"
+                              >
+                                Select All Unpaid
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSplitItemIds([])}
+                                className="text-xs font-black text-red-700 hover:underline cursor-pointer bg-white px-2.5 py-1 rounded-xl border border-red-200 shadow-xs"
+                              >
+                                Clear Selection
+                              </button>
+                            </div>
                           </div>
+
+                          {/* Quick Guest Selection Pills */}
+                          {(() => {
+                            const guestNames = Array.from(
+                              new Set(
+                                unpaidItems
+                                  .map((i) => i.guest_name || (i.customer_name !== 'Valued Guest' ? i.customer_name : ''))
+                                  .filter((n): n is string => !!n && n.trim() !== '')
+                              )
+                            );
+
+                            if (guestNames.length === 0) return null;
+
+                            return (
+                              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-[#1c3a1e]/10">
+                                <span className="text-[10px] font-bold text-gray-600">Quick Select Guest:</span>
+                                {guestNames.map((gName) => (
+                                  <button
+                                    key={gName}
+                                    type="button"
+                                    onClick={() => {
+                                      const matchedIds = unpaidItems
+                                        .filter((i) => (i.guest_name || i.customer_name) === gName)
+                                        .map((i) => i.id);
+                                      setSelectedSplitItemIds(matchedIds);
+                                      setGuestName(gName);
+                                    }}
+                                    className="bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 font-black text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                                  >
+                                    👤 Select {gName} ({unpaidItems.filter((i) => (i.guest_name || i.customer_name) === gName).length})
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Search Filter Input Bar */}
@@ -586,6 +630,8 @@ export const POSModals: React.FC<POSModalsProps> = ({
                           ) : (
                             filteredUnpaidItems.map((item) => {
                               const isSelected = selectedSplitItemIds.includes(item.id);
+                              const assignedGuest = item.guest_name || (item.customer_name !== 'Valued Guest' ? item.customer_name : '');
+
                               return (
                                 <div
                                   key={item.id}
@@ -609,8 +655,19 @@ export const POSModals: React.FC<POSModalsProps> = ({
                                       <Square className="h-4.5 w-4.5 text-gray-400 flex-shrink-0" />
                                     )}
                                     <div>
-                                      <div className="font-extrabold text-xs">
-                                        {item.quantity}x {item.item_name}
+                                      <div className="font-extrabold text-xs flex items-center gap-1.5 flex-wrap">
+                                        <span>{item.quantity}x {item.item_name}</span>
+                                        {assignedGuest && (
+                                          <span
+                                            className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                              isSelected
+                                                ? 'bg-purple-900 text-purple-100 border-purple-400'
+                                                : 'bg-purple-100 text-purple-900 border-purple-300'
+                                            }`}
+                                          >
+                                            👤 {assignedGuest}
+                                          </span>
+                                        )}
                                       </div>
                                       {item.selected_modifiers && item.selected_modifiers.length > 0 && (
                                         <div className={`text-[10px] font-medium ${isSelected ? 'text-gray-200' : 'text-gray-500'}`}>

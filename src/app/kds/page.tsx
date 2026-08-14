@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRealtimeKDS } from '@/hooks/useRealtimeKDS';
 import { ItemStatus, OrderItem } from '@/lib/types';
-import { updateOrderItemStatus, revertOrderItemStatus, markKDSItemsPrinted } from '../actions/order-actions';
+import { updateOrderItemStatus, updateMultipleOrderItemsStatus, revertOrderItemStatus, markKDSItemsPrinted } from '../actions/order-actions';
 import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
 import {
     ChefHat,
@@ -800,10 +800,16 @@ function KDSContent() {
 
                                 <button
                                     onClick={async () => {
-                                        for (const item of tableReadyItems) {
-                                            await updateOrderItemStatus(item.id, 'delivered');
-                                        }
-                                        refreshKDSData();
+                                        const ids = tableReadyItems.map((i) => i.id);
+                                        if (ids.length === 0) return;
+
+                                        // Optimistic local update
+                                        setLocalItems((prev) =>
+                                            prev.map((item) => (ids.includes(item.id) ? { ...item, status: 'delivered' } : item))
+                                        );
+
+                                        await updateMultipleOrderItemsStatus(ids, 'delivered');
+                                        await refreshKDSData();
                                     }}
                                     className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                                 >
@@ -895,10 +901,15 @@ function KDSContent() {
                                                 {hasPending && (
                                                     <button
                                                         onClick={async () => {
-                                                            const pendingItems = tableItems.filter((i) => i.status === 'pending');
-                                                            for (const item of pendingItems) {
-                                                                await handleStatusClick(item.id, 'pending');
-                                                            }
+                                                            const pendingIds = tableItems.filter((i) => i.status === 'pending').map((i) => i.id);
+                                                            if (pendingIds.length === 0) return;
+
+                                                            setLocalItems((prev) =>
+                                                                prev.map((item) => (pendingIds.includes(item.id) ? { ...item, status: 'preparing' } : item))
+                                                            );
+
+                                                            await updateMultipleOrderItemsStatus(pendingIds, 'preparing');
+                                                            await refreshKDSData();
                                                         }}
                                                         className="flex-1 bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-black py-1.5 px-2 rounded-xl text-[11px] transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
                                                     >
@@ -909,10 +920,15 @@ function KDSContent() {
                                                 {hasPreparing && (
                                                     <button
                                                         onClick={async () => {
-                                                            const preparingItems = tableItems.filter((i) => i.status === 'preparing');
-                                                            for (const item of preparingItems) {
-                                                                await handleStatusClick(item.id, 'preparing');
-                                                            }
+                                                            const preparingIds = tableItems.filter((i) => i.status === 'preparing').map((i) => i.id);
+                                                            if (preparingIds.length === 0) return;
+
+                                                            setLocalItems((prev) =>
+                                                                prev.map((item) => (preparingIds.includes(item.id) ? { ...item, status: 'ready' } : item))
+                                                            );
+
+                                                            await updateMultipleOrderItemsStatus(preparingIds, 'ready');
+                                                            await refreshKDSData();
                                                         }}
                                                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-1.5 px-2 rounded-xl text-[11px] transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
                                                     >

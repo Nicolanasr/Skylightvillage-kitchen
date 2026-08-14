@@ -4,6 +4,7 @@ import { pool } from '@/lib/db';
 import { StationType, MenuCategory, MenuItem, StaffMember, Table, ModifierGroup } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
+import { invalidateMenuCache } from './order-actions';
 
 export async function createCategory(name: string) {
   if (!name || name.trim() === '' || !pool) return { success: false, error: 'Category name required' };
@@ -20,6 +21,7 @@ export async function createCategory(name: string) {
       sortOrder,
     ]);
 
+    invalidateMenuCache();
     revalidatePath('/pos');
     revalidatePath('/order');
     revalidatePath('/admin');
