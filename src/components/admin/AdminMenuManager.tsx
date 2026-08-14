@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { MenuItem, MenuCategory } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { updateMenuItem, deleteMenuItem } from '@/app/actions/admin-actions';
@@ -100,16 +101,17 @@ export const AdminMenuManager: React.FC<AdminMenuManagerProps> = ({
                                             >
                                                 <div>
                                                     <div className="flex gap-3 mb-3">
-                                                        {displayImage ? (
-                                                            <img
-                                                                src={displayImage}
-                                                                alt={item.name}
-                                                                className="h-14 w-14 rounded-2xl object-cover border border-[#1c3a1e]/15 flex-shrink-0"
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLElement).style.display = 'none';
-                                                                }}
-                                                            />
-                                                        ) : (
+                                                         {displayImage ? (
+                                                             <div className="relative h-14 w-14 rounded-2xl overflow-hidden border border-[#1c3a1e]/15 flex-shrink-0">
+                                                                 <Image
+                                                                     src={displayImage}
+                                                                     alt={item.name}
+                                                                     fill
+                                                                     unoptimized
+                                                                     className="object-cover"
+                                                                 />
+                                                             </div>
+                                                         ) : (
                                                             <div className="h-14 w-14 rounded-2xl bg-white border border-[#1c3a1e]/15 flex items-center justify-center flex-shrink-0">
                                                                 <ImageIcon className="h-6 w-6 text-[#1c3a1e]/40" />
                                                             </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { StaffAuthGuard } from '@/components/auth/staff-auth-guard';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { useRealtimePOS } from '@/hooks/useRealtimePOS';
@@ -663,8 +664,8 @@ function AdminContent() {
 
                   {editImageUrl && (
                     <div className="flex items-center gap-3 pt-1 bg-emerald-50/60 p-2 rounded-xl border border-emerald-500/20">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden border border-emerald-500/30 shrink-0 bg-white">
-                        <img src={transformGoogleDriveUrl(editImageUrl)} alt="Preview" className="h-full w-full object-cover" />
+                      <div className="relative h-12 w-12 rounded-lg overflow-hidden border border-emerald-500/30 shrink-0 bg-white">
+                        <Image src={transformGoogleDriveUrl(editImageUrl)} alt="Preview" fill unoptimized className="h-full w-full object-cover" />
                       </div>
                       <span className="text-[11px] font-extrabold text-emerald-950">✅ Image Linked & Ready</span>
                     </div>
@@ -866,8 +867,8 @@ function AdminContent() {
 
                   {newItemImage && (
                     <div className="flex items-center gap-3 pt-1 bg-emerald-50/60 p-2 rounded-xl border border-emerald-500/20">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden border border-emerald-500/30 shrink-0 bg-white">
-                        <img src={transformGoogleDriveUrl(newItemImage)} alt="Preview" className="h-full w-full object-cover" />
+                      <div className="relative h-12 w-12 rounded-lg overflow-hidden border border-emerald-500/30 shrink-0 bg-white">
+                        <Image src={transformGoogleDriveUrl(newItemImage)} alt="Preview" fill unoptimized className="h-full w-full object-cover" />
                       </div>
                       <span className="text-[11px] font-extrabold text-emerald-950">✅ Image Linked & Ready</span>
                     </div>
