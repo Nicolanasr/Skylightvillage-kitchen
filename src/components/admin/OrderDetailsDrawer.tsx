@@ -37,14 +37,15 @@ export const OrderDetailsDrawer: React.FC<OrderDetailsDrawerProps> = ({
       const modKey = JSON.stringify(item.selected_modifiers || []);
       const compKey = item.is_comped ? 'comped' : 'normal';
       const key = `${item.item_name}_${item.unit_price_usd}_${modKey}_${compKey}`;
+      const itemQty = Number(item.quantity || 1);
 
       if (map.has(key)) {
         const existing = map.get(key);
-        existing.quantity += (item.quantity || 1);
+        existing.quantity = Number(existing.quantity || 0) + itemQty;
         if (!existing.all_ids) existing.all_ids = [existing.id];
         existing.all_ids.push(item.id);
       } else {
-        map.set(key, { ...item, quantity: item.quantity || 1, all_ids: [item.id] });
+        map.set(key, { ...item, quantity: itemQty, all_ids: [item.id] });
       }
     }
     return Array.from(map.values());

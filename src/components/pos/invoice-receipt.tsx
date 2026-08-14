@@ -55,10 +55,11 @@ export function ThermalReceipt({
     activeItems.forEach((item) => {
         const modKey = JSON.stringify(item.selected_modifiers || []);
         const key = `${item.item_name}_${item.unit_price_usd}_${modKey}_${item.is_comped}`;
+        const itemQty = Number(item.quantity || 1);
 
         if (consolidatedMap.has(key)) {
             const existing = consolidatedMap.get(key)!;
-            existing.quantity += item.quantity;
+            existing.quantity = Number(existing.quantity || 0) + itemQty;
             if (item.special_notes && !existing.special_notes?.includes(item.special_notes)) {
                 existing.special_notes = existing.special_notes
                     ? `${existing.special_notes}, ${item.special_notes}`
@@ -68,7 +69,7 @@ export function ThermalReceipt({
             consolidatedMap.set(key, {
                 id: item.id,
                 item_name: item.item_name,
-                quantity: item.quantity,
+                quantity: itemQty,
                 unit_price_usd: Number(item.unit_price_usd),
                 selected_modifiers: item.selected_modifiers || [],
                 special_notes: item.special_notes,
