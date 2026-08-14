@@ -9,7 +9,7 @@ import {
     recordCashDropAction,
     performBlindZReportCloseAction,
 } from '@/app/actions/report-actions';
-import { Bell, Monitor, ChefHat, Shield, ArrowLeft, Flame, DollarSign, FileText, TrendingUp, Printer, CheckCircle2 } from 'lucide-react';
+import { Bell, Monitor, ChefHat, Shield, ArrowLeft, Flame, DollarSign, FileText, TrendingUp, Printer, CheckCircle2, X } from 'lucide-react';
 
 interface POSHeaderProps {
     serviceCalls: ServiceCall[];
@@ -19,6 +19,7 @@ interface POSHeaderProps {
     posViewMode?: 'tables' | 'takeout';
     setPosViewMode?: (mode: 'tables' | 'takeout') => void;
     orderItems?: any[];
+    sessions?: any[];
 }
 
 export const POSHeader: React.FC<POSHeaderProps> = ({
@@ -29,8 +30,10 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
     posViewMode = 'tables',
     setPosViewMode,
     orderItems = [],
+    sessions = [],
 }) => {
     const pendingCalls = serviceCalls.filter((c) => c.status === 'pending');
+    const [isAlertDismissed, setIsAlertDismissed] = useState(false);
 
     // Shift Z-Report State
     const [showShiftModal, setShowShiftModal] = useState(false);
@@ -65,10 +68,15 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
         loadShiftData();
     }, []);
 
-    // Calculate overdue kitchen items (pending or preparing for > 12 minutes)
+    // Active session IDs (where session.status === 'active')
+    const activeSessionIds = new Set((sessions || []).filter((s) => s.status === 'active').map((s) => s.id));
+
+    // Calculate overdue kitchen items (pending or preparing for > 12 minutes belonging ONLY to active sessions!)
     const now = Date.now();
-    const overdueItems = orderItems.filter((i) => {
+    const overdueItems = (orderItems || []).filter((i) => {
         if (i.status !== 'pending' && i.status !== 'preparing') return false;
+        if (i.session_id && !activeSessionIds.has(i.session_id)) return false;
+
         const elapsedMins = Math.floor((now - new Date(i.created_at).getTime()) / 60000);
         return elapsedMins >= 12;
     });
@@ -80,7 +88,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
     return (
         <div className="space-y-4">
             {/* Kitchen Overdue Prep Alert Banner */}
-            {overdueItems.length > 0 && (
+            {!isAlertDismissed && overdueItems.length > 0 && (
                 <div className="bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-lg font-black flex items-center justify-between animate-pulse">
                     <div className="flex items-center gap-3">
                         <Flame className="h-5 w-5 text-amber-300" />
@@ -90,15 +98,24 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                         </span>
                     </div>
 
-                    <a
-                        href="/kds"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="bg-white text-rose-900 text-xs font-black px-4 py-2 rounded-xl hover:bg-amber-100 transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
-                    >
-                        <ChefHat className="h-4 w-4" />
-                        <span>Open KDS Screen</span>
-                    </a>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href="/kds"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-white text-rose-900 text-xs font-black px-4 py-2 rounded-xl hover:bg-amber-100 transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                        >
+                            <ChefHat className="h-4 w-4" />
+                            <span>Open KDS Screen</span>
+                        </a>
+                        <button
+                            onClick={() => setIsAlertDismissed(true)}
+                            className="bg-rose-800 hover:bg-rose-900 text-white p-2 rounded-xl text-xs font-black transition-all cursor-pointer"
+                            title="Dismiss Alert"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             )}
 

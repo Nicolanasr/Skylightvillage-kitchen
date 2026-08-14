@@ -199,6 +199,7 @@ function POSContent() {
           posViewMode={posViewMode}
           setPosViewMode={setPosViewMode}
           orderItems={orderItems}
+          sessions={sessions}
         />
 
         {/* Main Content Layout */}
