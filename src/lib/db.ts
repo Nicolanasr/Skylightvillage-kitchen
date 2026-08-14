@@ -1,10 +1,5 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import ws from 'ws';
+import { Pool } from 'pg';
 import { Table, TableSession, MenuItem, MenuCategory, OrderItem, ServiceCall, Payment, Discount, StaffMember, ActivityLog } from './types';
-
-if (typeof window === 'undefined') {
-  neonConfig.webSocketConstructor = ws;
-}
 
 const connectionString = process.env.DATABASE_URL;
 export const pool = connectionString
@@ -13,6 +8,7 @@ export const pool = connectionString
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      ssl: { rejectUnauthorized: false },
     })
   : null;
 
