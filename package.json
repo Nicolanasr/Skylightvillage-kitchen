@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",
+    "@types/pg": "^8.21.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.344.0",
     "next": "^16.2.12",
+    "pg": "^8.23.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
