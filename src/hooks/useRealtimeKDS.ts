@@ -82,18 +82,30 @@ export function useRealtimeKDS(stationFilter: string) {
     } catch (e) {}
 
     // 4. External WebSocket Stream (if NEXT_PUBLIC_WEBSOCKET_URL or APINATOR_KEY configured)
-    const apiKey = process.env.NEXT_PUBLIC_APINATOR_KEY || process.env.APINATOR_KEY || '';
+    const apiKey = process.env.NEXT_PUBLIC_APINATOR_KEY || process.env.APINATOR_KEY || 'app_d01de6e4a0b4c1aa6a723850115ba737654d3e54';
     const cluster = process.env.NEXT_PUBLIC_APINATOR_CLUSTER || 'eu';
-    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (apiKey ? `wss://ws-${cluster}.apinator.io/app/${apiKey}?protocol=7&client=js` : '');
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `wss://ws-${cluster}.apinator.io/app/${apiKey}?protocol=7&client=js`;
 
     if (wsUrl) {
       try {
         ws = new WebSocket(wsUrl);
-        ws.onopen = () => console.log('⚡ Connected to Apinator WebSocket (Channel: skylight-kds)');
+        ws.onopen = () => {
+          console.log('⚡ Connected to Apinator WebSocket (Channel: skylight-kds)');
+          try {
+            ws?.send(JSON.stringify({
+              event: 'realtime:subscribe',
+              data: JSON.stringify({ channel: 'skylight-kds' })
+            }));
+          } catch (e) {}
+        };
         ws.onmessage = (msg) => {
           try {
             const data = JSON.parse(msg.data);
-            if (data.event === 'kds_update') {
+            if (data.event === 'realtime:ping') {
+              ws?.send(JSON.stringify({ event: 'realtime:pong', data: '' }));
+              return;
+            }
+            if (data.event === 'kds_update' || data.channel === 'skylight-kds') {
               console.log('⚡ Realtime Source: WebSocket (Apinator cloud push)');
               refreshKDSData();
             }
