@@ -52,6 +52,12 @@ export async function ensureDatabaseSchemaAndIndexes() {
       ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
       ALTER TABLE order_items ADD COLUMN IF NOT EXISTS loyalty_phone TEXT;
 
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       ALTER TABLE service_calls ADD COLUMN IF NOT EXISTS details TEXT DEFAULT '';
       ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
       ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
