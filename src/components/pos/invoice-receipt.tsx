@@ -85,7 +85,7 @@ export function ThermalReceipt({
     const billId = getInvoiceReference(tableNumber, sessionId || items[0]?.session_id);
 
     const receiptMarkup = (
-        <div className="print-receipt-container hidden print:block text-black bg-white font-sans text-xs w-[76mm] max-w-[76mm] p-2 mx-auto">
+        <div className="print-receipt-container hidden print:block text-black bg-white font-sans text-xs w-full max-w-full print:w-full print:max-w-full p-2 mx-auto">
             {/* Header / Logo */}
             <header className="text-center mb-2">
                 <img
