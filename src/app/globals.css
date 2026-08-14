@@ -94,8 +94,8 @@ body {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 76mm !important;
-    max-width: 76mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
     margin: 0 auto !important;
