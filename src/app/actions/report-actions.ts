@@ -19,30 +19,7 @@ export interface StatusLogEntry {
 
 // 1. DDL Schema Initialization for Status Transition Logs & Timestamps
 export async function initReportSchema() {
-  if (!pool) return;
-  try {
-    await pool.query(`
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS preparing_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
-      ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
-
-      CREATE TABLE IF NOT EXISTS order_item_status_logs (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          order_item_id UUID REFERENCES order_items(id) ON DELETE CASCADE,
-          session_id UUID REFERENCES table_sessions(id) ON DELETE SET NULL,
-          table_number INT,
-          item_name TEXT,
-          station VARCHAR(30),
-          from_status VARCHAR(20),
-          to_status VARCHAR(20),
-          duration_seconds INT DEFAULT 0,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-  } catch (e) {
-    console.error('Neon initReportSchema error:', e);
-  }
+  return;
 }
 
 // 2. Helper to log item status transition and update milestone timestamps
