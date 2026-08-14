@@ -16,7 +16,7 @@ import {
   wipeAllDatabaseTestDataAction,
 } from '../actions/admin-actions';
 import { getStaffRoster } from '../actions/audit-actions';
-import { MenuItem, StationType, TableSession, StaffMember } from '@/lib/types';
+import { MenuItem, StationType, TableSession, StaffMember, ModifierGroup } from '@/lib/types';
 import { calculateBillTotals, getInvoiceReference } from '@/lib/currency';
 import { getDetailedOdooReportData, StatusLogEntry } from '../actions/report-actions';
 import { AdminHeader } from '@/components/admin/AdminHeader';
@@ -28,7 +28,7 @@ import { AdminTableManager } from '@/components/admin/AdminTableManager';
 import { OrderHistoryTracker } from '@/components/admin/OrderHistoryTracker';
 import { OdooAnalyticsReports } from '@/components/admin/OdooAnalyticsReports';
 import { OrderDetailsDrawer } from '@/components/admin/OrderDetailsDrawer';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Plus, X } from 'lucide-react';
 
 export default function AdminPage() {
   return (
@@ -76,6 +76,7 @@ function AdminContent() {
   const [newItemSortOrder, setNewItemSortOrder] = useState('0');
   const [newItemIsBestseller, setNewItemIsBestseller] = useState(false);
   const [newItemIsStaffOnly, setNewItemIsStaffOnly] = useState(false);
+  const [newItemModifierGroups, setNewItemModifierGroups] = useState<ModifierGroup[]>([]);
 
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [editName, setEditName] = useState('');
@@ -88,6 +89,7 @@ function AdminContent() {
   const [editSortOrder, setEditSortOrder] = useState('0');
   const [editIsBestseller, setEditIsBestseller] = useState(false);
   const [editIsStaffOnly, setEditIsStaffOnly] = useState(false);
+  const [editModifierGroups, setEditModifierGroups] = useState<ModifierGroup[]>([]);
 
   // Staff Management State
   const [newStaffName, setNewStaffName] = useState('');
@@ -246,6 +248,7 @@ function AdminContent() {
     setEditSortOrder(String(item.sort_order ?? 0));
     setEditIsBestseller(!!item.is_bestseller);
     setEditIsStaffOnly(!!item.is_staff_only);
+    setEditModifierGroups(Array.isArray(item.modifier_groups) ? JSON.parse(JSON.stringify(item.modifier_groups)) : []);
   };
 
   const handleSaveFullEditSubmit = async (e: React.FormEvent) => {
@@ -257,6 +260,7 @@ function AdminContent() {
 
     await updateMenuItem(editingItem.id, {
       name: editName.trim(),
+      categoryId: editCatId,
       priceUsd: priceNum,
       priceCampingUsd: !isNaN(priceCampingNum) ? priceCampingNum : priceNum,
       station: editStation,
@@ -265,6 +269,7 @@ function AdminContent() {
       sortOrder: parseInt(editSortOrder, 10) || 0,
       isBestseller: editIsBestseller,
       isStaffOnly: editIsStaffOnly,
+      modifierGroups: editModifierGroups,
     });
 
     setEditingItem(null);
@@ -289,6 +294,7 @@ function AdminContent() {
       sortOrder: parseInt(newItemSortOrder, 10) || 0,
       isBestseller: newItemIsBestseller,
       isStaffOnly: newItemIsStaffOnly,
+      modifierGroups: newItemModifierGroups,
     });
 
     setNewItemName('');
@@ -299,6 +305,7 @@ function AdminContent() {
     setNewItemSortOrder('0');
     setNewItemIsBestseller(false);
     setNewItemIsStaffOnly(false);
+    setNewItemModifierGroups([]);
     setIsAddItemModalOpen(false);
     refreshPOSData();
   };
@@ -521,9 +528,9 @@ function AdminContent() {
       {/* FULL EDIT DISH MODAL */}
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-[#1c3a1e]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-lg rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
+          <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl text-[#1c3a1e]">
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1c3a1e]/15">
-              <h3 className="text-lg font-black text-[#1c3a1e]">Edit Menu Item Details</h3>
+              <h3 className="text-lg font-black text-[#1c3a1e]">Edit Menu Item & Variations</h3>
               <button
                 onClick={() => setEditingItem(null)}
                 className="text-gray-500 hover:text-black font-bold text-base cursor-pointer"
@@ -695,6 +702,9 @@ function AdminContent() {
                   </label>
                 </div>
               </div>
+
+              {/* VARIATIONS & MODIFIER GROUPS EDITOR */}
+              <ModifierGroupsEditor groups={editModifierGroups} setGroups={setEditModifierGroups} />
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -896,6 +906,9 @@ function AdminContent() {
                 </div>
               </div>
 
+              {/* VARIATIONS & MODIFIER GROUPS EDITOR */}
+              <ModifierGroupsEditor groups={newItemModifierGroups} setGroups={setNewItemModifierGroups} />
+
               <button
                 type="submit"
                 className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3.5 rounded-2xl text-xs shadow-xs transition-all cursor-pointer mt-4"
@@ -904,6 +917,169 @@ function AdminContent() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModifierGroupsEditor({
+  groups,
+  setGroups,
+}: {
+  groups: ModifierGroup[];
+  setGroups: React.Dispatch<React.SetStateAction<ModifierGroup[]>>;
+}) {
+  const addGroup = () => {
+    setGroups((prev) => [
+      ...prev,
+      { group_name: 'Choice / Option Group', required: false, options: [{ name: 'Option 1', price_extra_usd: 0 }] },
+    ]);
+  };
+
+  const removeGroup = (gIdx: number) => {
+    setGroups((prev) => prev.filter((_, idx) => idx !== gIdx));
+  };
+
+  const updateGroupName = (gIdx: number, val: string) => {
+    setGroups((prev) => {
+      const copy = JSON.parse(JSON.stringify(prev));
+      copy[gIdx].group_name = val;
+      return copy;
+    });
+  };
+
+  const toggleGroupRequired = (gIdx: number) => {
+    setGroups((prev) => {
+      const copy = JSON.parse(JSON.stringify(prev));
+      copy[gIdx].required = !copy[gIdx].required;
+      return copy;
+    });
+  };
+
+  const addOption = (gIdx: number) => {
+    setGroups((prev) => {
+      const copy = JSON.parse(JSON.stringify(prev));
+      copy[gIdx].options.push({ name: '', price_extra_usd: 0 });
+      return copy;
+    });
+  };
+
+  const removeOption = (gIdx: number, oIdx: number) => {
+    setGroups((prev) => {
+      const copy = JSON.parse(JSON.stringify(prev));
+      copy[gIdx].options = copy[gIdx].options.filter((_: any, idx: number) => idx !== oIdx);
+      return copy;
+    });
+  };
+
+  const updateOption = (gIdx: number, oIdx: number, field: 'name' | 'price_extra_usd', val: any) => {
+    setGroups((prev) => {
+      const copy = JSON.parse(JSON.stringify(prev));
+      copy[gIdx].options[oIdx][field] = val;
+      return copy;
+    });
+  };
+
+  return (
+    <div className="space-y-4 border-t border-[#1c3a1e]/15 pt-4 mt-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <label className="block text-xs font-black text-[#1c3a1e] uppercase tracking-wider">
+            🎨 Dish Variations & Extra Options (Modifiers)
+          </label>
+          <p className="text-[11px] text-gray-500 font-medium">
+            Add custom options like size, doneness, extra cheese, or sauce
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={addGroup}
+          className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>+ Add Group</span>
+        </button>
+      </div>
+
+      {groups.length === 0 ? (
+        <div className="bg-[#fafbfa] border border-dashed border-[#1c3a1e]/20 rounded-2xl p-4 text-center text-xs text-gray-500 font-bold">
+          No variation options configured for this dish. Tap "+ Add Group" to add choices.
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+          {groups.map((group, gIdx) => (
+            <div key={gIdx} className="bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-2xl p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <input
+                  type="text"
+                  value={group.group_name}
+                  onChange={(e) => updateGroupName(gIdx, e.target.value)}
+                  placeholder="Group Name (e.g. Size, Extra Toppings)"
+                  className="bg-white border border-[#1c3a1e]/20 rounded-xl px-3 py-1.5 text-xs font-black text-[#1c3a1e] w-full focus:outline-none focus:border-[#1c3a1e]"
+                />
+                <label className="flex items-center gap-1 text-[11px] font-extrabold shrink-0 text-[#1c3a1e] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={group.required}
+                    onChange={() => toggleGroupRequired(gIdx)}
+                    className="h-3.5 w-3.5 accent-[#1c3a1e]"
+                  />
+                  <span>Required</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeGroup(gIdx)}
+                  className="text-gray-400 hover:text-red-600 p-1 rounded-lg shrink-0 transition-colors cursor-pointer"
+                  title="Remove Group"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Options List */}
+              <div className="space-y-1.5 pl-2 border-l-2 border-[#1c3a1e]/20 pt-1">
+                {group.options.map((opt, oIdx) => (
+                  <div key={oIdx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={opt.name}
+                      onChange={(e) => updateOption(gIdx, oIdx, 'name', e.target.value)}
+                      placeholder="Choice Name (e.g. Large, Extra Cheese)"
+                      className="bg-white border border-[#1c3a1e]/15 rounded-lg px-2.5 py-1 text-xs text-[#1c3a1e] font-bold w-full focus:outline-none"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[11px] font-black text-gray-500">$+</span>
+                      <input
+                        type="number"
+                        step="0.25"
+                        value={opt.price_extra_usd}
+                        onChange={(e) => updateOption(gIdx, oIdx, 'price_extra_usd', parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="bg-white border border-[#1c3a1e]/15 rounded-lg px-2 py-1 text-xs font-black text-[#1c3a1e] w-20 focus:outline-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeOption(gIdx, oIdx)}
+                      className="text-gray-400 hover:text-red-600 p-1 rounded-lg shrink-0 cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => addOption(gIdx)}
+                  className="text-[11px] font-extrabold text-[#1c3a1e] hover:text-[#d4af37] pt-1 flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Add Option Choice</span>
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

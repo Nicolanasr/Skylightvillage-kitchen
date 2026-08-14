@@ -136,6 +136,7 @@ export async function updateMenuItem(
   menuItemId: string,
   data: {
     name?: string;
+    categoryId?: string;
     description?: string;
     priceUsd?: number;
     priceCampingUsd?: number;
@@ -156,6 +157,7 @@ export async function updateMenuItem(
 
     const item = itemRes.rows[0];
     const name = data.name !== undefined ? data.name : item.name;
+    const category_id = data.categoryId !== undefined ? data.categoryId : item.category_id;
     const description = data.description !== undefined ? data.description : item.description;
     const price_usd = data.priceUsd !== undefined ? Number(data.priceUsd) : Number(item.price_usd);
     const price_camping_usd = data.priceCampingUsd !== undefined
@@ -170,8 +172,8 @@ export async function updateMenuItem(
     const modifier_groups = data.modifierGroups !== undefined ? data.modifierGroups : (item.modifier_groups || []);
 
     await pool.query(
-      `UPDATE menu_items SET name = $1, description = $2, price_usd = $3, price_camping_usd = $4, station = $5, image_url = $6, available = $7, is_staff_only = $8, sort_order = $9, is_bestseller = $10, modifier_groups = $11 WHERE id = $12`,
-      [name, description, price_usd, price_camping_usd, station, image_url, available, is_staff_only, sort_order, is_bestseller, JSON.stringify(modifier_groups), menuItemId]
+      `UPDATE menu_items SET name = $1, category_id = $2, description = $3, price_usd = $4, price_camping_usd = $5, station = $6, image_url = $7, available = $8, is_staff_only = $9, sort_order = $10, is_bestseller = $11, modifier_groups = $12 WHERE id = $13`,
+      [name, category_id, description, price_usd, price_camping_usd, station, image_url, available, is_staff_only, sort_order, is_bestseller, JSON.stringify(modifier_groups), menuItemId]
     );
   } catch (e: any) {
     console.error('Neon updateMenuItem error:', e);
