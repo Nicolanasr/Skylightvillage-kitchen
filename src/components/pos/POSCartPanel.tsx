@@ -471,31 +471,6 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                                         </span>
                                                     )}
 
-                                                    {!item.is_paid && item.status !== 'cancelled' ? (
-                                                        <div className="flex items-center bg-white border border-[#1c3a1e]/20 rounded-lg shadow-xs">
-                                                            <button
-                                                                onClick={() => handleQuantityEdit(item.id, -1)}
-                                                                className="h-6 w-6 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black cursor-pointer"
-                                                            >
-                                                                -
-                                                            </button>
-                                                            <span className="px-2 text-xs font-black text-[#1c3a1e]">{item.quantity}</span>
-                                                            <button
-                                                                onClick={() => handleQuantityEdit(item.id, 1)}
-                                                                className="h-6 w-6 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black cursor-pointer"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <span
-                                                            className={`font-black text-xs ${item.status === 'cancelled' ? 'line-through text-red-500' : 'text-emerald-700'
-                                                                }`}
-                                                        >
-                                                            {item.quantity}x
-                                                        </span>
-                                                    )}
-
                                                     <span
                                                         className={`font-black text-xs ${item.is_paid
                                                                 ? 'text-emerald-800'
