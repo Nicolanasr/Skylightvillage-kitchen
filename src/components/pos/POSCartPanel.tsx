@@ -244,7 +244,9 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
     const handleQuantityEdit = async (itemId: string, delta: number) => {
         const item = tableItems.find((i) => i.id === itemId);
         if (!item) return;
-        const newQty = item.quantity + delta;
+        const currentQty = Math.round(Number(item.quantity || 1));
+        const stepDelta = Math.round(Number(delta || 1));
+        const newQty = currentQty + stepDelta;
         if (newQty <= 0) {
             await cancelOrderItem(itemId);
         } else {

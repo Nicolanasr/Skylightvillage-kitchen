@@ -55,7 +55,11 @@ export async function getPOSData() {
         }
         return { ...s, merged_table_ids: mergedArr };
       });
-      orderItems = ordRes.rows;
+      orderItems = ordRes.rows.map((r: any) => ({
+        ...r,
+        quantity: Math.round(Number(r.quantity || 1)),
+        unit_price_usd: Number(r.unit_price_usd || 0),
+      }));
       payments = payRes.rows;
       discounts = discRes.rows;
       serviceCalls = callRes.rows;
@@ -523,13 +527,14 @@ export async function updateOrderItemQuantity(orderItemId: string, newQty: numbe
     const itemRes = await pool.query('SELECT * FROM order_items WHERE id = $1', [orderItemId]);
     if (itemRes.rows.length > 0) {
       const item = itemRes.rows[0];
-      const oldQty = Number(item.quantity || 1);
-      const diff = newQty - oldQty;
+      const oldQty = Math.round(Number(item.quantity || 1));
+      const targetQty = Math.round(Number(newQty || 1));
+      const diff = targetQty - oldQty;
 
-      if (newQty <= 0) {
+      if (targetQty <= 0) {
         await cancelOrderItem(orderItemId);
       } else {
-        await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [newQty, orderItemId]);
+        await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [targetQty, orderItemId]);
         if (diff > 0 && item.menu_item_id) {
           await deductRecipeStockForItems(
             [{ menuItemId: item.menu_item_id, quantity: diff }],
