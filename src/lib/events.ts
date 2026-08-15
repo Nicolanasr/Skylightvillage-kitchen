@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { publishApinatorEvent } from './websocket';
+import { invalidatePOSCache } from '@/app/actions/payment-actions';
 
 class AppEventEmitter extends EventEmitter {}
 
@@ -20,6 +21,7 @@ export function notifyKDSUpdate() {
 }
 
 export function notifyPOSUpdate() {
+  invalidatePOSCache();
   const payload = { timestamp: Date.now() };
   appEvents.emit(EVENT_POS_UPDATE, payload);
   publishApinatorEvent('skylight-pos', 'pos_update', payload);

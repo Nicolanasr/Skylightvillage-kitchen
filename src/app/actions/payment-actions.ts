@@ -37,7 +37,13 @@ export async function getPOSData() {
       const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes, loyaltyRes] = await Promise.all([
         pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
         pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 80"),
-        pool.query("SELECT * FROM order_items WHERE (status != 'cancelled' AND (created_at > NOW() - INTERVAL '8 hours' OR session_id IN (SELECT id FROM table_sessions WHERE status = 'active'))) ORDER BY created_at ASC"),
+        pool.query(`
+          SELECT oi.* FROM order_items oi
+          LEFT JOIN table_sessions ts ON oi.session_id = ts.id
+          WHERE oi.status != 'cancelled'
+            AND (ts.status = 'active' OR oi.created_at > NOW() - INTERVAL '8 hours')
+          ORDER BY oi.created_at ASC
+        `),
         pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
         pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
         pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
@@ -97,7 +103,7 @@ export async function getPOSData() {
     return tbl;
   });
 
-  return {
+  const result = {
     tables,
     sessions,
     serviceCalls,
@@ -108,6 +114,13 @@ export async function getPOSData() {
     categories,
     loyaltyEnabled,
   };
+
+  posCache = {
+    timestamp: now,
+    data: result,
+  };
+
+  return result;
 }
 
 export async function updateTableStatusAction(tableId: string, status: string) {
