@@ -73,6 +73,7 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
+        image_url: m.image_url && m.image_url.startsWith('data:image/') ? `/api/dish-image?id=${m.id}` : (m.image_url || ''),
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 
@@ -1027,6 +1028,7 @@ export async function getPublicViewOnlyMenuData() {
       .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
+        image_url: m.image_url && m.image_url.startsWith('data:image/') ? `/api/dish-image?id=${m.id}` : (m.image_url || ''),
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 

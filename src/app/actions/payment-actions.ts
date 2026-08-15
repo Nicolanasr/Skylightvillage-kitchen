@@ -74,6 +74,7 @@ export async function getPOSData() {
       serviceCalls = callRes.rows;
       menuItems = itemRes.rows.map((m: any) => ({
         ...m,
+        image_url: m.image_url && m.image_url.startsWith('data:image/') ? `/api/dish-image?id=${m.id}` : (m.image_url || ''),
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
       categories = catRes.rows;
