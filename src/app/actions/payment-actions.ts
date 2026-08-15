@@ -25,22 +25,25 @@ export async function getPOSData() {
   let menuItems: any[] = [];
   let categories: any[] = [];
 
+  let loyaltyEnabled = true;
+
   const now = Date.now();
-  if (posCache && (now - posCache.timestamp < 2500)) {
+  if (posCache && (now - posCache.timestamp < 3000)) {
     return posCache.data;
   }
 
   if (pool) {
     try {
-      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes] = await Promise.all([
+      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes, loyaltyRes] = await Promise.all([
         pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
-        pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 100"),
-        pool.query("SELECT * FROM order_items WHERE (status != 'cancelled' AND (created_at > NOW() - INTERVAL '12 hours' OR session_id IN (SELECT id FROM table_sessions WHERE status = 'active'))) ORDER BY created_at ASC"),
-        pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 200"),
-        pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 200"),
+        pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 80"),
+        pool.query("SELECT * FROM order_items WHERE (status != 'cancelled' AND (created_at > NOW() - INTERVAL '8 hours' OR session_id IN (SELECT id FROM table_sessions WHERE status = 'active'))) ORDER BY created_at ASC"),
+        pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
+        pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
         pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
         pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
         pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
+        pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'").catch(() => ({ rows: [] })),
       ]);
 
       tables = tblRes.rows;
@@ -68,6 +71,11 @@ export async function getPOSData() {
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
       categories = catRes.rows;
+
+      if (loyaltyRes.rows && loyaltyRes.rows.length > 0 && loyaltyRes.rows[0].value !== null) {
+        const val = loyaltyRes.rows[0].value;
+        loyaltyEnabled = val === true || val === 'true' || val === '1';
+      }
     } catch (e) {
       console.error('POS fetch error:', e);
     }
@@ -88,12 +96,6 @@ export async function getPOSData() {
     }
     return tbl;
   });
-
-  let loyaltyEnabled = true;
-  try {
-    const { getLoyaltyEnabledSetting } = await import('./loyalty-actions');
-    loyaltyEnabled = await getLoyaltyEnabledSetting();
-  } catch (e) {}
 
   return {
     tables,

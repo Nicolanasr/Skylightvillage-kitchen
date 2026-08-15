@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import { CalculatedBill, formatLbp, formatUsd, getInvoiceReference } from '@/lib/currency';
 import { OrderItem } from '@/lib/types';
 import { QRCodeSVG } from 'qrcode.react';
@@ -89,9 +90,12 @@ export function ThermalReceipt({
         <div className="print-receipt-container hidden print:block text-black bg-white font-sans text-xs w-full max-w-full print:w-full print:max-w-full p-2 mx-auto">
             {/* Header / Logo */}
             <header className="text-center mb-2">
-                <img
+                <Image
                     src="/images/Skylight-logo-white.png"
                     alt="Skylight Village Logo"
+                    width={144}
+                    height={48}
+                    unoptimized
                     className="w-36 h-auto mx-auto mb-1 object-contain brightness-0 filter"
                 />
                 <p className="text-[10px] text-black font-bold m-0">Jaj, Lebanon | Tel: +961 70 66 33 99</p>

@@ -72,9 +72,12 @@ function ViewOnlyMenuContent() {
             {/* Header with Official Skylight Logo - Identical to /order page */}
             <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#1c3a1e]/10 px-4 py-3 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
-                    <img
+                    <Image
                         src="/images/Skylight-logo-icon.png"
                         alt="Skylight Village Logo"
+                        width={40}
+                        height={40}
+                        unoptimized
                         className="h-10 w-auto object-contain filter invert"
                     />
                     <div>
@@ -269,11 +272,13 @@ function ViewOnlyMenuContent() {
                         </div>
 
                         {selectedItemDetail.image_url && (
-                            <div className="h-56 w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                                <img
+                            <div className="relative h-56 w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+                                <Image
                                     src={transformGoogleDriveUrl(selectedItemDetail.image_url)}
                                     alt={selectedItemDetail.name}
-                                    className="h-full w-full object-cover"
+                                    fill
+                                    unoptimized
+                                    className="object-cover"
                                 />
                             </div>
                         )}

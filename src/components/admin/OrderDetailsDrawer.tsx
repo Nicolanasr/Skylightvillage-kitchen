@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { TableSession, MenuItem } from '@/lib/types';
 import { StatusLogEntry } from '@/app/actions/report-actions';
 import { getInvoiceReference } from '@/lib/currency';
@@ -124,13 +125,12 @@ export const OrderDetailsDrawer: React.FC<OrderDetailsDrawerProps> = ({
                       <div className="flex items-start gap-3">
                         <div className="w-12 h-12 rounded-xl border border-[#1c3a1e]/15 bg-amber-50 flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative">
                           {imgUrl ? (
-                            <img
+                            <Image
                               src={imgUrl}
                               alt={item.item_name}
-                              className="w-full h-full object-cover"
-                              onError={(e: any) => {
-                                e.target.style.display = 'none';
-                              }}
+                              fill
+                              unoptimized
+                              className="object-cover"
                             />
                           ) : null}
                           <span className="text-base font-black text-[#1c3a1e] select-none">

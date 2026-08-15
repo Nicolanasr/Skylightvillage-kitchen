@@ -808,10 +808,12 @@ function CustomerOrderContent() {
                         {/* Header Image if available */}
                         {selectedItemForModifier.image_url && (
                             <div className="relative h-48 w-full">
-                                <img
+                                <Image
                                     src={selectedItemForModifier.image_url}
                                     alt={selectedItemForModifier.name}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    unoptimized
+                                    className="object-cover"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
                             </div>
@@ -1474,10 +1476,12 @@ function CustomerOrderContent() {
                             {guideStep === 0 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
-                                        <img
+                                        <Image
                                             src="/images/sc-guide-1.png"
                                             alt="Browse Menu Screenshot"
-                                            className="w-full h-full object-cover object-top"
+                                            fill
+                                            unoptimized
+                                            className="object-cover object-top"
                                         />
                                     </div>
 
@@ -1505,10 +1509,12 @@ function CustomerOrderContent() {
                             {guideStep === 1 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
-                                        <img
+                                        <Image
                                             src="/images/sc-guide-2.png"
                                             alt="Customize Dish Screenshot"
-                                            className="w-full h-full object-cover object-top"
+                                            fill
+                                            unoptimized
+                                            className="object-cover object-top"
                                         />
                                     </div>
 
@@ -1534,10 +1540,12 @@ function CustomerOrderContent() {
                             {guideStep === 2 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
-                                        <img
+                                        <Image
                                             src="/images/sc-guide-3.png"
                                             alt="Cart Drawer Screenshot"
-                                            className="w-full h-full object-cover object-top"
+                                            fill
+                                            unoptimized
+                                            className="object-cover object-top"
                                         />
                                     </div>
 
@@ -1563,10 +1571,12 @@ function CustomerOrderContent() {
                             {guideStep === 3 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
-                                        <img
+                                        <Image
                                             src="/images/sc-guide-4.png"
                                             alt="Service Bell Screenshot"
-                                            className="w-full h-full object-cover object-top"
+                                            fill
+                                            unoptimized
+                                            className="object-cover object-top"
                                         />
                                     </div>
 
@@ -1592,10 +1602,12 @@ function CustomerOrderContent() {
                             {guideStep === 4 && (
                                 <div className="space-y-3 text-center py-1 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="relative w-full h-44 bg-[#f4f7f4] border border-[#1c3a1e]/15 rounded-2xl overflow-hidden shadow-sm">
-                                        <img
+                                        <Image
                                             src="/images/sc-guide-5.png"
                                             alt="Live Order Status Screenshot"
-                                            className="w-full h-full object-cover object-top"
+                                            fill
+                                            unoptimized
+                                            className="object-cover object-top"
                                         />
                                     </div>
 

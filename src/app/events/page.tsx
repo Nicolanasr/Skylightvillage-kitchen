@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { getOrderPageData, submitEventVoucherOrder, getEventVouchersReport } from '@/app/actions/order-actions';
 import { MenuItem, MenuCategory, SelectedModifier } from '@/lib/types';
 import { formatUsd, formatLbp } from '@/lib/currency';
@@ -433,14 +434,15 @@ function EventTerminalContent() {
                                         )}
 
                                         <div className="flex gap-3 items-start">
-                                            <img
-                                                src={displayImage}
-                                                alt={item.name}
-                                                className="h-16 w-16 rounded-2xl object-cover border border-[#1c3a1e]/15 shrink-0 bg-[#f4f7f4]"
-                                                onError={(e: any) => {
-                                                    e.target.src = '/images/Skylight-logo-icon.png';
-                                                }}
-                                            />
+                                            <div className="relative h-16 w-16 rounded-2xl overflow-hidden border border-[#1c3a1e]/15 shrink-0 bg-[#f4f7f4]">
+                                                <Image
+                                                    src={displayImage}
+                                                    alt={item.name}
+                                                    fill
+                                                    unoptimized
+                                                    className="object-cover"
+                                                />
+                                            </div>
                                             <div className="space-y-1 flex-1">
                                                 <div className="flex items-center gap-1 flex-wrap">
                                                     <h3 className="font-extrabold text-sm text-[#1c3a1e] leading-snug group-hover:text-[#d4af37] transition-colors">{item.name}</h3>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Table, TableSession, OrderItem, MenuItem } from '@/lib/types';
 import { calculateBillTotals, formatUsd } from '@/lib/currency';
 import { updateOrderItemQuantity, cancelOrderItem, restoreCancelledOrderItem, compOrderItem, removeDiscount, unmergeAllTables, updateTableStatusAction } from '@/app/actions/payment-actions';
@@ -449,13 +450,12 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                         <div className="flex items-start gap-2.5">
                                             <div className="w-8 h-8 rounded-lg border border-[#1c3a1e]/15 bg-amber-50 flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative">
                                                 {imgUrl ? (
-                                                    <img
+                                                    <Image
                                                         src={imgUrl}
                                                         alt={item.item_name}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e: any) => {
-                                                            e.target.style.display = 'none';
-                                                        }}
+                                                        fill
+                                                        unoptimized
+                                                        className="object-cover"
                                                     />
                                                 ) : null}
                                                 <span className="text-xs font-black text-[#1c3a1e]">
