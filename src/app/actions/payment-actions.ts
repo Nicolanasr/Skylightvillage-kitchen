@@ -47,7 +47,12 @@ export async function getPOSData() {
         pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
         pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
         pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
-        pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+        pool.query(`
+          SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+                 CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+          FROM menu_items 
+          ORDER BY sort_order ASC, name ASC
+        `),
         pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
         pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'").catch(() => ({ rows: [] })),
       ]);
