@@ -156,22 +156,6 @@ function CustomerOrderContent() {
     const [isSubmittingSharePay, setIsSubmittingSharePay] = useState(false);
     const [shareCustomerName, setShareCustomerName] = useState<string>('');
 
-    // Auto-lookup loyalty profile when phone number changes
-    useEffect(() => {
-        if (customerPhone.trim().length >= 6) {
-            lookupOrCreateCustomerLoyalty(customerPhone, customerName).then((res) => {
-                if (res.success && res.customer) {
-                    setLoyaltyProfile(res.customer);
-                    setRewardTiers(res.rewardTiers || []);
-                } else {
-                    setLoyaltyProfile(null);
-                }
-            });
-        } else {
-            setLoyaltyProfile(null);
-        }
-    }, [customerPhone, customerName]);
-
     const handleSaveLoyaltyProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!tempPhoneInput.trim()) return;
@@ -1021,27 +1005,18 @@ function CustomerOrderContent() {
                                     </div>
 
                                     {customerPhone && (
-                                        <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1 flex items-center justify-between">
-                                            <span>👤 {customerName || 'Guest'}: {customerPhone}</span>
-                                            <span className="text-[10px] text-emerald-700 font-black">Linked ✅</span>
+                                        <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-2xs">
+                                            <span className="truncate">👤 {customerName || 'Guest'} ({customerPhone})</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsLoyaltyModalOpen(true)}
+                                                className="bg-[#d4af37] text-[#1c3a1e] hover:bg-[#c29f2f] px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer shrink-0 transition-all flex items-center gap-1 ml-2 shadow-2xs"
+                                            >
+                                                <Sparkles className="h-3 w-3 text-[#1c3a1e]" />
+                                                <span>🎁 Redeem Points</span>
+                                            </button>
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Discrete Redeem VIP Points Link */}
-                                <div className="flex justify-end pt-0.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsLoyaltyModalOpen(true)}
-                                        className="text-[11px] font-bold text-[#997a15] hover:underline flex items-center gap-1 cursor-pointer"
-                                    >
-                                        <Sparkles className="h-3 w-3 text-[#d4af37]" />
-                                        <span>
-                                            {loyaltyProfile
-                                                ? `${loyaltyProfile.customer_name} (${loyaltyProfile.points_balance} PTS)`
-                                                : 'Have VIP points? Redeem discount ➔'}
-                                        </span>
-                                    </button>
                                 </div>
 
                                 {isBillRequested ? (
