@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { logItemStatusChange, logBatchItemStatusChange } from './report-actions';
 import { deductRecipeStockForItems } from './inventory-actions';
 import { notifyKDSUpdate, notifyPOSUpdate } from '@/lib/events';
+import { sendTelegramOrderNotification } from '@/lib/telegram';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
@@ -385,6 +386,20 @@ export async function submitCustomerOrder(data: {
       invalidateKDSCache();
       notifyKDSUpdate();
       notifyPOSUpdate();
+
+      // Trigger Telegram Push Notification to staff group
+      sendTelegramOrderNotification({
+        orderType: effOrderType,
+        tableNumber,
+        customerName: effCustName,
+        customerPhone: effCustPhone,
+        items: data.items.map(i => ({
+          itemName: i.itemName,
+          quantity: i.quantity,
+          selectedModifiers: i.selectedModifiers,
+          specialNotes: i.specialNotes,
+        })),
+      }).catch(err => console.error('Telegram notification error:', err));
     }
 
     if (primaryTable) {
