@@ -1097,11 +1097,15 @@ function KDSContent() {
                                         <div className="flex justify-between items-start pb-3 border-b border-[#1c3a1e]/15 mb-3">
                                             <div className="flex items-start gap-3">
                                                 {mItem?.image_url && (
-                                                    <img
-                                                        src={mItem.image_url}
-                                                        alt={item.item_name}
-                                                        className="h-11 w-11 rounded-xl object-cover border border-[#1c3a1e]/15 flex-shrink-0 shadow-sm"
-                                                    />
+                                                    <div className="relative h-11 w-11 rounded-xl overflow-hidden border border-[#1c3a1e]/15 flex-shrink-0 shadow-sm">
+                                                        <Image
+                                                            src={mItem.image_url}
+                                                            alt={item.item_name}
+                                                            fill
+                                                            unoptimized
+                                                            className="object-cover"
+                                                        />
+                                                    </div>
                                                 )}
                                                 <div>
                                                     <h3 className="flex items-center gap-1.5 flex-wrap mb-1 text-sm font-extrabold text-[#1c3a1e]">

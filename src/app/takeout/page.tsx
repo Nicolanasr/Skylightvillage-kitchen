@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import Image from 'next/image';
 import { getOrderPageData, submitCustomerOrder, createTakeoutOrCampingSession } from '@/app/actions/order-actions';
 import { MenuItem, MenuCategory, SelectedModifier, getMenuItemPrice } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
@@ -470,14 +471,12 @@ function TakeoutContent({ forcedOrderType }: { forcedOrderType?: 'takeout' | 'ca
                     >
                       {/* Left Thumbnail Image */}
                       <div className="relative h-24 w-24 sm:h-28 sm:w-28 bg-[#f4f7f4] rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-[#1c3a1e]/10">
-                        <img
+                        <Image
                           src={displayImage}
                           alt={item.name}
+                          fill
+                          unoptimized
                           className={`w-full h-full ${item.image_url ? 'object-cover' : 'object-contain p-4 opacity-50 filter invert'} group-hover:scale-105 transition-transform duration-300`}
-                          onError={(e: any) => {
-                            e.target.src = '/images/Skylight-logo-icon.png';
-                            e.target.className = 'w-full h-full object-contain p-4 opacity-50';
-                          }}
                         />
                         {item.is_bestseller && (
                           <div className="absolute top-1 left-1 bg-[#d4af37] text-[#1c3a1e] font-black text-[9px] px-1.5 py-0.5 rounded-md shadow-sm z-10 flex items-center gap-0.5">

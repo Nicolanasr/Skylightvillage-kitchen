@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { logItemStatusChange, logBatchItemStatusChange } from './report-actions';
 import { deductRecipeStockForItems } from './inventory-actions';
 import { notifyKDSUpdate, notifyPOSUpdate } from '@/lib/events';
+import { sendTelegramOrderNotification } from '@/lib/telegram';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
@@ -56,7 +57,12 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       loyaltySettingRes
     ] = await Promise.all([
       pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
-      pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+      pool.query(`
+        SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+               CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+        FROM menu_items 
+        ORDER BY sort_order ASC, name ASC
+      `),
       hasRealSession ? pool.query('SELECT * FROM order_items WHERE session_id = $1 ORDER BY created_at ASC', [session.id]) : Promise.resolve({ rows: [] }),
       hasRealSession ? pool.query('SELECT * FROM discounts WHERE session_id = $1', [session.id]) : Promise.resolve({ rows: [] }),
       hasRealSession ? pool.query('SELECT * FROM payments WHERE session_id = $1', [session.id]) : Promise.resolve({ rows: [] }),
@@ -73,6 +79,7 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
       .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
+        image_url: m.image_url && m.image_url.startsWith('data:image/') ? `/api/dish-image?id=${m.id}` : (m.image_url || ''),
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 
@@ -379,6 +386,20 @@ export async function submitCustomerOrder(data: {
       invalidateKDSCache();
       notifyKDSUpdate();
       notifyPOSUpdate();
+
+      // Trigger Telegram Push Notification to staff group
+      sendTelegramOrderNotification({
+        orderType: effOrderType,
+        tableNumber,
+        customerName: effCustName,
+        customerPhone: effCustPhone,
+        items: data.items.map(i => ({
+          itemName: i.itemName,
+          quantity: i.quantity,
+          selectedModifiers: i.selectedModifiers,
+          specialNotes: i.specialNotes,
+        })),
+      }).catch(err => console.error('Telegram notification error:', err));
     }
 
     if (primaryTable) {
@@ -1015,7 +1036,12 @@ export async function getPublicViewOnlyMenuData() {
   try {
     const [catRes, itemRes] = await Promise.all([
       pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
-      pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+      pool.query(`
+        SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+               CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+        FROM menu_items 
+        ORDER BY sort_order ASC, name ASC
+      `),
     ]);
 
     const liveCategories = catRes.rows.filter((c: any) => c.available !== false);
@@ -1027,6 +1053,7 @@ export async function getPublicViewOnlyMenuData() {
       .filter((m: any) => !m.is_staff_only && !disabledCatIds.has(m.category_id))
       .map((m: any) => ({
         ...m,
+        image_url: m.image_url && m.image_url.startsWith('data:image/') ? `/api/dish-image?id=${m.id}` : (m.image_url || ''),
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Lock, ShieldAlert, LogOut, UserCheck, Users, Shield } from 'lucide-react';
 import { StaffMember } from '@/lib/types';
 import { logStaffActivity, getStaffRoster } from '@/app/actions/audit-actions';
@@ -114,9 +115,12 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
 
                     {/* Logo */}
                     <div className="flex justify-center mb-4">
-                        <img
+                        <Image
                             src="/images/Skylight-logo-icon.png"
                             alt="Skylight Village Logo"
+                            width={48}
+                            height={48}
+                            unoptimized
                             className="h-12 w-auto object-contain mb-2"
                         />
                     </div>

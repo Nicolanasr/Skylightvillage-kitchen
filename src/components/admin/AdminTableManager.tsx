@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { Table } from '@/lib/types';
 import { addTableAction, updateTableAction, deleteTableAction } from '@/app/actions/admin-actions';
@@ -240,9 +241,12 @@ export const AdminTableManager: React.FC<AdminTableManagerProps> = ({
 
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                         <div className="bg-[#fff] p-1 rounded-xl flex items-center justify-center h-10 w-10 border border-slate-300">
-                                            <img
+                                            <Image
                                                 src="/images/Skylight-logo-white.png"
                                                 alt="Skylight Logo"
+                                                width={24}
+                                                height={24}
+                                                unoptimized
                                                 className="h-5 w-auto object-contain filter invert"
                                             />
                                         </div>

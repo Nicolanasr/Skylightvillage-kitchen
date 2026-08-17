@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Table, TableSession, OrderItem, MenuItem } from '@/lib/types';
 import { calculateBillTotals, formatUsd } from '@/lib/currency';
 import { updateOrderItemQuantity, cancelOrderItem, restoreCancelledOrderItem, compOrderItem, removeDiscount, unmergeAllTables, updateTableStatusAction } from '@/app/actions/payment-actions';
@@ -244,7 +245,9 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
     const handleQuantityEdit = async (itemId: string, delta: number) => {
         const item = tableItems.find((i) => i.id === itemId);
         if (!item) return;
-        const newQty = item.quantity + delta;
+        const currentQty = Math.round(Number(item.quantity || 1));
+        const stepDelta = Math.round(Number(delta || 1));
+        const newQty = currentQty + stepDelta;
         if (newQty <= 0) {
             await cancelOrderItem(itemId);
         } else {
@@ -447,13 +450,12 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                         <div className="flex items-start gap-2.5">
                                             <div className="w-8 h-8 rounded-lg border border-[#1c3a1e]/15 bg-amber-50 flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative">
                                                 {imgUrl ? (
-                                                    <img
+                                                    <Image
                                                         src={imgUrl}
                                                         alt={item.item_name}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e: any) => {
-                                                            e.target.style.display = 'none';
-                                                        }}
+                                                        fill
+                                                        unoptimized
+                                                        className="object-cover"
                                                     />
                                                 ) : null}
                                                 <span className="text-xs font-black text-[#1c3a1e]">
@@ -466,31 +468,6 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                                     {item.guest_name && (
                                                         <span className="bg-purple-500/10 text-purple-900 border border-purple-500/30 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
                                                             <User className="h-3 w-3" /> {item.guest_name}
-                                                        </span>
-                                                    )}
-
-                                                    {!item.is_paid && item.status !== 'cancelled' ? (
-                                                        <div className="flex items-center bg-white border border-[#1c3a1e]/20 rounded-lg shadow-xs">
-                                                            <button
-                                                                onClick={() => handleQuantityEdit(item.id, -1)}
-                                                                className="h-6 w-6 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black cursor-pointer"
-                                                            >
-                                                                -
-                                                            </button>
-                                                            <span className="px-2 text-xs font-black text-[#1c3a1e]">{item.quantity}</span>
-                                                            <button
-                                                                onClick={() => handleQuantityEdit(item.id, 1)}
-                                                                className="h-6 w-6 text-gray-700 hover:text-black flex items-center justify-center text-xs font-black cursor-pointer"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <span
-                                                            className={`font-black text-xs ${item.status === 'cancelled' ? 'line-through text-red-500' : 'text-emerald-700'
-                                                                }`}
-                                                        >
-                                                            {item.quantity}x
                                                         </span>
                                                     )}
 

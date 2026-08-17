@@ -25,22 +25,36 @@ export async function getPOSData() {
   let menuItems: any[] = [];
   let categories: any[] = [];
 
+  let loyaltyEnabled = true;
+
   const now = Date.now();
-  if (posCache && (now - posCache.timestamp < 2500)) {
+  if (posCache && (now - posCache.timestamp < 3000)) {
     return posCache.data;
   }
 
   if (pool) {
     try {
-      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes] = await Promise.all([
+      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes, loyaltyRes] = await Promise.all([
         pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
-        pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 100"),
-        pool.query("SELECT * FROM order_items WHERE (status != 'cancelled' AND (created_at > NOW() - INTERVAL '12 hours' OR session_id IN (SELECT id FROM table_sessions WHERE status = 'active'))) ORDER BY created_at ASC"),
-        pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 200"),
-        pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '12 hours' ORDER BY created_at DESC LIMIT 200"),
+        pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 80"),
+        pool.query(`
+          SELECT oi.* FROM order_items oi
+          LEFT JOIN table_sessions ts ON oi.session_id = ts.id
+          WHERE oi.status != 'cancelled'
+            AND (ts.status = 'active' OR oi.created_at > NOW() - INTERVAL '8 hours')
+          ORDER BY oi.created_at ASC
+        `),
+        pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
+        pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
         pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
-        pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
+        pool.query(`
+          SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+                 CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+          FROM menu_items 
+          ORDER BY sort_order ASC, name ASC
+        `),
         pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
+        pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'").catch(() => ({ rows: [] })),
       ]);
 
       tables = tblRes.rows;
@@ -55,15 +69,25 @@ export async function getPOSData() {
         }
         return { ...s, merged_table_ids: mergedArr };
       });
-      orderItems = ordRes.rows;
+      orderItems = ordRes.rows.map((r: any) => ({
+        ...r,
+        quantity: Math.round(Number(r.quantity || 1)),
+        unit_price_usd: Number(r.unit_price_usd || 0),
+      }));
       payments = payRes.rows;
       discounts = discRes.rows;
       serviceCalls = callRes.rows;
       menuItems = itemRes.rows.map((m: any) => ({
         ...m,
+        image_url: m.image_url && m.image_url.startsWith('data:image/') ? `/api/dish-image?id=${m.id}` : (m.image_url || ''),
         modifier_groups: typeof m.modifier_groups === 'string' ? JSON.parse(m.modifier_groups) : (m.modifier_groups || []),
       }));
       categories = catRes.rows;
+
+      if (loyaltyRes.rows && loyaltyRes.rows.length > 0 && loyaltyRes.rows[0].value !== null) {
+        const val = loyaltyRes.rows[0].value;
+        loyaltyEnabled = val === true || val === 'true' || val === '1';
+      }
     } catch (e) {
       console.error('POS fetch error:', e);
     }
@@ -85,13 +109,7 @@ export async function getPOSData() {
     return tbl;
   });
 
-  let loyaltyEnabled = true;
-  try {
-    const { getLoyaltyEnabledSetting } = await import('./loyalty-actions');
-    loyaltyEnabled = await getLoyaltyEnabledSetting();
-  } catch (e) {}
-
-  return {
+  const result = {
     tables,
     sessions,
     serviceCalls,
@@ -102,6 +120,13 @@ export async function getPOSData() {
     categories,
     loyaltyEnabled,
   };
+
+  posCache = {
+    timestamp: now,
+    data: result,
+  };
+
+  return result;
 }
 
 export async function updateTableStatusAction(tableId: string, status: string) {
@@ -523,13 +548,14 @@ export async function updateOrderItemQuantity(orderItemId: string, newQty: numbe
     const itemRes = await pool.query('SELECT * FROM order_items WHERE id = $1', [orderItemId]);
     if (itemRes.rows.length > 0) {
       const item = itemRes.rows[0];
-      const oldQty = Number(item.quantity || 1);
-      const diff = newQty - oldQty;
+      const oldQty = Math.round(Number(item.quantity || 1));
+      const targetQty = Math.round(Number(newQty || 1));
+      const diff = targetQty - oldQty;
 
-      if (newQty <= 0) {
+      if (targetQty <= 0) {
         await cancelOrderItem(orderItemId);
       } else {
-        await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [newQty, orderItemId]);
+        await pool.query('UPDATE order_items SET quantity = $1 WHERE id = $2', [targetQty, orderItemId]);
         if (diff > 0 && item.menu_item_id) {
           await deductRecipeStockForItems(
             [{ menuItemId: item.menu_item_id, quantity: diff }],
