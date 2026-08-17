@@ -100,8 +100,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                             key={tab.id}
                             href={`/admin/${tab.id}`}
                             onClick={(e) => {
+                                e.preventDefault();
                                 if (setActiveTab) {
                                     setActiveTab(tab.id as any);
+                                }
+                                if (typeof window !== 'undefined') {
+                                    window.history.pushState(null, '', `/admin/${tab.id}`);
                                 }
                             }}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border ${isActive

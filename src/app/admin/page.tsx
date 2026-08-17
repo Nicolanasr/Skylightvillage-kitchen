@@ -106,14 +106,19 @@ export function AdminContent({ initialTab = 'menu' }: { initialTab?: AdminTab })
     });
   };
 
+  // Modular On-Demand Lazy Data Fetching & Caching
   useEffect(() => {
-    fetchStaffRoster();
-    getDetailedOdooReportData().then((res) => {
-      if (res.statusLogs) {
-        setStatusLogs(res.statusLogs);
-      }
-    });
-  }, [activeTab]);
+    if (activeTab === 'staff' && staffMembers.length === 0) {
+      fetchStaffRoster();
+    }
+    if (activeTab === 'reports' && statusLogs.length === 0) {
+      getDetailedOdooReportData().then((res) => {
+        if (res.statusLogs) {
+          setStatusLogs(res.statusLogs);
+        }
+      });
+    }
+  }, [activeTab, staffMembers.length, statusLogs.length]);
 
   const handleSyncClick = async () => {
     setIsSeeding(true);
