@@ -142,7 +142,7 @@ function CustomerOrderContent() {
         if (!tempPhoneInput.trim()) return;
         setIsSearchingCartPhone(true);
         try {
-            const res = await searchLoyaltyCustomers(tempPhoneInput);
+            const res = await searchLoyaltyCustomers(tempPhoneInput, true);
             if (res.success && res.customers && res.customers.length > 0) {
                 const found = res.customers[0];
                 setCustomerPhone(found.phone_number);

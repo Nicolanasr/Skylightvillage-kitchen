@@ -743,7 +743,7 @@ export async function removeLoyaltyPhoneFromOrderItem(orderItemId: string) {
  * Search loyalty customers by phone number or name (for POS typeahead)
  * Returns up to 8 matching results ordered by most recent activity
  */
-export async function searchLoyaltyCustomers(query: string) {
+export async function searchLoyaltyCustomers(query: string, exactMatch = false) {
   if (!pool || !query?.trim() || query.trim().length < 2) {
     return { success: true, customers: [] };
   }
@@ -755,14 +755,23 @@ export async function searchLoyaltyCustomers(query: string) {
   const pattern = `%${rawQuery}%`;
 
   try {
-    const res = await pool.query(
-      `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
-       FROM customer_loyalty
-       WHERE phone_number ILIKE $1 OR customer_name ILIKE $1 OR phone_number = ANY($2::text[])
-       ORDER BY updated_at DESC NULLS LAST
-       LIMIT 8`,
-      [pattern, variations]
-    );
+    const res = exactMatch
+      ? await pool.query(
+          `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
+           FROM customer_loyalty
+           WHERE phone_number = ANY($1::text[]) OR phone_number = $2
+           ORDER BY updated_at DESC NULLS LAST
+           LIMIT 8`,
+          [variations, rawQuery]
+        )
+      : await pool.query(
+          `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
+           FROM customer_loyalty
+           WHERE phone_number ILIKE $1 OR customer_name ILIKE $1 OR phone_number = ANY($2::text[])
+           ORDER BY updated_at DESC NULLS LAST
+           LIMIT 8`,
+          [pattern, variations]
+        );
 
     return {
       success: true,
