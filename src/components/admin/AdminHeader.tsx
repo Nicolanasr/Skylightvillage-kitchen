@@ -96,9 +96,14 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
                     return (
-                        <button
+                        <a
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            href={`/admin/${tab.id}`}
+                            onClick={(e) => {
+                                if (setActiveTab) {
+                                    setActiveTab(tab.id as any);
+                                }
+                            }}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border ${isActive
                                 ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md scale-[1.02]'
                                 : 'bg-white text-gray-700 border-[#1c3a1e]/15 hover:bg-[#eaf2eb] hover:text-[#1c3a1e]'
@@ -106,7 +111,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                         >
                             <Icon className="h-4 w-4" />
                             <span>{tab.label}</span>
-                        </button>
+                        </a>
                     );
                 })}
             </div>

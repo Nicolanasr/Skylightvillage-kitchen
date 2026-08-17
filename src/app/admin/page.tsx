@@ -32,18 +32,20 @@ import { OdooAnalyticsReports } from '@/components/admin/OdooAnalyticsReports';
 import { OrderDetailsDrawer } from '@/components/admin/OrderDetailsDrawer';
 import { PlusCircle, Trash2, Plus, X } from 'lucide-react';
 
+export type AdminTab = 'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports';
+
 export default function AdminPage() {
   return (
     <StaffAuthGuard pageTitle="Skylight Village Admin Manager">
-      <AdminContent />
+      <AdminContent initialTab="menu" />
     </StaffAuthGuard>
   );
 }
 
-function AdminContent() {
+export function AdminContent({ initialTab = 'menu' }: { initialTab?: AdminTab }) {
   const { categories, menuItems, orderItems, tables, sessions, discounts, payments, refreshPOSData } =
     useRealtimePOS();
-  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
   // Database Action Banners
