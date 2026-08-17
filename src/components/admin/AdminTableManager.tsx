@@ -246,6 +246,7 @@ export const AdminTableManager: React.FC<AdminTableManagerProps> = ({
                                                 alt="Skylight Logo"
                                                 width={24}
                                                 height={24}
+                                                style={{ width: 'auto', height: 'auto' }}
                                                 unoptimized
                                                 className="h-5 w-auto object-contain filter invert"
                                             />

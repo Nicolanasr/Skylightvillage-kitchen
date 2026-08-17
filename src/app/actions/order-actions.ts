@@ -388,18 +388,22 @@ export async function submitCustomerOrder(data: {
       notifyPOSUpdate();
 
       // Trigger Telegram Push Notification to staff group
-      sendTelegramOrderNotification({
-        orderType: effOrderType,
-        tableNumber,
-        customerName: effCustName,
-        customerPhone: effCustPhone,
-        items: data.items.map(i => ({
-          itemName: i.itemName,
-          quantity: i.quantity,
-          selectedModifiers: i.selectedModifiers,
-          specialNotes: i.specialNotes,
-        })),
-      }).catch(err => console.error('Telegram notification error:', err));
+      try {
+        await sendTelegramOrderNotification({
+          orderType: effOrderType,
+          tableNumber,
+          customerName: effCustName,
+          customerPhone: effCustPhone,
+          items: data.items.map(i => ({
+            itemName: i.itemName,
+            quantity: i.quantity,
+            selectedModifiers: i.selectedModifiers,
+            specialNotes: i.specialNotes,
+          })),
+        });
+      } catch (err) {
+        console.error('Telegram notification error:', err);
+      }
     }
 
     if (primaryTable) {
@@ -519,6 +523,24 @@ export async function addWaiterManualOrderItem(data: {
       invalidateKDSCache();
       notifyKDSUpdate();
       notifyPOSUpdate();
+
+      // Trigger Telegram Push Notification
+      try {
+        await sendTelegramOrderNotification({
+          orderType: effOrderType,
+          tableNumber: effTableNumber,
+          customerName: effCustName,
+          customerPhone: effCustPhone,
+          items: [{
+            itemName: data.itemName,
+            quantity: data.quantity,
+            selectedModifiers: data.selectedModifiers,
+            specialNotes: data.specialNotes,
+          }],
+        });
+      } catch (err) {
+        console.error('Telegram notification error:', err);
+      }
     }
   } catch (e) {
     console.error('Waiter manual order item insert error:', e);
@@ -629,6 +651,24 @@ export async function addBatchWaiterManualOrderItems(data: {
       invalidateKDSCache();
       notifyKDSUpdate();
       notifyPOSUpdate();
+
+      // Trigger Telegram Push Notification
+      try {
+        await sendTelegramOrderNotification({
+          orderType: effOrderType,
+          tableNumber: effTableNumber,
+          customerName: effCustName,
+          customerPhone: effCustPhone,
+          items: data.items.map(i => ({
+            itemName: i.itemName,
+            quantity: i.quantity,
+            selectedModifiers: i.selectedModifiers,
+            specialNotes: i.specialNotes,
+          })),
+        });
+      } catch (err) {
+        console.error('Telegram notification error:', err);
+      }
     }
   } catch (e) {
     console.error('addBatchWaiterManualOrderItems error:', e);
