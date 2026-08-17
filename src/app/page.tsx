@@ -75,7 +75,7 @@ function ViewOnlyHomeContent() {
                             alt="Skylight Village Logo"
                             width={40}
                             height={40}
-                            style={{ width: 'auto', height: 'auto' }}
+
                             unoptimized
                             className="h-10 w-auto object-contain filter invert"
                         />
@@ -120,8 +120,8 @@ function ViewOnlyHomeContent() {
                     <button
                         onClick={() => handleCategoryClick('all')}
                         className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeCategory === 'all'
-                                ? 'bg-[#1c3a1e] text-white shadow-md'
-                                : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
+                            ? 'bg-[#1c3a1e] text-white shadow-md'
+                            : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
                             }`}
                     >
                         All Items
@@ -133,8 +133,8 @@ function ViewOnlyHomeContent() {
                                 key={cat.id}
                                 onClick={() => handleCategoryClick(cat.id)}
                                 className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeCategory === cat.id
-                                        ? 'bg-[#1c3a1e] text-white shadow-md'
-                                        : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                    ? 'bg-[#1c3a1e] text-white shadow-md'
+                                    : 'bg-[#eaf2eb] text-[#1c3a1e] hover:bg-[#d8e6da]'
                                     }`}
                             >
                                 {cat.name}
@@ -188,8 +188,8 @@ function ViewOnlyHomeContent() {
                                                     key={item.id}
                                                     onClick={() => setSelectedItemDetail(item)}
                                                     className={`bg-white rounded-2xl overflow-hidden flex flex-row items-center p-3 gap-3.5 transition-all group border border-[#1c3a1e]/10 shadow-sm ${isOutOfStock
-                                                            ? 'opacity-50 grayscale cursor-not-allowed border-[#1c3a1e]/10'
-                                                            : 'hover:border-[#d4af37] hover:shadow-md cursor-pointer active:scale-[0.99]'
+                                                        ? 'opacity-50 grayscale cursor-not-allowed border-[#1c3a1e]/10'
+                                                        : 'hover:border-[#d4af37] hover:shadow-md cursor-pointer active:scale-[0.99]'
                                                         }`}
                                                 >
                                                     {/* Left Square Thumbnail Image */}

@@ -8,6 +8,7 @@ import { logItemStatusChange, logBatchItemStatusChange } from './report-actions'
 import { deductRecipeStockForItems } from './inventory-actions';
 import { notifyKDSUpdate, notifyPOSUpdate } from '@/lib/events';
 import { sendTelegramOrderNotification } from '@/lib/telegram';
+import { resolveOrUpsertCustomer } from './crm-actions';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
@@ -341,14 +342,24 @@ export async function submitCustomerOrder(data: {
   }
 
   try {
+    let customerId: string | null = null;
+    if (effCustPhone) {
+      const cust = await resolveOrUpsertCustomer({ phone: effCustPhone, name: effCustName });
+      if (cust) customerId = cust.id;
+    }
+
     await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, finalSessionId]);
+
+    if (customerId) {
+      await pool.query('UPDATE table_sessions SET customer_id = $1 WHERE id = $2', [customerId, finalSessionId]).catch(() => {});
+    }
 
     const valuePlaceholders: string[] = [];
     const params: any[] = [];
     let pIdx = 1;
 
     for (const newItem of itemsToInsert) {
-      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14}, $${pIdx+15})`);
+      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14}, $${pIdx+15}, $${pIdx+16})`);
       params.push(
         newItem.id,
         newItem.order_id,
@@ -365,14 +376,15 @@ export async function submitCustomerOrder(data: {
         effOrderType,
         effCustName,
         effCustPhone,
-        effCustPhone || null  // loyalty_phone: auto-assign from customer phone
+        effCustPhone || null, // loyalty_phone
+        customerId
       );
-      pIdx += 16;
+      pIdx += 17;
     }
 
     if (valuePlaceholders.length > 0) {
       await pool.query(
-        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone, loyalty_phone)
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone, loyalty_phone, customer_id)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );

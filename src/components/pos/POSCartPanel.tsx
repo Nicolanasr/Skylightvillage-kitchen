@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import { Table, TableSession, OrderItem, MenuItem } from '@/lib/types';
 import { calculateBillTotals, formatUsd } from '@/lib/currency';
-import { updateOrderItemQuantity, cancelOrderItem, restoreCancelledOrderItem, compOrderItem, removeDiscount, unmergeAllTables, updateTableStatusAction } from '@/app/actions/payment-actions';
+import { updateOrderItemQuantity, cancelOrderItem, restoreCancelledOrderItem, compOrderItem, removeDiscount, unmergeAllTables, updateTableStatusAction, assignGuestNameToOrderItems } from '@/app/actions/payment-actions';
 import { updateOrderItemStatus } from '@/app/actions/order-actions';
 import { assignLoyaltyPhoneToSession, assignLoyaltyPhoneToOrderItem, removeLoyaltyPhoneFromOrderItem, redeemLoyaltyRewardAction, searchLoyaltyCustomers, lookupOrCreateCustomerLoyalty } from '@/app/actions/loyalty-actions';
 import { User, UserCheck, RotateCcw, Percent, Eye, CreditCard, Sparkles, X, Phone } from 'lucide-react';
@@ -60,27 +60,40 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
     const [itemVipToast, setItemVipToast] = React.useState('');
     const [itemVipResults, setItemVipResults] = React.useState<any[]>([]);
     const [itemVipSearching, setItemVipSearching] = React.useState(false);
+    const [hasSearched, setHasSearched] = React.useState(false);
     const [vipProfile, setVipProfile] = React.useState<any>(null);
     const [vipTiers, setVipTiers] = React.useState<any[]>([]);
-    const itemVipDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Auto-lookup VIP profile and eligible gifts when phone is selected/typed
-    React.useEffect(() => {
-        if (itemVipPhone.trim().length >= 6) {
-            lookupOrCreateCustomerLoyalty(itemVipPhone, itemVipCustName).then((res) => {
-                if (res.success && res.customer) {
-                    setVipProfile(res.customer);
-                    setVipTiers(res.rewardTiers || []);
-                } else {
-                    setVipProfile(null);
-                    setVipTiers([]);
-                }
-            });
-        } else {
-            setVipProfile(null);
-            setVipTiers([]);
+    const executeExplicitSearch = async () => {
+        if (!itemVipPhone.trim()) return;
+        setItemVipSearching(true);
+        setHasSearched(true);
+        setItemVipResults([]);
+        try {
+            const res = await searchLoyaltyCustomers(itemVipPhone);
+            if (res.success) {
+                setItemVipResults(res.customers || []);
+            }
+        } catch (e) {
+            console.error('Search error:', e);
+        } finally {
+            setItemVipSearching(false);
         }
-    }, [itemVipPhone]);
+    };
+
+    const selectExistingCustomer = async (cust: any) => {
+        setItemVipPhone(cust.phone_number);
+        setItemVipCustName(cust.customer_name);
+        setVipProfile(cust);
+        setHasSearched(false);
+        setItemVipResults([]);
+
+        const res = await lookupOrCreateCustomerLoyalty(cust.phone_number, cust.customer_name);
+        if (res.success) {
+            setVipTiers(res.rewardTiers || []);
+        }
+    };
+    const itemVipDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [redeemingBannerKey, setRedeemingBannerKey] = React.useState<string | null>(null);
     const [redeemingTierId, setRedeemingTierId] = React.useState<string | null>(null);
@@ -102,28 +115,6 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
             setItemVipToast(res.error || 'Failed to redeem reward');
         }
         setItemVipLoading(false);
-    };
-
-    const handleItemVipPhoneChange = (val: string) => {
-        setItemVipPhone(val);
-        setItemVipResults([]);
-        if (itemVipDebounce.current) clearTimeout(itemVipDebounce.current);
-        if (val.trim().length >= 2) {
-            setItemVipSearching(true);
-            itemVipDebounce.current = setTimeout(async () => {
-                const res = await searchLoyaltyCustomers(val);
-                if (res.success) setItemVipResults(res.customers || []);
-                setItemVipSearching(false);
-            }, 320);
-        } else {
-            setItemVipSearching(false);
-        }
-    };
-
-    const selectExistingCustomer = (cust: any) => {
-        setItemVipPhone(cust.phone_number);
-        setItemVipCustName(cust.customer_name);
-        setItemVipResults([]);
     };
 
     const activeItems = tableItems.filter((i) => i.status !== 'cancelled');
@@ -201,15 +192,38 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
         setItemVipLoading(true);
         setItemVipToast('');
 
+        const inputVal = itemVipPhone.trim();
+        const hasDigits = /\d/.test(inputVal);
+
+        // If input is a pure guest name without digits (e.g. "Marc"), assign as guest_name directly
+        if (!hasDigits) {
+            const itemIds = itemVipTarget.id === '__all__'
+                ? activeItems.filter((i) => !i.is_paid).map((i) => i.id)
+                : [itemVipTarget.id];
+
+            await assignGuestNameToOrderItems(itemIds, inputVal);
+            setItemVipToast(`✅ Guest "${inputVal}" linked to item!`);
+            refreshPOSData();
+            setTimeout(() => {
+                setItemVipTarget(null);
+                setItemVipPhone('');
+                setItemVipCustName('');
+                setItemVipToast('');
+                setItemVipResults([]);
+            }, 1500);
+            setItemVipLoading(false);
+            return;
+        }
+
         if (itemVipTarget.id === '__all__') {
             // Assign phone to ALL unassigned active items
             const unassigned = activeItems.filter((i) => !i.loyalty_phone && !i.is_paid);
             let successCount = 0;
             for (const item of unassigned) {
-                const res = await assignLoyaltyPhoneToOrderItem(item.id, itemVipPhone, itemVipCustName);
+                const res = await assignLoyaltyPhoneToOrderItem(item.id, inputVal, itemVipCustName);
                 if (res.success) successCount++;
             }
-            setItemVipToast(`✅ Linked ${itemVipPhone} to ${successCount} item${successCount !== 1 ? 's' : ''}!`);
+            setItemVipToast(`✅ Linked ${inputVal} to ${successCount} item${successCount !== 1 ? 's' : ''}!`);
             refreshPOSData();
             setTimeout(() => {
                 setItemVipTarget(null);
@@ -219,9 +233,9 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                 setItemVipResults([]);
             }, 1800);
         } else {
-            const res = await assignLoyaltyPhoneToOrderItem(itemVipTarget.id, itemVipPhone, itemVipCustName);
+            const res = await assignLoyaltyPhoneToOrderItem(itemVipTarget.id, inputVal, itemVipCustName);
             if (res.success && res.customer) {
-                setItemVipToast(`✅ ${res.customer.customer_name} linked! (${res.customer.points_balance} pts)`);
+                setItemVipToast(`✅ ${res.customer.customer_name} linked!`);
                 refreshPOSData();
                 setTimeout(() => {
                     setItemVipTarget(null);
@@ -231,7 +245,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                     setItemVipResults([]);
                 }, 1800);
             } else {
-                setItemVipToast(res.error || 'Failed to assign VIP.');
+                setItemVipToast(res.error || 'Failed to assign guest.');
             }
         }
         setItemVipLoading(false);
@@ -638,10 +652,10 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                         <div className="flex justify-between items-center pb-2 border-b border-[#1c3a1e]/15">
                             <div>
                                 <h3 className="text-sm font-black text-[#1c3a1e] flex items-center gap-2">
-                                    <Sparkles className="h-4 w-4 text-[#d4af37]" />
-                                    Assign VIP Loyalty
+                                    <User className="h-4 w-4 text-[#1c3a1e]" />
+                                    Assign Guest / Customer to Item
                                 </h3>
-                                <p className="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 mt-1 inline-block truncate max-w-[230px]">
+                                <p className="text-[10px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-0.5 mt-1 inline-block truncate max-w-[230px]">
                                     🍽 {itemVipTarget.name}
                                 </p>
                             </div>
@@ -689,35 +703,55 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                         )}
 
                         <form onSubmit={handleAssignItemVip} className="space-y-3">
-                            {/* Phone input with live search */}
+                            {/* Phone input with explicit Search button */}
                             <div className="relative">
                                 <label className="block text-xs font-black text-[#1c3a1e] mb-1">
                                     Mobile Phone or Name *
                                 </label>
-                                <div className="relative">
+                                <div className="flex gap-2">
                                     <input
                                         type="text"
                                         required
                                         autoFocus
-                                        placeholder="Search or type phone…"
+                                        placeholder="Enter phone or name…"
                                         value={itemVipPhone}
-                                        onChange={(e) => handleItemVipPhoneChange(e.target.value)}
-                                        className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-sm font-black text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e] pr-8"
+                                        onChange={(e) => {
+                                            setItemVipPhone(e.target.value);
+                                            setHasSearched(false);
+                                        }}
+                                        className="flex-1 bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-2.5 text-xs font-black text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e]"
                                     />
-                                    {itemVipSearching && (
-                                        <span className="absolute right-3 top-3.5 text-gray-400 text-xs">⏳</span>
-                                    )}
+                                    <button
+                                        type="button"
+                                        disabled={!itemVipPhone.trim() || itemVipSearching}
+                                        onClick={executeExplicitSearch}
+                                        className="bg-[#1c3a1e] hover:bg-black text-white px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                        {itemVipSearching ? (
+                                            <span className="animate-spin text-xs">⏳</span>
+                                        ) : (
+                                            <span>🔍 Search</span>
+                                        )}
+                                    </button>
                                 </div>
 
-                                {/* Dropdown results */}
-                                {itemVipResults.length > 0 && (
-                                    <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-[#1c3a1e]/20 rounded-2xl shadow-xl overflow-hidden">
+                                {/* Loading state */}
+                                {itemVipSearching && (
+                                    <div className="p-3 text-center text-xs text-[#1c3a1e] font-bold bg-[#eaf2eb] rounded-xl mt-2 flex items-center justify-center gap-2 border border-[#1c3a1e]/15">
+                                        <span className="animate-spin">⏳</span>
+                                        <span>Searching customer database...</span>
+                                    </div>
+                                )}
+
+                                {/* Explicit Search Results Dropdown */}
+                                {hasSearched && !itemVipSearching && (
+                                    <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-[#1c3a1e]/20 rounded-2xl shadow-xl overflow-hidden divide-y divide-[#1c3a1e]/10">
                                         {itemVipResults.map((cust) => (
                                             <button
                                                 key={cust.id}
                                                 type="button"
                                                 onClick={() => selectExistingCustomer(cust)}
-                                                className="w-full text-left px-4 py-2.5 hover:bg-[#eaf2eb] transition-colors border-b border-[#1c3a1e]/10 last:border-0 cursor-pointer"
+                                                className="w-full text-left px-4 py-2.5 hover:bg-[#eaf2eb] transition-colors cursor-pointer"
                                             >
                                                 <div className="flex justify-between items-center">
                                                     <div>
@@ -727,12 +761,26 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                                             {cust.phone_number}
                                                         </span>
                                                     </div>
-                                                    <span className="text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
-                                                        🌟 {cust.points_balance} pts
+                                                    <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                                        Select Profile
                                                     </span>
                                                 </div>
                                             </button>
                                         ))}
+
+                                        {itemVipResults.length === 0 && (
+                                            <div className="p-3 text-center text-xs text-gray-600 font-medium">
+                                                No existing profile found for &quot;{itemVipPhone}&quot;.
+                                            </div>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setHasSearched(false)}
+                                            className="w-full bg-[#1c3a1e]/5 hover:bg-[#1c3a1e]/10 text-[#1c3a1e] font-black text-xs py-2 px-3 text-center cursor-pointer transition-colors"
+                                        >
+                                            ➕ Register &amp; Link New Profile (&quot;{itemVipPhone}&quot;)
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -815,7 +863,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                 disabled={itemVipLoading}
                                 className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer disabled:opacity-60"
                             >
-                                {itemVipLoading ? 'Linking…' : '🌟 Link VIP to This Item'}
+                                {itemVipLoading ? 'Linking…' : '👤 Link Guest / Customer to Item'}
                             </button>
                         </form>
                     </div>

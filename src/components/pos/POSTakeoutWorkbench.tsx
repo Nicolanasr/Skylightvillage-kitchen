@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { TableSession, OrderItem } from '@/lib/types';
 import { createTakeoutOrCampingSession } from '@/app/actions/order-actions';
 import { formatUsd } from '@/lib/currency';
+import { normalizePhone } from '@/lib/phone';
 import { ShoppingBag, MapPin, Plus, User, Phone, CheckCircle2, Clock, Eye, Search } from 'lucide-react';
 
 interface POSTakeoutWorkbenchProps {
@@ -51,7 +52,7 @@ export const POSTakeoutWorkbench: React.FC<POSTakeoutWorkbenchProps> = ({
     const res = await createTakeoutOrCampingSession({
       orderType: modalType,
       customerName: custName.trim(),
-      customerPhone: custPhone.trim(),
+      customerPhone: normalizePhone(custPhone) || custPhone.trim(),
     });
 
     if (res.success && res.session) {

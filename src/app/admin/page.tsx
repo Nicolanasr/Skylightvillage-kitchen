@@ -23,6 +23,7 @@ import { getDetailedOdooReportData, StatusLogEntry } from '../actions/report-act
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminMenuManager } from '@/components/admin/AdminMenuManager';
 import { AdminCategoryManager } from '@/components/admin/AdminCategoryManager';
+import { AdminCRMManager } from '@/components/admin/AdminCRMManager';
 import { AdminInventoryManager } from '@/components/admin/AdminInventoryManager';
 import { AdminLoyaltyManager } from '@/components/admin/AdminLoyaltyManager';
 import { AdminTableManager } from '@/components/admin/AdminTableManager';
@@ -42,7 +43,7 @@ export default function AdminPage() {
 function AdminContent() {
   const { categories, menuItems, orderItems, tables, sessions, discounts, payments, refreshPOSData } =
     useRealtimePOS();
-  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
   // Database Action Banners
@@ -362,7 +363,12 @@ function AdminContent() {
           />
         )}
 
-        {/* TAB 3: INVENTORY & RECIPE BOM MANAGER */}
+        {/* TAB 3: GUESTS & CRM MANAGER */}
+        {activeTab === 'crm' && (
+          <AdminCRMManager />
+        )}
+
+        {/* TAB 4: INVENTORY & RECIPE BOM MANAGER */}
         {activeTab === 'inventory' && (
           <AdminInventoryManager />
         )}

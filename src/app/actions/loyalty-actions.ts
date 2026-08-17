@@ -3,6 +3,8 @@
 import { pool } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
+import { resolveOrUpsertCustomer } from './crm-actions';
+import { normalizePhone, getPhoneLookupVariations } from '@/lib/phone';
 
 export interface CustomerLoyalty {
   id: string;
@@ -176,10 +178,14 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
   await ensureLoyaltyTables();
   await seedDefaultRewardTiers();
 
-  const cleanPhone = phoneNumber.trim();
+  const canonicalPhone = normalizePhone(phoneNumber) || phoneNumber.trim();
+  const variations = getPhoneLookupVariations(phoneNumber);
+  if (variations.length === 0) variations.push(phoneNumber.trim());
   const cleanName = customerName.trim() || 'Valued Guest';
 
   try {
+    // Also sync with Master CRM customers table
+    await resolveOrUpsertCustomer({ phone: canonicalPhone, name: cleanName }).catch(() => {});
     const tierRes = await pool.query('SELECT * FROM loyalty_reward_tiers WHERE active = true ORDER BY points_required ASC');
     const rewardTiers = tierRes.rows.map((t) => ({
       ...t,
@@ -188,8 +194,8 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
     })) as LoyaltyRewardTier[];
 
     const res = await pool.query(
-      'SELECT * FROM customer_loyalty WHERE phone_number = $1 OR vip_code = $1 OR id = $1 LIMIT 1',
-      [cleanPhone]
+      'SELECT * FROM customer_loyalty WHERE phone_number = ANY($1::text[]) OR vip_code = $2 OR id = $2 LIMIT 1',
+      [variations, phoneNumber.trim()]
     );
 
     let customer: CustomerLoyalty;
@@ -208,8 +214,9 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
       const insertRes = await pool.query(
         `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
          VALUES ($1, $2, $3, 0, 0, 1)
+         ON CONFLICT (phone_number) DO UPDATE SET customer_name = EXCLUDED.customer_name
          RETURNING *`,
-        [newId, cleanPhone, cleanName]
+        [newId, canonicalPhone, cleanName]
       );
       const c = insertRes.rows[0];
       customer = {
@@ -742,18 +749,24 @@ export async function searchLoyaltyCustomers(query: string) {
   }
   await ensureLoyaltyTables();
 
-  const q = `%${query.trim()}%`;
+  const rawQuery = query.trim();
+  const canonical = normalizePhone(rawQuery);
+  const variations = getPhoneLookupVariations(rawQuery);
+  const pattern = `%${rawQuery}%`;
+
   try {
     const res = await pool.query(
       `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
        FROM customer_loyalty
-       WHERE phone_number ILIKE $1 OR customer_name ILIKE $1
+       WHERE phone_number ILIKE $1 OR customer_name ILIKE $1 OR phone_number = ANY($2::text[])
        ORDER BY updated_at DESC NULLS LAST
        LIMIT 8`,
-      [q]
+      [pattern, variations]
     );
+
     return {
       success: true,
+      canonicalPhone: canonical,
       customers: res.rows.map((c) => ({
         id: c.id,
         phone_number: c.phone_number || '',
@@ -765,7 +778,7 @@ export async function searchLoyaltyCustomers(query: string) {
     };
   } catch (e) {
     console.error('Error searching loyalty customers:', e);
-    return { success: true, customers: [] };
+    return { success: true, canonicalPhone: canonical, customers: [] };
   }
 }
 

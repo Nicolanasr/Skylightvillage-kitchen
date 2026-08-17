@@ -189,8 +189,8 @@ export const AdminTableManager: React.FC<AdminTableManagerProps> = ({
                                                 </span>
                                                 <span
                                                     className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md border print:hidden ${tbl.status === 'occupied'
-                                                            ? 'bg-blue-500/10 text-blue-900 border-blue-500/30'
-                                                            : 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30'
+                                                        ? 'bg-blue-500/10 text-blue-900 border-blue-500/30'
+                                                        : 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30'
                                                         }`}
                                                 >
                                                     {tbl.status}
@@ -246,7 +246,7 @@ export const AdminTableManager: React.FC<AdminTableManagerProps> = ({
                                                 alt="Skylight Logo"
                                                 width={24}
                                                 height={24}
-                                                style={{ width: 'auto', height: 'auto' }}
+
                                                 unoptimized
                                                 className="h-5 w-auto object-contain filter invert"
                                             />

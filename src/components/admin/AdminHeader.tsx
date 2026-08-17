@@ -15,11 +15,12 @@ import {
     ChefHat,
     Package,
     Sparkles,
+    Users,
 } from 'lucide-react';
 
 interface AdminHeaderProps {
-    activeTab: 'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports';
-    setActiveTab: (tab: 'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports') => void;
+    activeTab: 'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports';
+    setActiveTab: (tab: 'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports') => void;
     isSeeding: boolean;
     isWiping: boolean;
     seedStatus: string | null;
@@ -84,6 +85,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 {[
                     { id: 'menu', label: 'Menu Items Catalog', icon: UtensilsCrossed },
                     { id: 'categories', label: 'Menu Categories', icon: Layers },
+                    { id: 'crm', label: 'Guests & CRM', icon: Users },
                     { id: 'inventory', label: 'Recipe & Inventory BOM', icon: Package },
                     { id: 'loyalty', label: 'Loyalty & VIP Rewards', icon: Sparkles },
                     { id: 'tables', label: 'Tables & QR Manager', icon: Grid },

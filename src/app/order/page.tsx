@@ -17,7 +17,8 @@ import {
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
 import { getOrderPageData, submitCustomerOrder, triggerServiceCall } from '../actions/order-actions';
 import { assignGuestNameToOrderItems } from '../actions/payment-actions';
-import { lookupOrCreateCustomerLoyalty, redeemLoyaltyRewardAction } from '../actions/loyalty-actions';
+import { lookupOrCreateCustomerLoyalty, redeemLoyaltyRewardAction, searchLoyaltyCustomers } from '../actions/loyalty-actions';
+import { normalizePhone } from '@/lib/phone';
 import { submitCustomerFeedbackAction } from '../actions/report-actions';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import {
@@ -112,6 +113,33 @@ function CustomerOrderContent() {
     const [tempPhoneInput, setTempPhoneInput] = useState('');
     const [tempNameInput, setTempNameInput] = useState('');
     const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+    const [isSearchingCartPhone, setIsSearchingCartPhone] = useState(false);
+    const [isNewGuestModalOpen, setIsNewGuestModalOpen] = useState(false);
+    const [newGuestNameInput, setNewGuestNameInput] = useState('');
+
+    const handleSearchCartPhone = async () => {
+        if (!tempPhoneInput.trim()) return;
+        setIsSearchingCartPhone(true);
+        try {
+            const res = await searchLoyaltyCustomers(tempPhoneInput);
+            if (res.success && res.customers && res.customers.length > 0) {
+                const found = res.customers[0];
+                setCustomerPhone(found.phone_number);
+                setCustomerName(found.customer_name);
+                setLoyaltyProfile(found);
+                setAddedToastMsg(`✅ Recognized Guest: ${found.customer_name}`);
+                setTimeout(() => setAddedToastMsg(null), 3500);
+            } else {
+                // Profile not found -> open modal to enter name
+                setCustomerPhone(normalizePhone(tempPhoneInput) || tempPhoneInput.trim());
+                setIsNewGuestModalOpen(true);
+            }
+        } catch (e) {
+            console.error('Cart phone search error:', e);
+        } finally {
+            setIsSearchingCartPhone(false);
+        }
+    };
 
     // Post-Meal 5-Star Rating & Feedback State
     const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
@@ -256,7 +284,7 @@ function CustomerOrderContent() {
             eventSource = new EventSource('/api/events');
             eventSource.addEventListener('pos_update', () => refreshPageData());
             eventSource.addEventListener('kds_update', () => refreshPageData());
-        } catch (e) {}
+        } catch (e) { }
 
         return () => {
             if (eventSource) eventSource.close();
@@ -438,11 +466,11 @@ function CustomerOrderContent() {
                 bc.postMessage({ event: 'kds_update' });
                 bc.postMessage({ event: 'pos_update' });
                 bc.close();
-            } catch (e) {}
+            } catch (e) { }
             try {
                 localStorage.setItem('skylight_event_kds', Date.now().toString());
                 localStorage.setItem('skylight_event_pos', Date.now().toString());
-            } catch (e) {}
+            } catch (e) { }
 
             await refreshPageData();
             setTimeout(() => setOrderSuccessMsg(null), 4000);
@@ -502,7 +530,7 @@ function CustomerOrderContent() {
                         alt="Skylight Village Logo"
                         width={40}
                         height={40}
-                        style={{ width: 'auto', height: 'auto' }}
+
                         unoptimized
                         className="h-10 w-auto object-contain filter invert"
                     />
@@ -531,62 +559,23 @@ function CustomerOrderContent() {
                         href="https://g.page/r/CVjTZaAHNiz0EAI/review"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all"
+                        className="hidden sm:flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all"
                         title="Leave us a Google Review!"
                     >
                         <Star className="h-4 w-4 fill-[#d4af37] text-[#d4af37]" />
-                        <span className="hidden sm:inline">Review Us</span>
+                        <span>Review Us</span>
                     </a>
 
                     {/* Running Bill Button */}
                     <button
                         onClick={() => setIsBillOpen(true)}
-                        className="flex items-center gap-2 bg-[#eaf2eb] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/30 text-[#1c3a1e] text-xs px-3 py-2 rounded-xl font-bold transition-all"
+                        className="flex items-center gap-1.5 bg-[#eaf2eb] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/30 text-[#1c3a1e] text-xs px-3 py-2 rounded-xl font-bold transition-all"
                     >
                         <Receipt className="h-4 w-4 text-[#1c3a1e]" />
                         <span>{formatUsd(liveBill.finalTotalUsd)}</span>
                     </button>
-
-                    {/* Cart Drawer Trigger */}
-                    <button
-                        onClick={() => setIsCartOpen(true)}
-                        className="relative bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-bold p-2.5 rounded-xl shadow-lg transition-all"
-                    >
-                        <ShoppingBag className="h-5 w-5" />
-                        {cart.length > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-white">
-                                {cart.reduce((acc, c) => acc + c.quantity, 0)}
-                            </span>
-                        )}
-                    </button>
                 </div>
             </header>
-
-            {/* VIP Loyalty Points Top Banner */}
-            {loyaltyEnabled && (
-                <div className="bg-[#1c3a1e] text-white px-4 py-2.5 text-xs font-bold flex justify-between items-center border-b border-[#d4af37]/30 shadow-xs">
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-[#d4af37] shrink-0" />
-                        <span className="truncate">🌟 VIP Rewards: Earn 1 Pt per $1 Spent</span>
-                    </div>
-                    {loyaltyProfile ? (
-                        <button
-                            onClick={() => setIsLoyaltyModalOpen(true)}
-                            className="bg-[#d4af37] text-[#1c3a1e] font-black px-3 py-1 rounded-xl text-xs shrink-0 cursor-pointer shadow-xs hover:scale-105 transition-all flex items-center gap-1"
-                        >
-                            <span>🌟 {loyaltyProfile.customer_name}: {loyaltyProfile.points_balance} PTS</span>
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => setIsLoyaltyModalOpen(true)}
-                            className="bg-[#d4af37]/20 hover:bg-[#d4af37]/30 text-[#d4af37] border border-[#d4af37]/40 px-3 py-1 rounded-xl text-xs font-black shrink-0 cursor-pointer transition-all flex items-center gap-1"
-                        >
-                            <span>{customerPhone ? `Phone: ${customerPhone}` : 'Join VIP Rewards'}</span>
-                            <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
-                    )}
-                </div>
-            )}
 
             {/* Live Order Status Tracker Banner */}
             {(() => {
@@ -990,30 +979,83 @@ function CustomerOrderContent() {
                         </div>
 
                         {cart.length > 0 && (
-                            <div className="pt-4 border-t border-[#1c3a1e]/15 mt-6">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs text-gray-600 font-medium">Subtotal USD:</span>
-                                    <span className="text-sm font-black text-[#1c3a1e]">{formatUsd(cartSubtotal)}</span>
+                            <div className="pt-4 border-t border-[#1c3a1e]/15 mt-4 space-y-3">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600 font-medium">Subtotal USD:</span>
+                                        <span className="font-black text-[#1c3a1e]">{formatUsd(cartSubtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600 font-medium">Subtotal LBP:</span>
+                                        <span className="font-extrabold text-[#1c3a1e]">
+                                            {formatLbp(cartSubtotal, exchangeRate)}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-xs text-gray-600 font-medium">Subtotal LBP:</span>
-                                    <span className="text-xs font-extrabold text-[#1c3a1e]">
-                                        {formatLbp(cartSubtotal, exchangeRate)}
-                                    </span>
+
+                                {/* 1-Line Inline Optional Phone Entry with Explicit Search */}
+                                <div className="bg-[#fafbfa] border border-[#1c3a1e]/15 rounded-2xl p-2.5 space-y-1.5 shadow-2xs">
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs font-black text-[#1c3a1e] whitespace-nowrap flex items-center gap-1 shrink-0">
+                                            <span>📱</span>
+                                            <span>Phone:</span>
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            placeholder="03 724 473 (Optional)"
+                                            value={tempPhoneInput || customerPhone}
+                                            onChange={(e) => {
+                                                setTempPhoneInput(e.target.value);
+                                                if (!e.target.value) setCustomerPhone('');
+                                            }}
+                                            className="flex-1 bg-white border border-[#1c3a1e]/20 rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e]"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSearchCartPhone}
+                                            disabled={isSearchingCartPhone || !tempPhoneInput.trim()}
+                                            className="bg-[#1c3a1e] hover:bg-black text-white px-2.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer disabled:opacity-40"
+                                        >
+                                            {isSearchingCartPhone ? '⏳' : '🔍 Search'}
+                                        </button>
+                                    </div>
+
+                                    {customerPhone && (
+                                        <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1 flex items-center justify-between">
+                                            <span>👤 {customerName || 'Guest'}: {customerPhone}</span>
+                                            <span className="text-[10px] text-emerald-700 font-black">Linked ✅</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Discrete Redeem VIP Points Link */}
+                                <div className="flex justify-end pt-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLoyaltyModalOpen(true)}
+                                        className="text-[11px] font-bold text-[#997a15] hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Sparkles className="h-3 w-3 text-[#d4af37]" />
+                                        <span>
+                                            {loyaltyProfile
+                                                ? `${loyaltyProfile.customer_name} (${loyaltyProfile.points_balance} PTS)`
+                                                : 'Have VIP points? Redeem discount ➔'}
+                                        </span>
+                                    </button>
                                 </div>
 
                                 {isBillRequested ? (
-                                    <div className="bg-red-500/10 border border-red-500/30 text-red-700 text-xs p-3 rounded-xl text-center font-bold mb-2">
+                                    <div className="bg-red-500/10 border border-red-500/30 text-red-700 text-xs p-3 rounded-xl text-center font-bold">
                                         Pre-Bill generated. Contact server to add items.
                                     </div>
                                 ) : (
                                     <button
                                         onClick={handleOrderSubmit}
                                         disabled={orderSubmitting}
-                                        className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg disabled:opacity-50 transition-all"
+                                        className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 text-xs shadow-lg disabled:opacity-50 transition-all uppercase tracking-wider"
                                     >
                                         <CheckCircle2 className="h-4 w-4" />
-                                        <span>{orderSubmitting ? 'Sending...' : 'Submit Order to Kitchen'}</span>
+                                        <span>{orderSubmitting ? 'Sending Order...' : 'Submit Order to Kitchen 🚀'}</span>
                                     </button>
                                 )}
                             </div>
@@ -1176,8 +1218,8 @@ function CustomerOrderContent() {
                                         key={count}
                                         onClick={() => setPayShareSplitCount(count)}
                                         className={`py-2 rounded-xl text-xs font-black border transition-all cursor-pointer ${payShareSplitCount === count
-                                                ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
-                                                : 'bg-[#fafbfa] text-[#1c3a1e] border-gray-200 hover:bg-gray-100'
+                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                            : 'bg-[#fafbfa] text-[#1c3a1e] border-gray-200 hover:bg-gray-100'
                                             }`}
                                     >
                                         {count === 1 ? 'Full' : `1/${count} Split`}
@@ -1203,8 +1245,8 @@ function CustomerOrderContent() {
                                                 }
                                             }}
                                             className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isChecked
-                                                    ? 'bg-emerald-50 border-emerald-500/40 text-emerald-950 font-bold'
-                                                    : 'bg-[#fafbfa] border-gray-200 text-gray-700'
+                                                ? 'bg-emerald-50 border-emerald-500/40 text-emerald-950 font-bold'
+                                                : 'bg-[#fafbfa] border-gray-200 text-gray-700'
                                                 }`}
                                         >
                                             <div className="flex items-center gap-2">
@@ -1290,13 +1332,38 @@ function CustomerOrderContent() {
                 </div>
             )}
 
+            {/* FLOATING STICKY BOTTOM CART BAR */}
+            {cart.length > 0 && !isCartOpen && (
+                <div className="fixed bottom-4 left-4 right-20 z-40 animate-in slide-in-from-bottom-4">
+                    <button
+                        onClick={() => setIsCartOpen(true)}
+                        className="w-full bg-[#1c3a1e] hover:bg-black text-white p-3 rounded-2xl shadow-2xl flex items-center justify-between border border-[#d4af37]/40 transition-all cursor-pointer"
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 bg-[#d4af37] text-[#1c3a1e] rounded-xl font-black text-xs flex items-center justify-center shadow-xs shrink-0">
+                                {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                            </div>
+                            <div className="text-left">
+                                <p className="text-xs font-black text-white leading-tight">View Your Cart</p>
+                                <p className="text-[10px] text-gray-300 font-medium truncate max-w-[130px] sm:max-w-none">Tap to submit order</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs font-black text-[#d4af37]">{formatUsd(cartSubtotal)}</span>
+                            <ChevronRight className="h-4 w-4 text-white" />
+                        </div>
+                    </button>
+                </div>
+            )}
+
             {/* Floating Action Button (FAB) - Service Bell */}
-            <div className="fixed bottom-6 right-6 z-40">
+            <div className="fixed bottom-4 right-4 z-40">
                 <button
                     onClick={() => setIsServiceBellOpen(!isServiceBellOpen)}
-                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white p-4 rounded-2xl shadow-2xl flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white p-3.5 rounded-2xl shadow-2xl flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 border border-[#d4af37]/30"
                 >
-                    <Bell className="h-6 w-6" />
+                    <Bell className="h-5 w-5" />
                 </button>
 
                 {/* Service Options Popover */}
@@ -1446,8 +1513,8 @@ function CustomerOrderContent() {
                                         <button
                                             onClick={() => setGuideLang('en')}
                                             className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${guideLang === 'en'
-                                                    ? 'bg-[#1c3a1e] text-white shadow-xs'
-                                                    : 'text-gray-500 hover:text-[#1c3a1e]'
+                                                ? 'bg-[#1c3a1e] text-white shadow-xs'
+                                                : 'text-gray-500 hover:text-[#1c3a1e]'
                                                 }`}
                                         >
                                             EN
@@ -1455,8 +1522,8 @@ function CustomerOrderContent() {
                                         <button
                                             onClick={() => setGuideLang('ar')}
                                             className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${guideLang === 'ar'
-                                                    ? 'bg-[#1c3a1e] text-white shadow-xs'
-                                                    : 'text-gray-500 hover:text-[#1c3a1e]'
+                                                ? 'bg-[#1c3a1e] text-white shadow-xs'
+                                                : 'text-gray-500 hover:text-[#1c3a1e]'
                                                 }`}
                                         >
                                             عربي
@@ -1640,8 +1707,8 @@ function CustomerOrderContent() {
                                         key={stepIdx}
                                         onClick={() => setGuideStep(stepIdx)}
                                         className={`h-2 rounded-full transition-all ${guideStep === stepIdx
-                                                ? 'w-6 bg-[#d4af37]'
-                                                : 'w-2 bg-gray-300 hover:bg-gray-400'
+                                            ? 'w-6 bg-[#d4af37]'
+                                            : 'w-2 bg-gray-300 hover:bg-gray-400'
                                             }`}
                                     />
                                 ))}
@@ -1684,6 +1751,52 @@ function CustomerOrderContent() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* NEW GUEST NAME REGISTRATION MODAL */}
+            {isNewGuestModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-white border border-[#1c3a1e]/15 w-full max-w-sm rounded-3xl p-6 shadow-2xl text-[#1c3a1e] space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b border-[#1c3a1e]/15">
+                            <h3 className="text-sm font-black text-[#1c3a1e] flex items-center gap-2">
+                                <span>👤</span> New Guest Profile
+                            </h3>
+                            <button onClick={() => setIsNewGuestModalOpen(false)} className="text-gray-400 font-bold p-1">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-600 font-medium">
+                            No existing profile found for <strong className="text-[#1c3a1e] font-mono">{customerPhone}</strong>. Enter your name below to register and save your order history!
+                        </p>
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-black text-[#1c3a1e]">Your Name (Optional)</label>
+                            <input
+                                type="text"
+                                autoFocus
+                                placeholder="e.g. Nicola Nasr"
+                                value={newGuestNameInput}
+                                onChange={(e) => setNewGuestNameInput(e.target.value)}
+                                className="w-full bg-[#fafbfa] border border-[#1c3a1e]/20 rounded-xl p-3 text-xs font-bold text-[#1c3a1e] focus:outline-none focus:border-[#1c3a1e]"
+                            />
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const resolvedName = newGuestNameInput.trim() || 'Valued Guest';
+                                setCustomerName(resolvedName);
+                                setIsNewGuestModalOpen(false);
+                                setAddedToastMsg(`✅ Registered: ${resolvedName} (${customerPhone})`);
+                                setTimeout(() => setAddedToastMsg(null), 3500);
+                            }}
+                            className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 rounded-2xl text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                        >
+                            Save &amp; Link Profile 🚀
+                        </button>
                     </div>
                 </div>
             )}
@@ -1733,8 +1846,8 @@ function CustomerOrderContent() {
                                                             onClick={() => handleRedeemCustomerReward(tier.id)}
                                                             disabled={!canAfford || redeemingTierId === tier.id}
                                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${canAfford
-                                                                    ? 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white shadow-xs'
-                                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                ? 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white shadow-xs'
+                                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                                 }`}
                                                         >
                                                             {redeemingTierId === tier.id ? (
@@ -1777,7 +1890,9 @@ function CustomerOrderContent() {
                         ) : (
                             <form onSubmit={handleSaveLoyaltyProfile} className="space-y-3">
                                 <p className="text-xs text-gray-600 font-medium">
-                                    Enter your mobile number to earn 1 Point for every $1 spent. Points can be redeemed for free Shisha, Tawook, or discounts!
+                                    {loyaltyEnabled
+                                        ? 'Enter your mobile number to earn points for every $1 spent and redeem rewards for free Shisha or Tawook!'
+                                        : 'Enter your mobile number (optional) to save your visit history, reorder quickly, and receive exclusive member offers & updates!'}
                                 </p>
 
                                 <div>
@@ -1808,7 +1923,7 @@ function CustomerOrderContent() {
                                     disabled={loyaltyLoading}
                                     className="w-full bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer mt-2"
                                 >
-                                    {loyaltyLoading ? 'Linking VIP Profile...' : 'Save & Link VIP Profile 🚀'}
+                                    {loyaltyLoading ? 'Saving Profile...' : 'Save & Link Guest Profile 🚀'}
                                 </button>
                             </form>
                         )}
@@ -1884,8 +1999,8 @@ function CustomerOrderContent() {
                                                         }
                                                     }}
                                                     className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${isSelected
-                                                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
-                                                            : 'bg-[#fafbfa] text-gray-700 border-gray-300 hover:bg-gray-100'
+                                                        ? 'bg-[#1c3a1e] text-white border-[#1c3a1e]'
+                                                        : 'bg-[#fafbfa] text-gray-700 border-gray-300 hover:bg-gray-100'
                                                         }`}
                                                 >
                                                     {isSelected ? '✓ ' : '+ '}{tag}
