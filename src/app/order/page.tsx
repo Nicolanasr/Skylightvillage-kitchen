@@ -117,6 +117,27 @@ function CustomerOrderContent() {
     const [isNewGuestModalOpen, setIsNewGuestModalOpen] = useState(false);
     const [newGuestNameInput, setNewGuestNameInput] = useState('');
 
+    const openLoyaltyModal = async () => {
+        setIsLoyaltyModalOpen(true);
+        const targetPhone = customerPhone || tempPhoneInput;
+        if (targetPhone) {
+            setLoyaltyLoading(true);
+            try {
+                const res = await lookupOrCreateCustomerLoyalty(targetPhone, customerName);
+                if (res.success && res.customer) {
+                    setCustomerPhone(res.customer.phone_number || '');
+                    setCustomerName(res.customer.customer_name || '');
+                    setLoyaltyProfile(res.customer);
+                    setRewardTiers(res.rewardTiers || []);
+                }
+            } catch (e) {
+                console.error('Error loading loyalty modal profile:', e);
+            } finally {
+                setLoyaltyLoading(false);
+            }
+        }
+    };
+
     const handleSearchCartPhone = async () => {
         if (!tempPhoneInput.trim()) return;
         setIsSearchingCartPhone(true);
@@ -127,6 +148,13 @@ function CustomerOrderContent() {
                 setCustomerPhone(found.phone_number);
                 setCustomerName(found.customer_name);
                 setLoyaltyProfile(found);
+
+                // Fetch eligible reward tiers directly
+                const loyaltyRes = await lookupOrCreateCustomerLoyalty(found.phone_number, found.customer_name);
+                if (loyaltyRes.success) {
+                    setRewardTiers(loyaltyRes.rewardTiers || []);
+                }
+
                 setAddedToastMsg(`✅ Recognized Guest: ${found.customer_name}`);
                 setTimeout(() => setAddedToastMsg(null), 3500);
             } else {
@@ -615,7 +643,7 @@ function CustomerOrderContent() {
                 </div>
             )}
             {/* Category Navigation Bar */}
-            <div className="sticky top-[75px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex flex-col gap-2.5">
+            <div className="sticky top-[60px] md:top-[61px] z-[21] bg-[#fafbfa]/95 backdrop-blur-md py-3 px-4 overflow-x-auto border-b border-[#1c3a1e]/10 scrollbar-none flex flex-col gap-2.5">
                 {/* Search Input Bar */}
                 {/* <div className="relative max-w-3xl w-full mx-auto">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1009,7 +1037,7 @@ function CustomerOrderContent() {
                                             <span className="truncate">👤 {customerName || 'Guest'} ({customerPhone})</span>
                                             <button
                                                 type="button"
-                                                onClick={() => setIsLoyaltyModalOpen(true)}
+                                                onClick={openLoyaltyModal}
                                                 className="bg-[#d4af37] text-[#1c3a1e] hover:bg-[#c29f2f] px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer shrink-0 transition-all flex items-center gap-1 ml-2 shadow-2xs"
                                             >
                                                 <Sparkles className="h-3 w-3 text-[#1c3a1e]" />
@@ -1761,10 +1789,17 @@ function CustomerOrderContent() {
 
                         <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                                 const resolvedName = newGuestNameInput.trim() || 'Valued Guest';
                                 setCustomerName(resolvedName);
                                 setIsNewGuestModalOpen(false);
+
+                                const res = await lookupOrCreateCustomerLoyalty(customerPhone, resolvedName);
+                                if (res.success && res.customer) {
+                                    setLoyaltyProfile(res.customer);
+                                    setRewardTiers(res.rewardTiers || []);
+                                }
+
                                 setAddedToastMsg(`✅ Registered: ${resolvedName} (${customerPhone})`);
                                 setTimeout(() => setAddedToastMsg(null), 3500);
                             }}
