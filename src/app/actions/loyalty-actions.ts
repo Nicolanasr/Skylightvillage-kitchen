@@ -301,16 +301,18 @@ export async function awardLoyaltyPointsForSession(
     for (const [phone, spentUsd] of phoneSpendMap.entries()) {
       if (spentUsd <= 0) continue;
       const pts = Math.floor(spentUsd); // 1 USD = 1 point
+      const variations = getPhoneLookupVariations(phone);
+      const canonical = normalizePhone(phone) || phone;
+      const custName = (phone === sessionPhone?.trim() && sessionName?.trim()) ? sessionName.trim() : 'Valued Guest';
 
+      // A. Update or create customer_loyalty
       const existingRes = await pool.query(
-        'SELECT * FROM customer_loyalty WHERE phone_number = $1 LIMIT 1',
-        [phone]
+        'SELECT * FROM customer_loyalty WHERE phone_number = ANY($1::text[]) OR phone_number = $2 LIMIT 1',
+        [variations, phone]
       );
 
-      let customerId = '';
-      const isNew = existingRes.rows.length === 0;
-      if (!isNew) {
-        customerId = existingRes.rows[0].id;
+      if (existingRes.rows.length > 0) {
+        const cId = existingRes.rows[0].id;
         await pool.query(
           `UPDATE customer_loyalty
            SET points_balance = points_balance + $1,
@@ -318,25 +320,37 @@ export async function awardLoyaltyPointsForSession(
                total_visits = total_visits + 1,
                updated_at = NOW()
            WHERE id = $3`,
-          [pts, spentUsd, customerId]
+          [pts, spentUsd, cId]
         );
       } else {
-        customerId = randomUUID();
-        const name = phone === sessionPhone?.trim() ? (sessionName?.trim() || 'Valued Guest') : 'Valued Guest';
+        const cId = randomUUID();
         await pool.query(
           `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
            VALUES ($1, $2, $3, $4, $5, 1)`,
-          [customerId, phone, name, pts, spentUsd]
+          [cId, canonical, custName, pts, spentUsd]
         );
       }
+
+      // B. Update or create Master CRM customers table
+      await resolveOrUpsertCustomer({ phone: canonical, name: custName });
+      await pool.query(
+        `UPDATE customers
+         SET points_balance = points_balance + $1,
+             total_spent_usd = total_spent_usd + $2,
+             total_orders = total_orders + 1,
+             last_order_at = NOW(),
+             updated_at = NOW()
+         WHERE phone_number = ANY($3::text[]) OR phone_number = $4`,
+        [pts, spentUsd, variations, canonical]
+      );
 
       // Audit log per person
       await pool.query(
         `INSERT INTO loyalty_audit_logs (id, customer_phone, action_type, points_amount, session_id, logged_by, notes)
          VALUES ($1, $2, 'earned', $3, $4, 'System', $5)`,
         [
-          `aud-${Date.now()}-${phone.replace(/\s/g, '')}`,
-          phone,
+          `aud-${Date.now()}-${canonical.replace(/\s/g, '')}`,
+          canonical,
           pts,
           sessionId,
           `Earned ${pts} pts from $${spentUsd.toFixed(2)} spend at table session ${sessionId}`,

@@ -181,24 +181,26 @@ export async function getCustomer360CRM(customerId: string) {
       notes: custRes.rows[0].notes || '',
     };
 
-    // Item Purchase History Breakdown
+    const phoneVariations = getPhoneLookupVariations(customer.phone_number);
+
+    // Item Purchase History Breakdown across all phone variations
     const itemHistoryRes = await pool.query(
       `SELECT item_name, SUM(quantity)::int as total_qty, SUM(unit_price_usd * quantity)::numeric(10,2) as total_spent
        FROM order_items
-       WHERE customer_id = $1 OR customer_phone = $2 OR loyalty_phone = $2
+       WHERE customer_id = $1 OR customer_phone = ANY($2::text[]) OR loyalty_phone = ANY($2::text[])
        GROUP BY item_name
        ORDER BY total_qty DESC
-       LIMIT 20`,
-      [customerId, customer.phone_number]
+       LIMIT 30`,
+      [customerId, phoneVariations]
     );
 
-    // Recent Sessions
+    // Recent Sessions across all phone variations
     const sessionsRes = await pool.query(
       `SELECT * FROM table_sessions
-       WHERE customer_id = $1 OR customer_phone = $2
+       WHERE customer_id = $1 OR customer_phone = ANY($2::text[])
        ORDER BY created_at DESC
-       LIMIT 20`,
-      [customerId, customer.phone_number]
+       LIMIT 30`,
+      [customerId, phoneVariations]
     );
 
     return {

@@ -117,7 +117,11 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
         setItemVipLoading(false);
     };
 
-    const activeItems = tableItems.filter((i) => i.status !== 'cancelled');
+    const activeItems = React.useMemo(() => {
+        return [...tableItems]
+            .filter((i) => i.status !== 'cancelled')
+            .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    }, [tableItems]);
     const sessionDiscounts = activeSession ? discounts.filter((d) => d.session_id === activeSession.id) : [];
     const sessionPayments = activeSession ? payments.filter((p) => p.session_id === activeSession.id) : [];
 

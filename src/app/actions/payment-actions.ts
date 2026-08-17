@@ -444,6 +444,14 @@ export async function closeTableSessionAction(sessionId: string, staffName = 'Wa
     const session = sessRes.rows[0];
     const tableIdsToReset = Array.from(new Set([session.primary_table_id, ...(session.merged_table_ids || [])]));
 
+    // Award loyalty points for session before closing
+    const ordRes = await pool.query("SELECT * FROM order_items WHERE session_id = $1 AND status != 'cancelled'", [sessionId]);
+    const discRes = await pool.query('SELECT * FROM discounts WHERE session_id = $1', [sessionId]);
+    const payRes = await pool.query('SELECT * FROM payments WHERE session_id = $1', [sessionId]);
+    const bill = calculateBillTotals(ordRes.rows, discRes.rows, payRes.rows, 89500);
+
+    await awardLoyaltyPointsForSession(session.id, bill.finalTotalUsd, session.customer_phone, session.customer_name);
+
     await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [sessionId]);
     await pool.query("UPDATE tables SET status = 'available' WHERE id::text = ANY($1::text[])", [tableIdsToReset]);
     await pool.query("UPDATE order_items SET is_paid = true WHERE session_id = $1", [sessionId]);

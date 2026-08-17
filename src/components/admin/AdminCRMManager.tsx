@@ -471,6 +471,36 @@ export const AdminCRMManager: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Previous Orders & Sessions History */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-black text-[#1c3a1e] uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-[#1c3a1e]" />
+                      <span>Previous Table Visits &amp; Order History ({custDetail.recentSessions.length})</span>
+                    </h4>
+
+                    {custDetail.recentSessions.length === 0 ? (
+                      <p className="text-xs text-gray-500 italic">No visit session history recorded yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {custDetail.recentSessions.map((sess) => (
+                          <div key={sess.id} className="bg-gray-50 rounded-2xl p-3 border border-gray-200 text-xs space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-black text-[#1c3a1e]">
+                                Session #{sess.id.slice(0, 8)} • Status: <span className="uppercase text-emerald-800 font-bold">{sess.status}</span>
+                              </span>
+                              <span className="font-black text-emerald-800">
+                                ${Number(sess.final_total_usd || sess.subtotal_usd || 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-gray-500 font-medium">
+                              Date: {sess.created_at ? new Date(sess.created_at).toLocaleString() : 'Recent'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : null}
             </div>
