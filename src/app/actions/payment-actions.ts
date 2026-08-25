@@ -133,15 +133,23 @@ export async function updateTableStatusAction(tableId: string, status: string) {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
+    // 1. Try updating physical table if tableId matches a table record
     await pool.query('UPDATE tables SET status = $1 WHERE id = $2', [status, tableId]);
 
-    if (status === 'available') {
+    // 2. If status is available/closed, close session whether tableId is a physical table ID or direct session ID
+    if (status === 'available' || status === 'closed') {
+      // Direct session match (Takeout / Camping / Virtual tables)
+      await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1 AND status = 'active'", [tableId]);
+      
+      // Physical table match (Dine-in tables)
       const sessRes = await pool.query("SELECT id FROM table_sessions WHERE primary_table_id = $1 AND status = 'active'", [tableId]);
-      if (sessRes.rows.length > 0) {
-        const sessId = sessRes.rows[0].id;
-        await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [sessId]);
+      for (const row of sessRes.rows) {
+        await pool.query("UPDATE table_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1", [row.id]);
       }
     }
+
+    invalidatePOSCache();
+    notifyPOSUpdate();
 
     revalidatePath('/pos');
     revalidatePath('/order');

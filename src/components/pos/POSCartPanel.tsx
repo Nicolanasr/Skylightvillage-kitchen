@@ -401,14 +401,17 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
 
                         <button
                             onClick={async () => {
-                                if (!confirm('Are you sure you want to reset and clear this table session?')) return;
+                                if (!confirm('Are you sure you want to reset and clear this session?')) return;
                                 await updateTableStatusAction(selectedTable.id, 'available');
+                                if (activeSession?.id && activeSession.id !== selectedTable.id) {
+                                    await updateTableStatusAction(activeSession.id, 'available');
+                                }
                                 refreshPOSData();
                             }}
                             className="bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 text-xs font-black px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer shadow-xs min-h-[44px] touch-manipulation active:scale-95 flex items-center justify-center"
-                            title="Close and reset table session to available"
+                            title="Close and reset table or takeout session"
                         >
-                            Reset Table
+                            Reset Session
                         </button>
                     </div>
                 </div>
