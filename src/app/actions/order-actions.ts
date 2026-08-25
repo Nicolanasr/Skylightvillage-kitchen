@@ -9,6 +9,8 @@ import { deductRecipeStockForItems } from './inventory-actions';
 import { notifyKDSUpdate, notifyPOSUpdate } from '@/lib/events';
 import { sendTelegramOrderNotification } from '@/lib/telegram';
 import { resolveOrUpsertCustomer } from './crm-actions';
+import { normalizePhone, getPhoneLookupVariations } from '@/lib/phone';
+import { lookupOrCreateCustomerLoyalty } from './loyalty-actions';
 
 // Data Fetch Action for Customer Order Page (Filters out staff-only items)
 export async function getOrderPageData(tableNumber?: number | string, token?: string) {
@@ -152,31 +154,42 @@ export async function createTakeoutOrCampingSession(data: {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    // Check if there is already an active session for the same mobile number
-    const cleanPhone = data.customerPhone ? data.customerPhone.trim() : '';
-    if (cleanPhone) {
+    const rawPhone = data.customerPhone ? data.customerPhone.trim() : '';
+    let canonicalPhone = rawPhone ? normalizePhone(rawPhone) || rawPhone : '';
+    let masterCustomerId: string | null = null;
+    let resolvedName = data.customerName?.trim() || 'Valued Guest';
+
+    if (canonicalPhone) {
+      const loyaltyRes = await lookupOrCreateCustomerLoyalty(canonicalPhone, resolvedName);
+      if (loyaltyRes.success && loyaltyRes.customer) {
+        canonicalPhone = loyaltyRes.customer.phone_number || canonicalPhone;
+        resolvedName = (loyaltyRes.customer.customer_name && loyaltyRes.customer.customer_name !== 'Valued Guest') ? loyaltyRes.customer.customer_name : resolvedName;
+        masterCustomerId = (loyaltyRes.customer as any).customer_id || null;
+      }
+      
+      const variations = getPhoneLookupVariations(canonicalPhone);
       const existingRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE customer_phone = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1",
-        [cleanPhone]
+        "SELECT * FROM table_sessions WHERE (customer_phone = ANY($1::text[]) OR customer_phone = $2) AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+        [variations, canonicalPhone]
       );
       if (existingRes.rows.length > 0) {
         const existingSess = existingRes.rows[0];
-        if (data.customerName && data.customerName.trim()) {
-          await pool.query('UPDATE table_sessions SET customer_name = $1 WHERE id = $2', [data.customerName.trim(), existingSess.id]);
+        if (resolvedName && resolvedName !== 'Valued Guest') {
+          await pool.query('UPDATE table_sessions SET customer_name = $1, customer_id = COALESCE($2, customer_id) WHERE id = $3', [resolvedName, masterCustomerId, existingSess.id]);
         }
         revalidatePath('/pos');
         revalidatePath('/order');
         revalidatePath('/takeout');
         revalidatePath('/kds');
-        return { success: true, sessionId: existingSess.id, session: { ...existingSess, customer_name: data.customerName.trim() || existingSess.customer_name } };
+        return { success: true, sessionId: existingSess.id, session: { ...existingSess, customer_name: resolvedName || existingSess.customer_name, customer_phone: canonicalPhone } };
       }
     }
 
     const sessionId = randomUUID();
     const res = await pool.query(
-      `INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status, order_type, customer_name, customer_phone)
-       VALUES ($1, NULL, $2, 'active', $3, $4, $5) RETURNING *`,
-      [sessionId, [], data.orderType, data.customerName, cleanPhone]
+      `INSERT INTO table_sessions (id, primary_table_id, merged_table_ids, status, order_type, customer_name, customer_phone, customer_id)
+       VALUES ($1, NULL, $2, 'active', $3, $4, $5, $6) RETURNING *`,
+      [sessionId, [], data.orderType, resolvedName, canonicalPhone, masterCustomerId]
     );
 
     revalidatePath('/pos');
@@ -186,7 +199,7 @@ export async function createTakeoutOrCampingSession(data: {
 
     return { success: true, sessionId, session: res.rows[0] };
   } catch (e: any) {
-    console.error('Neon createTakeoutOrCampingSession error:', e);
+    console.error('createTakeoutOrCampingSession error:', e);
     return { success: false, error: e.message };
   }
 }
@@ -288,15 +301,28 @@ export async function submitCustomerOrder(data: {
     tableNumber = 0;
   }
   const effOrderType = data.orderType || activeSession?.order_type || 'dine_in';
-  const effCustName = data.customerName || activeSession?.customer_name || '';
-  const effCustPhone = data.customerPhone || activeSession?.customer_phone || '';
+  const rawCustName = data.customerName || activeSession?.customer_name || '';
+  const rawCustPhone = data.customerPhone || activeSession?.customer_phone || '';
 
-  // Update session with customer phone/name if provided for loyalty tracking
-  if ((data.customerPhone && data.customerPhone.trim()) || (data.customerName && data.customerName.trim())) {
+  let canonicalPhone = rawCustPhone ? normalizePhone(rawCustPhone) || rawCustPhone : '';
+  let masterCustomerId: string | null = null;
+  let resolvedCustName = rawCustName.trim() || 'Valued Guest';
+
+  if (canonicalPhone) {
+    const loyaltyRes = await lookupOrCreateCustomerLoyalty(canonicalPhone, resolvedCustName);
+    if (loyaltyRes.success && loyaltyRes.customer) {
+      canonicalPhone = loyaltyRes.customer.phone_number || canonicalPhone;
+      resolvedCustName = (loyaltyRes.customer.customer_name && loyaltyRes.customer.customer_name !== 'Valued Guest') ? loyaltyRes.customer.customer_name : resolvedCustName;
+      masterCustomerId = (loyaltyRes.customer as any).customer_id || null;
+    }
+  }
+
+  // Update session with customer phone/name/customer_id if provided for loyalty tracking
+  if (canonicalPhone || (resolvedCustName && resolvedCustName !== 'Valued Guest')) {
     try {
       await pool.query(
-        'UPDATE table_sessions SET customer_phone = COALESCE(NULLIF($1, \'\'), customer_phone), customer_name = COALESCE(NULLIF($2, \'\'), customer_name) WHERE id = $3',
-        [data.customerPhone || '', data.customerName || '', finalSessionId]
+        'UPDATE table_sessions SET customer_phone = COALESCE(NULLIF($1, \'\'), customer_phone), customer_name = COALESCE(NULLIF($2, \'\'), customer_name), customer_id = COALESCE($3, customer_id) WHERE id = $4',
+        [canonicalPhone, resolvedCustName, masterCustomerId, finalSessionId]
       );
     } catch (e) {
       console.error('Error updating customer phone on session:', e);
@@ -324,8 +350,8 @@ export async function submitCustomerOrder(data: {
         session_id: finalSessionId,
         table_number: tableNumber,
         order_type: effOrderType,
-        customer_name: effCustName,
-        customer_phone: effCustPhone,
+        customer_name: resolvedCustName,
+        customer_phone: canonicalPhone,
         menu_item_id: item.menuItemId,
         item_name: item.itemName,
         quantity: 1,
@@ -342,16 +368,10 @@ export async function submitCustomerOrder(data: {
   }
 
   try {
-    let customerId: string | null = null;
-    if (effCustPhone) {
-      const cust = await resolveOrUpsertCustomer({ phone: effCustPhone, name: effCustName });
-      if (cust) customerId = cust.id;
-    }
-
     await pool.query('INSERT INTO orders (id, session_id) VALUES ($1, $2)', [orderId, finalSessionId]);
 
-    if (customerId) {
-      await pool.query('UPDATE table_sessions SET customer_id = $1 WHERE id = $2', [customerId, finalSessionId]).catch(() => {});
+    if (masterCustomerId) {
+      await pool.query('UPDATE table_sessions SET customer_id = $1 WHERE id = $2', [masterCustomerId, finalSessionId]).catch(() => {});
     }
 
     const valuePlaceholders: string[] = [];
@@ -374,10 +394,10 @@ export async function submitCustomerOrder(data: {
         JSON.stringify(newItem.selected_modifiers || []),
         newItem.special_notes || '',
         effOrderType,
-        effCustName,
-        effCustPhone,
-        effCustPhone || null, // loyalty_phone
-        customerId
+        resolvedCustName,
+        canonicalPhone,
+        canonicalPhone || null, // loyalty_phone
+        masterCustomerId
       );
       pIdx += 17;
     }
@@ -404,8 +424,8 @@ export async function submitCustomerOrder(data: {
         await sendTelegramOrderNotification({
           orderType: effOrderType,
           tableNumber,
-          customerName: effCustName,
-          customerPhone: effCustPhone,
+          customerName: resolvedCustName,
+          customerPhone: canonicalPhone,
           items: data.items.map(i => ({
             itemName: i.itemName,
             quantity: i.quantity,

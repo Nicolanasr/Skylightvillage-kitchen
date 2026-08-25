@@ -71,22 +71,37 @@ export async function resolveOrUpsertCustomer(data: {
     const newId = `cust-${canonicalPhone.replace(/[^\d]/g, '')}`;
     const vipCode = `VIP-${randomUUID().slice(0, 6).toUpperCase()}`;
 
-    const insertRes = await pool.query(
-      `INSERT INTO customers (id, phone_number, name, email, vip_code, points_balance, total_spent_usd, total_orders, last_order_at, tags, notes)
-       VALUES ($1, $2, $3, $4, $5, 0, 0, 0, NOW(), '["New Guest"]'::jsonb, '')
-       ON CONFLICT (phone_number) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
-       RETURNING *`,
-      [newId, canonicalPhone, cleanName, data.email || null, vipCode]
-    );
+    let insertRes;
+    try {
+      insertRes = await pool.query(
+        `INSERT INTO customers (id, phone_number, name, email, vip_code, points_balance, total_spent_usd, total_orders, last_order_at, tags, notes)
+         VALUES ($1, $2, $3, $4, $5, 0, 0, 0, NOW(), '["New Guest"]'::jsonb, '')
+         ON CONFLICT (phone_number) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
+         RETURNING *`,
+        [newId, canonicalPhone, cleanName, data.email || null, vipCode]
+      );
+    } catch (err: any) {
+      insertRes = await pool.query(
+        `INSERT INTO customers (id, phone_number, name, email, vip_code, points_balance, total_spent_usd, total_orders, last_order_at, tags, notes)
+         VALUES ($1, $2, $3, $4, $5, 0, 0, 0, NOW(), '["New Guest"]'::jsonb, '')
+         ON CONFLICT DO NOTHING
+         RETURNING *`,
+        [newId, canonicalPhone, cleanName, data.email || null, vipCode]
+      );
+      if (insertRes.rows.length === 0) {
+        const fetchRes = await pool.query('SELECT * FROM customers WHERE phone_number = $1 OR id = $2 LIMIT 1', [canonicalPhone, newId]);
+        insertRes = fetchRes;
+      }
+    }
 
     const newCust = insertRes.rows[0];
     return {
       ...newCust,
-      points_balance: 0,
-      total_spent_usd: 0,
-      total_orders: 0,
-      tags: ['New Guest'],
-      notes: '',
+      points_balance: Number(newCust?.points_balance || 0),
+      total_spent_usd: Number(newCust?.total_spent_usd || 0),
+      total_orders: Number(newCust?.total_orders || 0),
+      tags: typeof newCust?.tags === 'string' ? JSON.parse(newCust.tags) : (newCust?.tags || ['New Guest']),
+      notes: newCust?.notes || '',
     };
   } catch (e: any) {
     console.error('resolveOrUpsertCustomer error:', e);

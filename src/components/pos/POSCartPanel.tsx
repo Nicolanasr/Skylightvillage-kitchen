@@ -127,6 +127,56 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                 return (b.id || '').localeCompare(a.id || '');
             });
     }, [tableItems]);
+
+    // Group identical dishes together into a single cart line for POS view
+    const groupedCartItems = React.useMemo(() => {
+        const groupMap = new Map<string, { item: OrderItem; itemIds: string[]; totalQty: number; totalUsd: number; allNotes: string[]; allLoyaltyPhones: string[] }>();
+
+        tableItems.forEach((item) => {
+            if (item.status === 'cancelled') return;
+            const modsKey = JSON.stringify((item.selected_modifiers || []).slice().sort((a: any, b: any) => (a.option || '').localeCompare(b.option || '')));
+            const compKey = item.is_comped ? 'comp' : 'normal';
+            const paidKey = item.is_paid ? 'paid' : 'unpaid';
+
+            // Group by dish + comp + paid + modifiers so all duplicate dishes merge into 1 single line!
+            const key = `${item.menu_item_id || item.item_name}-${compKey}-${paidKey}-${modsKey}`;
+
+            if (groupMap.has(key)) {
+                const existing = groupMap.get(key)!;
+                existing.itemIds.push(item.id);
+                existing.totalQty += Number(item.quantity || 1);
+                existing.totalUsd += Number(item.unit_price_usd) * Number(item.quantity || 1);
+
+                if (item.special_notes && !existing.allNotes.includes(item.special_notes)) {
+                    existing.allNotes.push(item.special_notes);
+                }
+                const phone = item.loyalty_phone || item.customer_phone;
+                if (phone && !existing.allLoyaltyPhones.includes(phone)) {
+                    existing.allLoyaltyPhones.push(phone);
+                }
+            } else {
+                const initialNotes = item.special_notes ? [item.special_notes] : [];
+                const initialPhone = item.loyalty_phone || item.customer_phone;
+                groupMap.set(key, {
+                    item: { ...item },
+                    itemIds: [item.id],
+                    totalQty: Number(item.quantity || 1),
+                    totalUsd: Number(item.unit_price_usd) * Number(item.quantity || 1),
+                    allNotes: initialNotes,
+                    allLoyaltyPhones: initialPhone ? [initialPhone] : [],
+                });
+            }
+        });
+
+        return Array.from(groupMap.values()).map(g => ({
+            ...g,
+            item: {
+                ...g.item,
+                special_notes: g.allNotes.join(', '),
+                loyalty_phone: g.allLoyaltyPhones[0] || g.item.loyalty_phone,
+            }
+        }));
+    }, [tableItems]);
     const sessionDiscounts = activeSession ? discounts.filter((d) => d.session_id === activeSession.id) : [];
     const sessionPayments = activeSession ? payments.filter((p) => p.session_id === activeSession.id) : [];
 
@@ -351,25 +401,17 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
 
                         <button
                             onClick={async () => {
-                                const confirm1 = confirm(`Are you sure you want to close and reset Table #${selectedTable.table_number}?`);
-                                if (!confirm1) return;
-                                const confirm2 = confirm(`⚠️ SECOND CONFIRMATION: Resetting Table #${selectedTable.table_number} will clear all items and set status to Available. Click OK to proceed.`);
-                                if (!confirm2) return;
-
+                                if (!confirm('Are you sure you want to reset and clear this session?')) return;
                                 await updateTableStatusAction(selectedTable.id, 'available');
+                                if (activeSession?.id && activeSession.id !== selectedTable.id) {
+                                    await updateTableStatusAction(activeSession.id, 'available');
+                                }
                                 refreshPOSData();
                             }}
                             className="bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 text-xs font-black px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer shadow-xs min-h-[44px] touch-manipulation active:scale-95 flex items-center justify-center"
-                            title="Close and reset table session to available"
+                            title="Close and reset table or takeout session"
                         >
-                            Reset Table
-                        </button>
-
-                        <button
-                            onClick={onOpenAddItemModal}
-                            className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white text-xs font-black px-4 py-2.5 rounded-2xl transition-all cursor-pointer shadow-xs min-h-[44px] touch-manipulation active:scale-95 flex items-center justify-center"
-                        >
-                            + Add Item
+                            Reset Session
                         </button>
                     </div>
                 </div>
@@ -443,12 +485,12 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
 
                 {/* Order Items List */}
                 <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1 my-3">
-                    {tableItems.length === 0 ? (
+                    {groupedCartItems.length === 0 ? (
                         <div className="text-center py-12 text-gray-500 font-semibold text-xs bg-[#fafbfa] border border-dashed border-[#1c3a1e]/15 rounded-2xl">
                             No items in this cart. Tap dishes from the menu to add.
                         </div>
                     ) : (
-                        tableItems.map((item) => {
+                        groupedCartItems.map(({ item, itemIds, totalQty, totalUsd }) => {
                             const menuItemObj =
                                 menuItems.find((m) => m.id === item.menu_item_id) ||
                                 menuItems.find((m) => m.name.toLowerCase() === item.item_name.toLowerCase());
@@ -527,28 +569,11 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                             </div>
                                         </div>
 
-                                         <div className="flex items-center gap-3">
-                                            {!item.is_paid && item.status !== 'cancelled' && (
-                                                <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 rounded-xl p-1 shrink-0">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleQuantityEdit(item.id, -1)}
-                                                        className="w-8 h-8 rounded-lg bg-white text-[#1c3a1e] font-black text-sm hover:bg-gray-100 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
-                                                        title="Decrease Quantity"
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <span className="w-6 text-center font-black text-xs sm:text-sm text-[#1c3a1e]">{item.quantity}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleQuantityEdit(item.id, 1)}
-                                                        className="w-8 h-8 rounded-lg bg-[#1c3a1e] text-white font-black text-sm hover:bg-[#d4af37] hover:text-[#1c3a1e] flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
-                                                        title="Increase Quantity"
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-                                            )}
+                                        <div className="flex items-center gap-3">
+                                            {/* Quantity Badge */}
+                                            <span className="bg-[#1c3a1e] text-white px-2.5 py-1 rounded-xl text-xs font-black">
+                                                {totalQty}x
+                                            </span>
 
                                             <span
                                                 className={`text-xs sm:text-sm font-black ${item.is_paid
@@ -560,7 +585,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                             >
                                                 {item.is_comped || item.status === 'cancelled'
                                                     ? '$0.00'
-                                                    : formatUsd(Number(item.unit_price_usd) * item.quantity)}
+                                                    : formatUsd(totalUsd)}
                                             </span>
                                         </div>
                                     </div>

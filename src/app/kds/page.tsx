@@ -413,152 +413,150 @@ function KDSContent() {
                 document.body
             )}
 
-            {/* Header Bar */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-[#1c3a1e]/15 print:hidden">
-                <div className="flex items-center gap-3">
-                    <div>
-                        <h1 className="text-2xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
-                            <span>Skylight Kitchen KDS</span>
-                            <span className="text-xs bg-[#eaf2eb] text-[#1c3a1e] font-extrabold px-2.5 py-0.5 rounded-full border border-[#1c3a1e]/15">
-                                Realtime Feed
-                            </span>
-                        </h1>
-                        <p className="text-xs text-gray-600 font-semibold mt-0.5">
-                            Kitchen Display System & Station Pass Management
-                        </p>
+            {/* Compact Space-Saving POS KDS Header Bar */}
+            <header className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 mb-3 pb-3 border-b border-[#1c3a1e]/15 print:hidden">
+                <div className="flex items-center justify-between sm:justify-start gap-3">
+                    <h1 className="text-xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
+                        <span>👨‍🍳 KDS Feed</span>
+                        <span className="text-[10px] bg-[#eaf2eb] text-[#1c3a1e] font-extrabold px-2 py-0.5 rounded-full border border-[#1c3a1e]/15">
+                            LIVE
+                        </span>
+                    </h1>
+
+                    {/* Layout Mode Toggle Pill */}
+                    <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl">
+                        <button
+                            onClick={() => setGroupByTable(false)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer touch-manipulation active:scale-95 ${!groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                }`}
+                        >
+                            📋 Single ({displayedItems.length})
+                        </button>
+                        <button
+                            onClick={() => setGroupByTable(true)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer touch-manipulation active:scale-95 ${groupByTable ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-[#d8e6da]'
+                                }`}
+                        >
+                            🍽️ By Table ({Object.keys(itemsGroupedByCard).length})
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <a
-                        href="/pos"
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"
-                    >
-                        <Monitor className="h-4 w-4 text-[#1c3a1e]" />
-                        <span>POS Waiter Terminal</span>
-                    </a>
-
-                    <a
-                        href="/admin"
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"
-                    >
-                        <Shield className="h-4 w-4 text-[#1c3a1e]" />
-                        <span>Admin Manager</span>
-                    </a>
-
+                <div className="flex items-center gap-2 overflow-x-auto shrink-0">
                     <button
                         onClick={() => setShowPrintedItems(!showPrintedItems)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${showPrintedItems
-                            ? 'bg-purple-500/10 text-purple-800 border-purple-500/30'
-                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15'
+                        className={`px-3 py-2 rounded-2xl text-xs font-bold transition-all border flex items-center gap-1.5 min-h-[42px] touch-manipulation active:scale-95 ${showPrintedItems
+                            ? 'bg-purple-500/10 text-purple-800 border-purple-500/30 font-black'
+                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 font-bold'
                             }`}
                         title="Toggle re-printing already printed chits"
                     >
-                        <CheckSquare className="h-3.5 w-3.5" />
-                        <span>{showPrintedItems ? 'Including Printed' : 'Unprinted Only'}</span>
+                        <CheckSquare className="h-4 w-4" />
+                        <span>{showPrintedItems ? 'All Printed' : 'Unprinted'}</span>
                     </button>
 
                     <button
                         onClick={handlePrintKDSChits}
                         disabled={isPrinting || itemsToPrint.length === 0}
-                        className={`font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm ${isPrinting || itemsToPrint.length === 0
+                        className={`font-black px-4 py-2 rounded-2xl text-xs flex items-center gap-1.5 transition-all shadow-xs min-h-[42px] touch-manipulation active:scale-95 ${isPrinting || itemsToPrint.length === 0
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            : 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white active:scale-95'
+                            : 'bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white'
                             }`}
                     >
                         <Printer className="h-4 w-4" />
-                        <span>{isPrinting ? 'Printing Chits...' : `Print KDS Station Chits (${itemsToPrint.length})`}</span>
+                        <span>{isPrinting ? 'Printing…' : `Print Chits (${itemsToPrint.length})`}</span>
                     </button>
+
+                    <button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className={`px-3.5 py-2 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer border min-h-[42px] touch-manipulation active:scale-95 ${
+                            showAdvancedFilters || searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received'
+                                ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-sm'
+                                : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
+                        }`}
+                    >
+                        <Filter className="h-4 w-4" />
+                        <span>Sort & Options</span>
+                        {(searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received') && (
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        )}
+                    </button>
+
+                    <a
+                        href="/pos"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-3.5 py-2 rounded-2xl text-xs flex items-center gap-1.5 transition-all shadow-xs min-h-[42px] touch-manipulation active:scale-95 shrink-0"
+                    >
+                        <Monitor className="h-4 w-4 text-[#1c3a1e]" />
+                        <span>POS</span>
+                    </a>
                 </div>
             </header>
 
-            {/* Station Filter & Sorting Control Toolbar */}
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 print:hidden">
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => {
-                            setActiveTab('tickets');
-                            setStationFilter('all');
-                        }}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === 'all'
-                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
-                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
-                            }`}
-                    >
-                        <Filter className="h-4 w-4" />
-                        <span>All Stations</span>
-                        <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-[10px] font-black border border-[#1c3a1e]/10">
-                            {activeKitchenItems.length}
-                        </span>
-                    </button>
+            {/* Touch-Friendly Station Tab Carousel */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none max-w-full pb-2 mb-3 print:hidden">
+                <button
+                    onClick={() => {
+                        setActiveTab('tickets');
+                        setStationFilter('all');
+                    }}
+                    className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 border min-h-[46px] touch-manipulation cursor-pointer active:scale-95 shrink-0 ${activeTab === 'tickets' && stationFilter === 'all'
+                        ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md ring-2 ring-[#1c3a1e]/20'
+                        : 'bg-white text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#eaf2eb]'
+                        }`}
+                >
+                    <Filter className="h-4 w-4" />
+                    <span>All Stations</span>
+                    <span className="bg-[#1c3a1e]/10 text-[#1c3a1e] px-2 py-0.5 rounded-lg text-xs font-black border border-[#1c3a1e]/10">
+                        {activeKitchenItems.length}
+                    </span>
+                </button>
 
-                    <button
-                        onClick={() => setActiveTab('expediter')}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'expediter'
-                            ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
-                            : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
-                            }`}
-                    >
-                        <Truck className="h-4 w-4" />
-                        <span>Table Expediter / Pass</span>
-                        <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-[10px] font-black border border-[#1c3a1e]/10">
-                            {Object.keys(readyItemsByTable).length}
-                        </span>
-                    </button>
+                <button
+                    onClick={() => setActiveTab('expediter')}
+                    className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 border min-h-[46px] touch-manipulation cursor-pointer active:scale-95 shrink-0 ${activeTab === 'expediter'
+                        ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md ring-2 ring-[#1c3a1e]/20'
+                        : 'bg-white text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#eaf2eb]'
+                        }`}
+                >
+                    <Truck className="h-4 w-4" />
+                    <span>Table Expediter / Pass</span>
+                    <span className="bg-[#1c3a1e]/10 text-[#1c3a1e] px-2 py-0.5 rounded-lg text-xs font-black border border-[#1c3a1e]/10">
+                        {Object.keys(readyItemsByTable).length}
+                    </span>
+                </button>
 
-                    {[
-                        { id: 'mezza', name: 'Mezza', icon: Utensils },
-                        { id: 'sajj', name: 'Sajj', icon: Flame },
-                        { id: 'grill', name: 'BBQ', icon: Flame },
-                        { id: 'subs_sandwiches', name: 'Subs & Sandwiches', icon: Utensils },
-                        { id: 'bar', name: 'Bar & Drinks', icon: Wine },
-                        { id: 'shisha', name: 'Shisha', icon: Sparkles },
-                    ].map((st) => {
-                        const Icon = st.icon;
-                        const count = activeKitchenItems.filter((i) => i.station === st.id).length;
-                        return (
-                            <button
-                                key={st.id}
-                                onClick={() => {
-                                    setActiveTab('tickets');
-                                    setStationFilter(st.id);
-                                }}
-                                className={`px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 border min-h-[48px] touch-manipulation cursor-pointer active:scale-95 ${activeTab === 'tickets' && stationFilter === st.id
-                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md ring-2 ring-[#1c3a1e]/30'
-                                    : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
-                                    }`}
-                            >
-                                <Icon className="h-4.5 w-4.5" />
-                                <span>{st.name}</span>
-                                {count > 0 && (
-                                    <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-xs font-black border border-[#1c3a1e]/10">
-                                        {count}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Combined Unified Sort & Filter Control Popover Button */}
-                {activeTab === 'tickets' && (
-                    <div className="relative">
+                {[
+                    { id: 'mezza', name: 'Mezza', icon: Utensils },
+                    { id: 'sajj', name: 'Sajj', icon: Flame },
+                    { id: 'grill', name: 'BBQ', icon: Flame },
+                    { id: 'subs_sandwiches', name: 'Subs & Sandwiches', icon: Utensils },
+                    { id: 'bar', name: 'Bar & Drinks', icon: Wine },
+                    { id: 'shisha', name: 'Shisha', icon: Sparkles },
+                ].map((st) => {
+                    const Icon = st.icon;
+                    const count = activeKitchenItems.filter((i) => i.station === st.id).length;
+                    return (
                         <button
-                            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                            className={`px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 cursor-pointer border ${
-                                showAdvancedFilters || searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received' || showPrintedItems
-                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
-                                    : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
-                            }`}
+                            key={st.id}
+                            onClick={() => {
+                                setActiveTab('tickets');
+                                setStationFilter(st.id);
+                            }}
+                            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 border min-h-[46px] touch-manipulation cursor-pointer active:scale-95 shrink-0 ${activeTab === 'tickets' && stationFilter === st.id
+                                ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md ring-2 ring-[#1c3a1e]/20'
+                                : 'bg-white text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#eaf2eb]'
+                                }`}
                         >
-                            <Filter className="h-4 w-4" />
-                            <span>⚡ Sort & Display Options</span>
-                            {(searchQuery || selectedTables.length > 0 || selectedStatuses.length > 0 || sortBy !== 'received' || showPrintedItems) && (
-                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                            <Icon className="h-4 w-4" />
+                            <span>{st.name}</span>
+                            {count > 0 && (
+                                <span className="bg-amber-400 text-amber-950 px-2 py-0.5 rounded-lg text-xs font-black border border-amber-500/20">
+                                    {count}
+                                </span>
                             )}
                         </button>
-                    </div>
-                )}
+                    );
+                })}
             </div>
 
             {/* UNIFIED SORT & MULTI-FILTER CONTROL POPOVER SUITE */}
