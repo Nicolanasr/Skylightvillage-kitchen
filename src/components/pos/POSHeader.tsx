@@ -145,31 +145,28 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
             )}
 
             {/* Main Navigation Header */}
-            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center pb-4 border-b border-[#1c3a1e]/15 gap-4">
-                <div className="flex items-center gap-3">
+            <header className="flex flex-row justify-between items-center pb-2 border-b border-[#1c3a1e]/15 gap-3">
+                <div className="flex items-center gap-2">
                     {!showAllFloorTables && (
                         <button
                             onClick={() => setShowAllFloorTables(true)}
-                            className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all shadow-md cursor-pointer shrink-0"
+                            className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-3.5 py-2 rounded-2xl text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 min-h-[44px] touch-manipulation active:scale-95"
                         >
                             <ArrowLeft className="h-4 w-4" />
                             <span>Back to {posViewMode === 'takeout' ? 'Workbench' : 'Tables'}</span>
                         </button>
                     )}
 
-                    <div>
-                        <h1 className="text-2xl font-black text-[#1c3a1e] tracking-tight flex items-center gap-2">
-                            <Monitor className="h-6 w-6 text-[#d4af37]" />
-                            <span>Skylight POS Terminal</span>
+                    <div className="flex items-center gap-2">
+                        <Monitor className="h-5 w-5 text-[#d4af37]" />
+                        <h1 className="text-xl font-black text-[#1c3a1e] tracking-tight">
+                            Skylight POS
                         </h1>
-                        <p className="text-xs text-gray-600 font-medium">
-                            Real-time floor plan, fast order taking, table merging & invoice receipts
-                        </p>
                     </div>
                 </div>
 
                 {/* Streamlined Action Toolbar */}
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-2">
                     {/* View Mode Toggle Pill (Floor Plan vs Takeout Workbench) */}
                     <div className="flex items-center bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl">
                         <button
@@ -177,7 +174,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                                 setPosViewMode?.('tables');
                                 setShowAllFloorTables(true);
                             }}
-                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer min-h-[44px] touch-manipulation active:scale-95 flex items-center gap-1.5 ${posViewMode === 'tables' && showAllFloorTables
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer min-h-[44px] touch-manipulation active:scale-95 flex items-center gap-1.5 ${posViewMode === 'tables' && showAllFloorTables
                                     ? 'bg-[#1c3a1e] text-white shadow-sm'
                                     : 'text-[#1c3a1e] hover:bg-white/60'
                                 }`}
@@ -189,7 +186,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                                 setPosViewMode?.('takeout');
                                 setShowAllFloorTables(true);
                             }}
-                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer min-h-[44px] touch-manipulation active:scale-95 flex items-center gap-1.5 ${posViewMode === 'takeout' && showAllFloorTables
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer min-h-[44px] touch-manipulation active:scale-95 flex items-center gap-1.5 ${posViewMode === 'takeout' && showAllFloorTables
                                     ? 'bg-amber-600 text-white shadow-sm'
                                     : 'text-[#1c3a1e] hover:bg-white/60'
                                 }`}
@@ -201,20 +198,21 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                     {/* Direct Prominent Kitchen KDS Button */}
                     <a
                         href="/kds"
-                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs cursor-pointer min-h-[48px] touch-manipulation active:scale-95 border border-[#1c3a1e]"
+                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-3.5 py-2 rounded-2xl text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer min-h-[44px] touch-manipulation active:scale-95 border border-[#1c3a1e]"
                     >
-                        <ChefHat className="h-4.5 w-4.5 text-[#d4af37]" />
-                        <span>👨‍🍳 Kitchen KDS</span>
+                        <ChefHat className="h-4 w-4 text-[#d4af37]" />
+                        <span>👨‍🍳 KDS</span>
                     </a>
 
-                    {/* Quick Apps Dropdown Popover */}
+                    {/* Compact Icon-Based Quick Apps & Shift Dropdown Popover */}
                     <div className="relative">
                         <button
                             onClick={() => setShowToolsMenu(!showToolsMenu)}
-                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs cursor-pointer min-h-[48px] touch-manipulation active:scale-95"
+                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-3 py-2 rounded-2xl text-xs flex items-center gap-1 transition-all shadow-xs cursor-pointer min-h-[44px] min-w-[44px] justify-center touch-manipulation active:scale-95"
+                            title="Quick Apps & Cashier Shift Z-Report"
                         >
-                            <span>⚡ Quick Apps & Shift</span>
-                            <span className="text-[10px] text-gray-500">▼</span>
+                            <span className="text-base">⚡</span>
+                            <span className="text-[10px] text-gray-600 font-bold">▼</span>
                         </button>
 
                         {showToolsMenu && (
