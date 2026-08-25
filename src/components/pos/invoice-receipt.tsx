@@ -95,6 +95,7 @@ export function ThermalReceipt({
                     alt="Skylight Village Logo"
                     width={144}
                     height={48}
+
                     unoptimized
                     className="w-36 h-auto mx-auto mb-1 object-contain brightness-0 filter"
                 />

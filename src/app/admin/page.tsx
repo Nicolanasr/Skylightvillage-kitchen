@@ -23,6 +23,7 @@ import { getDetailedOdooReportData, StatusLogEntry } from '../actions/report-act
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminMenuManager } from '@/components/admin/AdminMenuManager';
 import { AdminCategoryManager } from '@/components/admin/AdminCategoryManager';
+import { AdminCRMManager } from '@/components/admin/AdminCRMManager';
 import { AdminInventoryManager } from '@/components/admin/AdminInventoryManager';
 import { AdminLoyaltyManager } from '@/components/admin/AdminLoyaltyManager';
 import { AdminTableManager } from '@/components/admin/AdminTableManager';
@@ -31,18 +32,20 @@ import { OdooAnalyticsReports } from '@/components/admin/OdooAnalyticsReports';
 import { OrderDetailsDrawer } from '@/components/admin/OrderDetailsDrawer';
 import { PlusCircle, Trash2, Plus, X } from 'lucide-react';
 
+export type AdminTab = 'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports';
+
 export default function AdminPage() {
   return (
     <StaffAuthGuard pageTitle="Skylight Village Admin Manager">
-      <AdminContent />
+      <AdminContent initialTab="menu" />
     </StaffAuthGuard>
   );
 }
 
-function AdminContent() {
+export function AdminContent({ initialTab = 'menu' }: { initialTab?: AdminTab }) {
   const { categories, menuItems, orderItems, tables, sessions, discounts, payments, refreshPOSData } =
     useRealtimePOS();
-  const [activeTab, setActiveTab] = useState<'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports'>('menu');
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
   // Database Action Banners
@@ -103,14 +106,19 @@ function AdminContent() {
     });
   };
 
+  // Modular On-Demand Lazy Data Fetching & Caching
   useEffect(() => {
-    fetchStaffRoster();
-    getDetailedOdooReportData().then((res) => {
-      if (res.statusLogs) {
-        setStatusLogs(res.statusLogs);
-      }
-    });
-  }, [activeTab]);
+    if (activeTab === 'staff' && staffMembers.length === 0) {
+      fetchStaffRoster();
+    }
+    if (activeTab === 'reports' && statusLogs.length === 0) {
+      getDetailedOdooReportData().then((res) => {
+        if (res.statusLogs) {
+          setStatusLogs(res.statusLogs);
+        }
+      });
+    }
+  }, [activeTab, staffMembers.length, statusLogs.length]);
 
   const handleSyncClick = async () => {
     setIsSeeding(true);
@@ -362,7 +370,12 @@ function AdminContent() {
           />
         )}
 
-        {/* TAB 3: INVENTORY & RECIPE BOM MANAGER */}
+        {/* TAB 3: GUESTS & CRM MANAGER */}
+        {activeTab === 'crm' && (
+          <AdminCRMManager />
+        )}
+
+        {/* TAB 4: INVENTORY & RECIPE BOM MANAGER */}
         {activeTab === 'inventory' && (
           <AdminInventoryManager />
         )}

@@ -170,53 +170,50 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
 
                 {/* Streamlined Action Toolbar */}
                 <div className="flex flex-wrap items-center gap-2.5">
-                    {/* Primary Floor Mode Switcher Pill */}
-                    <div className="flex items-center gap-1 bg-[#eaf2eb] p-1 rounded-2xl border border-[#1c3a1e]/15 shadow-xs">
+                    {/* View Mode Toggle Pill (Floor Plan vs Takeout Workbench) */}
+                    <div className="flex items-center bg-[#eaf2eb] border border-[#1c3a1e]/15 p-1 rounded-2xl">
                         <button
                             onClick={() => {
                                 setPosViewMode?.('tables');
                                 setShowAllFloorTables(true);
                             }}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${posViewMode === 'tables' && showAllFloorTables
+                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer min-h-[44px] touch-manipulation active:scale-95 flex items-center gap-1.5 ${posViewMode === 'tables' && showAllFloorTables
                                     ? 'bg-[#1c3a1e] text-white shadow-sm'
                                     : 'text-[#1c3a1e] hover:bg-white/60'
                                 }`}
                         >
-                            📋 Floor Plan
+                            <span>📋 Floor Plan</span>
                         </button>
                         <button
                             onClick={() => {
                                 setPosViewMode?.('takeout');
                                 setShowAllFloorTables(true);
                             }}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${posViewMode === 'takeout' && showAllFloorTables
+                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer min-h-[44px] touch-manipulation active:scale-95 flex items-center gap-1.5 ${posViewMode === 'takeout' && showAllFloorTables
                                     ? 'bg-amber-600 text-white shadow-sm'
                                     : 'text-[#1c3a1e] hover:bg-white/60'
                                 }`}
                         >
-                            🛍️ Takeout & Camping
+                            <span>🛍️ Takeout & Camping</span>
                         </button>
                     </div>
 
-                    {/* Shift Z-Report Control Button */}
-                    <button
-                        onClick={async () => {
-                            setShowShiftModal(true);
-                            loadShiftData();
-                        }}
-                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                    {/* Direct Prominent Kitchen KDS Button */}
+                    <a
+                        href="/kds"
+                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs cursor-pointer min-h-[48px] touch-manipulation active:scale-95 border border-[#1c3a1e]"
                     >
-                        <DollarSign className="h-4 w-4" />
-                        <span>{activeShift ? '🟢 Shift Z-Report' : '💵 Open Shift Float'}</span>
-                    </button>
+                        <ChefHat className="h-4.5 w-4.5 text-[#d4af37]" />
+                        <span>👨‍🍳 Kitchen KDS</span>
+                    </a>
 
-                    {/* Compact Tools Dropdown Popover */}
+                    {/* Quick Apps Dropdown Popover */}
                     <div className="relative">
                         <button
                             onClick={() => setShowToolsMenu(!showToolsMenu)}
-                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-black px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs cursor-pointer min-h-[48px] touch-manipulation active:scale-95"
                         >
-                            <span>⚡ Quick Apps</span>
+                            <span>⚡ Quick Apps & Shift</span>
                             <span className="text-[10px] text-gray-500">▼</span>
                         </button>
 
@@ -226,25 +223,29 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                                     className="fixed inset-0 z-40"
                                     onClick={() => setShowToolsMenu(false)}
                                 />
-                                <div className="absolute right-0 mt-2 w-56 bg-white border border-[#1c3a1e]/15 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
-                                    <a
-                                        href="/kds"
-                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
-                                        onClick={() => setShowToolsMenu(false)}
+                                <div className="absolute right-0 mt-2 w-64 bg-white border border-[#1c3a1e]/15 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+                                    <button
+                                        onClick={async () => {
+                                            setShowToolsMenu(false);
+                                            setShowShiftModal(true);
+                                            loadShiftData();
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl font-extrabold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors text-xs text-left cursor-pointer"
                                     >
-                                        <ChefHat className="h-4 w-4 text-[#1c3a1e]" />
-                                        <span>Kitchen KDS Display</span>
-                                    </a>
+                                        <DollarSign className="h-4 w-4 text-emerald-700" />
+                                        <span>{activeShift ? '🟢 Shift Z-Report & Cash' : '💵 Open Shift Float'}</span>
+                                    </button>
+                                    <div className="border-t border-gray-100 my-1" />
                                     <a
                                         href="/events"
-                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl font-extrabold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
                                         onClick={() => setShowToolsMenu(false)}
                                     >
                                         <span>🎟️ Event Vouchers Desk</span>
                                     </a>
                                     <a
                                         href="/pos/reports"
-                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl font-extrabold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
                                         onClick={() => setShowToolsMenu(false)}
                                     >
                                         <TrendingUp className="h-4 w-4 text-[#1c3a1e]" />
@@ -253,7 +254,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({
                                     <div className="border-t border-gray-100 my-1" />
                                     <a
                                         href="/admin"
-                                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
+                                        className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl font-extrabold text-[#1c3a1e] hover:bg-[#eaf2eb] transition-colors"
                                         onClick={() => setShowToolsMenu(false)}
                                     >
                                         <Shield className="h-4 w-4 text-[#1c3a1e]" />

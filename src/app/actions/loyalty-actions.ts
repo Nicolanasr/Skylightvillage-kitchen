@@ -3,6 +3,8 @@
 import { pool } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
+import { resolveOrUpsertCustomer } from './crm-actions';
+import { normalizePhone, getPhoneLookupVariations } from '@/lib/phone';
 
 export interface CustomerLoyalty {
   id: string;
@@ -176,10 +178,17 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
   await ensureLoyaltyTables();
   await seedDefaultRewardTiers();
 
-  const cleanPhone = phoneNumber.trim();
+  const canonicalPhone = normalizePhone(phoneNumber) || phoneNumber.trim();
+  const variations = getPhoneLookupVariations(phoneNumber);
+  if (variations.length === 0) variations.push(phoneNumber.trim());
   const cleanName = customerName.trim() || 'Valued Guest';
 
   try {
+    // Also sync with Master CRM customers table
+    const masterCustomer = await resolveOrUpsertCustomer({ phone: canonicalPhone, name: cleanName }).catch(() => null);
+    const masterCustomerId = masterCustomer ? masterCustomer.id : null;
+    const masterCustomerName = (masterCustomer && masterCustomer.name && masterCustomer.name !== 'Valued Guest') ? masterCustomer.name : cleanName;
+
     const tierRes = await pool.query('SELECT * FROM loyalty_reward_tiers WHERE active = true ORDER BY points_required ASC');
     const rewardTiers = tierRes.rows.map((t) => ({
       ...t,
@@ -188,14 +197,28 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
     })) as LoyaltyRewardTier[];
 
     const res = await pool.query(
-      'SELECT * FROM customer_loyalty WHERE phone_number = $1 OR vip_code = $1 OR id = $1 LIMIT 1',
-      [cleanPhone]
+      'SELECT * FROM customer_loyalty WHERE phone_number = ANY($1::text[]) OR vip_code = $2 OR id = $2 LIMIT 1',
+      [variations, phoneNumber.trim()]
     );
 
     let customer: CustomerLoyalty;
 
     if (res.rows.length > 0) {
       const c = res.rows[0];
+      const needsUpdateName = masterCustomerName !== 'Valued Guest' && (c.customer_name === 'Valued Guest' || !c.customer_name || c.customer_name !== masterCustomerName);
+      const needsUpdateId = !c.customer_id && masterCustomerId;
+
+      if (needsUpdateName || needsUpdateId) {
+        const updateName = needsUpdateName ? masterCustomerName : c.customer_name;
+        const updateId = needsUpdateId ? masterCustomerId : c.customer_id;
+        await pool.query(
+          'UPDATE customer_loyalty SET customer_name = $1, customer_id = $2, updated_at = NOW() WHERE id = $3',
+          [updateName, updateId, c.id]
+        );
+        c.customer_name = updateName;
+        c.customer_id = updateId;
+      }
+
       customer = {
         ...c,
         points_balance: Number(c.points_balance || 0),
@@ -206,10 +229,13 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
       // Auto-create new customer profile!
       const newId = randomUUID();
       const insertRes = await pool.query(
-        `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
-         VALUES ($1, $2, $3, 0, 0, 1)
+        `INSERT INTO customer_loyalty (id, customer_id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
+         VALUES ($1, $2, $3, $4, 0, 0, 1)
+         ON CONFLICT (phone_number) DO UPDATE SET 
+           customer_name = EXCLUDED.customer_name,
+           customer_id = COALESCE(customer_loyalty.customer_id, EXCLUDED.customer_id)
          RETURNING *`,
-        [newId, cleanPhone, cleanName]
+        [newId, masterCustomerId, canonicalPhone, masterCustomerName]
       );
       const c = insertRes.rows[0];
       customer = {
@@ -294,16 +320,18 @@ export async function awardLoyaltyPointsForSession(
     for (const [phone, spentUsd] of phoneSpendMap.entries()) {
       if (spentUsd <= 0) continue;
       const pts = Math.floor(spentUsd); // 1 USD = 1 point
+      const variations = getPhoneLookupVariations(phone);
+      const canonical = normalizePhone(phone) || phone;
+      const custName = (phone === sessionPhone?.trim() && sessionName?.trim()) ? sessionName.trim() : 'Valued Guest';
 
+      // A. Update or create customer_loyalty
       const existingRes = await pool.query(
-        'SELECT * FROM customer_loyalty WHERE phone_number = $1 LIMIT 1',
-        [phone]
+        'SELECT * FROM customer_loyalty WHERE phone_number = ANY($1::text[]) OR phone_number = $2 LIMIT 1',
+        [variations, phone]
       );
 
-      let customerId = '';
-      const isNew = existingRes.rows.length === 0;
-      if (!isNew) {
-        customerId = existingRes.rows[0].id;
+      if (existingRes.rows.length > 0) {
+        const cId = existingRes.rows[0].id;
         await pool.query(
           `UPDATE customer_loyalty
            SET points_balance = points_balance + $1,
@@ -311,25 +339,37 @@ export async function awardLoyaltyPointsForSession(
                total_visits = total_visits + 1,
                updated_at = NOW()
            WHERE id = $3`,
-          [pts, spentUsd, customerId]
+          [pts, spentUsd, cId]
         );
       } else {
-        customerId = randomUUID();
-        const name = phone === sessionPhone?.trim() ? (sessionName?.trim() || 'Valued Guest') : 'Valued Guest';
+        const cId = randomUUID();
         await pool.query(
           `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
            VALUES ($1, $2, $3, $4, $5, 1)`,
-          [customerId, phone, name, pts, spentUsd]
+          [cId, canonical, custName, pts, spentUsd]
         );
       }
+
+      // B. Update or create Master CRM customers table
+      await resolveOrUpsertCustomer({ phone: canonical, name: custName });
+      await pool.query(
+        `UPDATE customers
+         SET points_balance = points_balance + $1,
+             total_spent_usd = total_spent_usd + $2,
+             total_orders = total_orders + 1,
+             last_order_at = NOW(),
+             updated_at = NOW()
+         WHERE phone_number = ANY($3::text[]) OR phone_number = $4`,
+        [pts, spentUsd, variations, canonical]
+      );
 
       // Audit log per person
       await pool.query(
         `INSERT INTO loyalty_audit_logs (id, customer_phone, action_type, points_amount, session_id, logged_by, notes)
          VALUES ($1, $2, 'earned', $3, $4, 'System', $5)`,
         [
-          `aud-${Date.now()}-${phone.replace(/\s/g, '')}`,
-          phone,
+          `aud-${Date.now()}-${canonical.replace(/\s/g, '')}`,
+          canonical,
           pts,
           sessionId,
           `Earned ${pts} pts from $${spentUsd.toFixed(2)} spend at table session ${sessionId}`,
@@ -428,7 +468,7 @@ export async function redeemLoyaltyRewardAction(
     if (sessionId.startsWith('virtual-')) {
       const targetTableId = sessionId.replace('virtual-', '');
       const sessRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active' LIMIT 1",
+        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active' LIMIT 1",
         [targetTableId]
       );
       if (sessRes.rows.length > 0) {
@@ -736,24 +776,39 @@ export async function removeLoyaltyPhoneFromOrderItem(orderItemId: string) {
  * Search loyalty customers by phone number or name (for POS typeahead)
  * Returns up to 8 matching results ordered by most recent activity
  */
-export async function searchLoyaltyCustomers(query: string) {
+export async function searchLoyaltyCustomers(query: string, exactMatch = false) {
   if (!pool || !query?.trim() || query.trim().length < 2) {
     return { success: true, customers: [] };
   }
   await ensureLoyaltyTables();
 
-  const q = `%${query.trim()}%`;
+  const rawQuery = query.trim();
+  const canonical = normalizePhone(rawQuery);
+  const variations = getPhoneLookupVariations(rawQuery);
+  const pattern = `%${rawQuery}%`;
+
   try {
-    const res = await pool.query(
-      `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
-       FROM customer_loyalty
-       WHERE phone_number ILIKE $1 OR customer_name ILIKE $1
-       ORDER BY updated_at DESC NULLS LAST
-       LIMIT 8`,
-      [q]
-    );
+    const res = exactMatch
+      ? await pool.query(
+          `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
+           FROM customer_loyalty
+           WHERE phone_number = ANY($1::text[]) OR phone_number = $2
+           ORDER BY updated_at DESC NULLS LAST
+           LIMIT 8`,
+          [variations, rawQuery]
+        )
+      : await pool.query(
+          `SELECT id, phone_number, customer_name, points_balance, total_spent_usd, total_visits
+           FROM customer_loyalty
+           WHERE phone_number ILIKE $1 OR customer_name ILIKE $1 OR phone_number = ANY($2::text[])
+           ORDER BY updated_at DESC NULLS LAST
+           LIMIT 8`,
+          [pattern, variations]
+        );
+
     return {
       success: true,
+      canonicalPhone: canonical,
       customers: res.rows.map((c) => ({
         id: c.id,
         phone_number: c.phone_number || '',
@@ -765,7 +820,7 @@ export async function searchLoyaltyCustomers(query: string) {
     };
   } catch (e) {
     console.error('Error searching loyalty customers:', e);
-    return { success: true, customers: [] };
+    return { success: true, canonicalPhone: canonical, customers: [] };
   }
 }
 

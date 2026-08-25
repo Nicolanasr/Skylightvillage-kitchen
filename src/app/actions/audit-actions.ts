@@ -21,8 +21,8 @@ export async function logStaffActivity(data: {
   if (pool) {
     try {
       await pool.query(
-        `INSERT INTO activity_logs (id, staff_name, staff_role, action_type, table_number, details)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO activity_logs (id, staff_name, staff_role, action_type, action, table_number, details)
+         VALUES ($1, $2, $3, $4, $4, $5, $6)`,
         [logId, staffName, staffRole, data.actionType, tableNumber, data.details]
       );
     } catch (e) {

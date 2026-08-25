@@ -33,7 +33,7 @@ export const POSFloorPlan: React.FC<POSFloorPlanProps> = ({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
         {tables.map((tbl) => {
           // Find active session where tbl is primary OR secondary merged table
           const activeSess = sessions.find((s) => {
@@ -100,7 +100,7 @@ export const POSFloorPlan: React.FC<POSFloorPlanProps> = ({
             <div
               key={tbl.id}
               onClick={() => onSelectTable(primaryTblObj || tbl)}
-              className={`rounded-3xl p-4 cursor-pointer transition-all border-2 relative overflow-hidden shadow-xs flex flex-col justify-between min-h-[130px] ${
+              className={`rounded-3xl p-4 cursor-pointer transition-all border-2 relative overflow-hidden shadow-xs flex flex-col justify-between min-h-[135px] touch-manipulation active:scale-[0.98] ${
                 isSelected
                   ? 'border-[#1c3a1e] bg-[#1c3a1e] text-white ring-4 ring-[#1c3a1e]/20 scale-[1.02]'
                   : isBillRequested

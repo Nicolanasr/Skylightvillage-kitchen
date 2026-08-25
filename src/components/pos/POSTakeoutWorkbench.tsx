@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { TableSession, OrderItem } from '@/lib/types';
 import { createTakeoutOrCampingSession } from '@/app/actions/order-actions';
 import { formatUsd } from '@/lib/currency';
+import { normalizePhone } from '@/lib/phone';
 import { ShoppingBag, MapPin, Plus, User, Phone, CheckCircle2, Clock, Eye, Search } from 'lucide-react';
 
 interface POSTakeoutWorkbenchProps {
@@ -31,10 +32,10 @@ export const POSTakeoutWorkbench: React.FC<POSTakeoutWorkbenchProps> = ({
   const [custPhone, setCustPhone] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter non-table sessions (takeout & camping)
-  const takeoutSessions = sessions.filter(
-    (s) => (s.order_type === 'takeout' || s.order_type === 'camping') && s.status === 'active'
-  );
+  // Filter non-table sessions (takeout & camping) sorted by newest first
+  const takeoutSessions = sessions
+    .filter((s) => (s.order_type === 'takeout' || s.order_type === 'camping') && s.status === 'active')
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
   const filteredSessions = takeoutSessions.filter((s) => {
     if (!searchTerm.trim()) return true;
@@ -51,7 +52,7 @@ export const POSTakeoutWorkbench: React.FC<POSTakeoutWorkbenchProps> = ({
     const res = await createTakeoutOrCampingSession({
       orderType: modalType,
       customerName: custName.trim(),
-      customerPhone: custPhone.trim(),
+      customerPhone: normalizePhone(custPhone) || custPhone.trim(),
     });
 
     if (res.success && res.session) {
@@ -142,7 +143,7 @@ export const POSTakeoutWorkbench: React.FC<POSTakeoutWorkbenchProps> = ({
               <div
                 key={sess.id}
                 onClick={() => onSelectSession(sess)}
-                className={`rounded-3xl p-5 border-2 cursor-pointer transition-all shadow-xs flex flex-col justify-between min-h-[160px] ${
+                className={`rounded-3xl p-5 border-2 cursor-pointer transition-all shadow-xs flex flex-col justify-between min-h-[160px] touch-manipulation active:scale-[0.98] ${
                   isSelected
                     ? 'border-[#1c3a1e] bg-[#1c3a1e] text-white ring-4 ring-[#1c3a1e]/20 scale-[1.02]'
                     : sess.order_type === 'camping'

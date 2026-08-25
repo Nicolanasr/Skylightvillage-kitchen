@@ -15,11 +15,12 @@ import {
     ChefHat,
     Package,
     Sparkles,
+    Users,
 } from 'lucide-react';
 
 interface AdminHeaderProps {
-    activeTab: 'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports';
-    setActiveTab: (tab: 'menu' | 'categories' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports') => void;
+    activeTab: 'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports';
+    setActiveTab: (tab: 'menu' | 'categories' | 'crm' | 'inventory' | 'loyalty' | 'tables' | 'staff' | 'invoices' | 'reports') => void;
     isSeeding: boolean;
     isWiping: boolean;
     seedStatus: string | null;
@@ -84,6 +85,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 {[
                     { id: 'menu', label: 'Menu Items Catalog', icon: UtensilsCrossed },
                     { id: 'categories', label: 'Menu Categories', icon: Layers },
+                    { id: 'crm', label: 'Guests & CRM', icon: Users },
                     { id: 'inventory', label: 'Recipe & Inventory BOM', icon: Package },
                     { id: 'loyalty', label: 'Loyalty & VIP Rewards', icon: Sparkles },
                     { id: 'tables', label: 'Tables & QR Manager', icon: Grid },
@@ -94,9 +96,18 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
                     return (
-                        <button
+                        <a
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            href={`/admin/${tab.id}`}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                if (setActiveTab) {
+                                    setActiveTab(tab.id as any);
+                                }
+                                if (typeof window !== 'undefined') {
+                                    window.history.pushState(null, '', `/admin/${tab.id}`);
+                                }
+                            }}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border ${isActive
                                 ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md scale-[1.02]'
                                 : 'bg-white text-gray-700 border-[#1c3a1e]/15 hover:bg-[#eaf2eb] hover:text-[#1c3a1e]'
@@ -104,7 +115,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                         >
                             <Icon className="h-4 w-4" />
                             <span>{tab.label}</span>
-                        </button>
+                        </a>
                     );
                 })}
             </div>

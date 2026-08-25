@@ -146,18 +146,18 @@ function POSContent() {
     setMultiItemCart((prev) => {
       const existingIdx = prev.findIndex((c) => c.item.id === menuItem.id);
       if (existingIdx >= 0) {
-        const updated = [...prev];
-        updated[existingIdx].quantity += 1;
-        return updated;
+        const itemToUpdate = { ...prev[existingIdx], quantity: prev[existingIdx].quantity + 1 };
+        const others = prev.filter((_, idx) => idx !== existingIdx);
+        return [itemToUpdate, ...others];
       }
       return [
-        ...prev,
         {
           item: menuItem,
           quantity: 1,
           selectedModifiers: selectedWaiterModifiers,
           specialNotes: 'Added by Waiter',
         },
+        ...prev,
       ];
     });
     setSelectedMenuItemForWaiter(null);
