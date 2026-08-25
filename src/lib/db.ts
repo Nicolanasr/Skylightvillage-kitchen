@@ -13,9 +13,9 @@ const globalForDb = globalThis as unknown as {
 export const pool = rawDbUrl
   ? (globalForDb.conn ??= new Pool({
       connectionString: cleanDbUrl,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 15000,
+      max: 8,
+      idleTimeoutMillis: 5000,
+      connectionTimeoutMillis: 8000,
       keepAlive: true,
       ssl: { rejectUnauthorized: false },
     }))

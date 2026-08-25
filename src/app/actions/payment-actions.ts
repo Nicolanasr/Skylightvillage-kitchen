@@ -34,30 +34,28 @@ export async function getPOSData() {
 
   if (pool) {
     try {
-      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes, loyaltyRes] = await Promise.all([
-        pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
-        pool.query("SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 80"),
-        pool.query(`
-          SELECT oi.* FROM order_items oi
-          LEFT JOIN table_sessions ts ON oi.session_id = ts.id
-          WHERE oi.status != 'cancelled'
-            AND (ts.status = 'active' OR oi.created_at > NOW() - INTERVAL '8 hours')
-          ORDER BY oi.created_at ASC
-        `),
-        pool.query("SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
-        pool.query("SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150"),
-        pool.query("SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC"),
-        pool.query(`
-          SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
-                 CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
-          FROM menu_items 
-          ORDER BY sort_order ASC, name ASC
-        `),
-        pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
-        pool.query("SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled'").catch(() => ({ rows: [] })),
-      ]);
+      const multiRes = await pool.query(`
+        SELECT * FROM tables ORDER BY table_number ASC;
+        SELECT * FROM table_sessions WHERE status = 'active' OR created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 80;
+        SELECT oi.* FROM order_items oi
+        LEFT JOIN table_sessions ts ON oi.session_id = ts.id
+        WHERE oi.status != 'cancelled'
+          AND (ts.status = 'active' OR oi.created_at > NOW() - INTERVAL '8 hours')
+        ORDER BY oi.created_at ASC;
+        SELECT * FROM payments WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150;
+        SELECT * FROM discounts WHERE created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 150;
+        SELECT * FROM service_calls WHERE status = 'pending' ORDER BY created_at DESC;
+        SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+               CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+        FROM menu_items 
+        ORDER BY sort_order ASC, name ASC;
+        SELECT * FROM menu_categories ORDER BY sort_order ASC;
+        SELECT value FROM system_settings WHERE key = 'loyalty_program_enabled';
+      `);
 
-      tables = tblRes.rows;
+      const [tblRes, sessRes, ordRes, payRes, discRes, callRes, itemRes, catRes, loyaltyRes] = Array.isArray(multiRes) ? multiRes : [multiRes, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }];
+
+      tables = tblRes?.rows || [];
       sessions = sessRes.rows.map((s: any) => {
         let mergedArr: string[] = [];
         if (Array.isArray(s.merged_table_ids)) {
