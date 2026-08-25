@@ -128,38 +128,54 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
             });
     }, [tableItems]);
 
-    // Group identical items together into a single cart line for clean POS view
+    // Group identical dishes together into a single cart line for POS view
     const groupedCartItems = React.useMemo(() => {
-        const groupMap = new Map<string, { item: OrderItem; itemIds: string[]; totalQty: number; totalUsd: number }>();
+        const groupMap = new Map<string, { item: OrderItem; itemIds: string[]; totalQty: number; totalUsd: number; allNotes: string[]; allLoyaltyPhones: string[] }>();
 
         tableItems.forEach((item) => {
             if (item.status === 'cancelled') return;
             const modsKey = JSON.stringify((item.selected_modifiers || []).slice().sort((a: any, b: any) => (a.option || '').localeCompare(b.option || '')));
-            const notesKey = (item.special_notes || '').trim().toLowerCase();
-            const guestKey = (item.guest_name || item.customer_name || '').trim();
-            const phoneKey = (item.loyalty_phone || item.customer_phone || '').trim();
             const compKey = item.is_comped ? 'comp' : 'normal';
             const paidKey = item.is_paid ? 'paid' : 'unpaid';
-            const statusKey = item.status || 'pending';
 
-            const key = `${item.menu_item_id || item.item_name}-${statusKey}-${compKey}-${paidKey}-${modsKey}-${notesKey}-${guestKey}-${phoneKey}`;
+            // Group by dish + comp + paid + modifiers so all duplicate dishes merge into 1 single line!
+            const key = `${item.menu_item_id || item.item_name}-${compKey}-${paidKey}-${modsKey}`;
 
             if (groupMap.has(key)) {
                 const existing = groupMap.get(key)!;
                 existing.itemIds.push(item.id);
                 existing.totalQty += Number(item.quantity || 1);
                 existing.totalUsd += Number(item.unit_price_usd) * Number(item.quantity || 1);
+
+                if (item.special_notes && !existing.allNotes.includes(item.special_notes)) {
+                    existing.allNotes.push(item.special_notes);
+                }
+                const phone = item.loyalty_phone || item.customer_phone;
+                if (phone && !existing.allLoyaltyPhones.includes(phone)) {
+                    existing.allLoyaltyPhones.push(phone);
+                }
             } else {
+                const initialNotes = item.special_notes ? [item.special_notes] : [];
+                const initialPhone = item.loyalty_phone || item.customer_phone;
                 groupMap.set(key, {
                     item: { ...item },
                     itemIds: [item.id],
                     totalQty: Number(item.quantity || 1),
                     totalUsd: Number(item.unit_price_usd) * Number(item.quantity || 1),
+                    allNotes: initialNotes,
+                    allLoyaltyPhones: initialPhone ? [initialPhone] : [],
                 });
             }
         });
 
-        return Array.from(groupMap.values());
+        return Array.from(groupMap.values()).map(g => ({
+            ...g,
+            item: {
+                ...g.item,
+                special_notes: g.allNotes.join(', '),
+                loyalty_phone: g.allLoyaltyPhones[0] || g.item.loyalty_phone,
+            }
+        }));
     }, [tableItems]);
     const sessionDiscounts = activeSession ? discounts.filter((d) => d.session_id === activeSession.id) : [];
     const sessionPayments = activeSession ? payments.filter((p) => p.session_id === activeSession.id) : [];
