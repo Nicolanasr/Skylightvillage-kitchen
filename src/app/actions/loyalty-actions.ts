@@ -228,21 +228,37 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
     } else {
       // Auto-create new customer profile!
       const newId = randomUUID();
-      const insertRes = await pool.query(
-        `INSERT INTO customer_loyalty (id, customer_id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
-         VALUES ($1, $2, $3, $4, 0, 0, 1)
-         ON CONFLICT (phone_number) DO UPDATE SET 
-           customer_name = EXCLUDED.customer_name,
-           customer_id = COALESCE(customer_loyalty.customer_id, EXCLUDED.customer_id)
-         RETURNING *`,
-        [newId, masterCustomerId, canonicalPhone, masterCustomerName]
-      );
+      let insertRes;
+      try {
+        insertRes = await pool.query(
+          `INSERT INTO customer_loyalty (id, customer_id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
+           VALUES ($1, $2, $3, $4, 0, 0, 1)
+           ON CONFLICT (phone_number) DO UPDATE SET 
+             customer_name = EXCLUDED.customer_name,
+             customer_id = COALESCE(customer_loyalty.customer_id, EXCLUDED.customer_id)
+           RETURNING *`,
+          [newId, masterCustomerId, canonicalPhone, masterCustomerName]
+        );
+      } catch (err: any) {
+        insertRes = await pool.query(
+          `INSERT INTO customer_loyalty (id, customer_id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
+           VALUES ($1, $2, $3, $4, 0, 0, 1)
+           ON CONFLICT DO NOTHING
+           RETURNING *`,
+          [newId, masterCustomerId, canonicalPhone, masterCustomerName]
+        );
+        if (insertRes.rows.length === 0) {
+          const fetchRes = await pool.query('SELECT * FROM customer_loyalty WHERE phone_number = $1 OR id = $2 LIMIT 1', [canonicalPhone, newId]);
+          insertRes = fetchRes;
+        }
+      }
+
       const c = insertRes.rows[0];
       customer = {
         ...c,
-        points_balance: 0,
-        total_spent_usd: 0,
-        total_visits: 1,
+        points_balance: Number(c?.points_balance || 0),
+        total_spent_usd: Number(c?.total_spent_usd || 0),
+        total_visits: Number(c?.total_visits || 1),
       } as CustomerLoyalty;
     }
 

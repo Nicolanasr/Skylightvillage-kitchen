@@ -292,8 +292,10 @@ export async function ensureDatabaseSchemaAndIndexes() {
       CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category_id);
       CREATE INDEX IF NOT EXISTS idx_menu_items_staff ON menu_items(is_staff_only);
       CREATE INDEX IF NOT EXISTS idx_menu_categories_available ON menu_categories(available);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_loyalty_phone_unique ON customer_loyalty(phone_number);
       CREATE INDEX IF NOT EXISTS idx_customer_loyalty_phone ON customer_loyalty(phone_number);
       CREATE INDEX IF NOT EXISTS idx_customer_loyalty_customer_id ON customer_loyalty(customer_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone_unique ON customers(phone_number);
       CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone_number);
     `);
   } catch (e) {
