@@ -185,7 +185,10 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
 
   try {
     // Also sync with Master CRM customers table
-    await resolveOrUpsertCustomer({ phone: canonicalPhone, name: cleanName }).catch(() => {});
+    const masterCustomer = await resolveOrUpsertCustomer({ phone: canonicalPhone, name: cleanName }).catch(() => null);
+    const masterCustomerId = masterCustomer ? masterCustomer.id : null;
+    const masterCustomerName = (masterCustomer && masterCustomer.name && masterCustomer.name !== 'Valued Guest') ? masterCustomer.name : cleanName;
+
     const tierRes = await pool.query('SELECT * FROM loyalty_reward_tiers WHERE active = true ORDER BY points_required ASC');
     const rewardTiers = tierRes.rows.map((t) => ({
       ...t,
@@ -202,6 +205,20 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
 
     if (res.rows.length > 0) {
       const c = res.rows[0];
+      const needsUpdateName = masterCustomerName !== 'Valued Guest' && (c.customer_name === 'Valued Guest' || !c.customer_name || c.customer_name !== masterCustomerName);
+      const needsUpdateId = !c.customer_id && masterCustomerId;
+
+      if (needsUpdateName || needsUpdateId) {
+        const updateName = needsUpdateName ? masterCustomerName : c.customer_name;
+        const updateId = needsUpdateId ? masterCustomerId : c.customer_id;
+        await pool.query(
+          'UPDATE customer_loyalty SET customer_name = $1, customer_id = $2, updated_at = NOW() WHERE id = $3',
+          [updateName, updateId, c.id]
+        );
+        c.customer_name = updateName;
+        c.customer_id = updateId;
+      }
+
       customer = {
         ...c,
         points_balance: Number(c.points_balance || 0),
@@ -212,11 +229,13 @@ export async function lookupOrCreateCustomerLoyalty(phoneNumber: string, custome
       // Auto-create new customer profile!
       const newId = randomUUID();
       const insertRes = await pool.query(
-        `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
-         VALUES ($1, $2, $3, 0, 0, 1)
-         ON CONFLICT (phone_number) DO UPDATE SET customer_name = EXCLUDED.customer_name
+        `INSERT INTO customer_loyalty (id, customer_id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
+         VALUES ($1, $2, $3, $4, 0, 0, 1)
+         ON CONFLICT (phone_number) DO UPDATE SET 
+           customer_name = EXCLUDED.customer_name,
+           customer_id = COALESCE(customer_loyalty.customer_id, EXCLUDED.customer_id)
          RETURNING *`,
-        [newId, canonicalPhone, cleanName]
+        [newId, masterCustomerId, canonicalPhone, masterCustomerName]
       );
       const c = insertRes.rows[0];
       customer = {
@@ -449,7 +468,7 @@ export async function redeemLoyaltyRewardAction(
     if (sessionId.startsWith('virtual-')) {
       const targetTableId = sessionId.replace('virtual-', '');
       const sessRes = await pool.query(
-        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active' LIMIT 1",
+        "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active' LIMIT 1",
         [targetTableId]
       );
       if (sessRes.rows.length > 0) {

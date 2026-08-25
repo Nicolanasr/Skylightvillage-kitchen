@@ -215,7 +215,7 @@ export async function mergeTables(primaryTableId: string, secondaryTableIds: str
   try {
     let primarySessionId = '';
     const activeSessRes = await pool.query(
-      "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+      "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active'",
       [primaryTableId]
     );
 
@@ -238,7 +238,7 @@ export async function mergeTables(primaryTableId: string, secondaryTableIds: str
 
     for (const secId of secondaryTableIds) {
       const secSessRes = await pool.query(
-        "SELECT id FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active' AND id != $2",
+        "SELECT id FROM table_sessions WHERE (primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active' AND id != $2",
         [secId, primarySessionId]
       );
       for (const secSess of secSessRes.rows) {
@@ -254,7 +254,7 @@ export async function mergeTables(primaryTableId: string, secondaryTableIds: str
       `UPDATE order_items SET session_id = $1 
        WHERE session_id IN (
          SELECT id FROM table_sessions 
-         WHERE (primary_table_id::text = ANY($2::text[]) OR ANY(merged_table_ids)::text = ANY($2::text[]))
+         WHERE (primary_table_id::text = ANY($2::text[]) OR merged_table_ids ?| $2::text[])
            AND status = 'active'
        )`,
       [primarySessionId, allTableIds]

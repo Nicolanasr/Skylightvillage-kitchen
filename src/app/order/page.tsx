@@ -21,6 +21,10 @@ import { lookupOrCreateCustomerLoyalty, redeemLoyaltyRewardAction, searchLoyalty
 import { normalizePhone } from '@/lib/phone';
 import { submitCustomerFeedbackAction } from '../actions/report-actions';
 import { transformGoogleDriveUrl } from '@/lib/drive';
+import { OrderHeader } from '@/components/order/OrderHeader';
+import { OrderFloatingCartBar } from '@/components/order/OrderFloatingCartBar';
+import { OrderToastBanner } from '@/components/order/OrderToastBanner';
+import { OrderServiceBellFAB } from '@/components/order/OrderServiceBellFAB';
 import {
     Bell,
     CheckCircle2,
@@ -518,76 +522,16 @@ function CustomerOrderContent() {
 
     return (
         <div className="min-h-screen bg-[#fafbfa] text-[#1c271c] pb-28">
-            {/* Locked Screen Overlay if Pre-Bill Requested */}
-            {isBillRequested && (
-                <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between text-amber-800 text-xs font-semibold">
-                    <div className="flex items-center gap-2">
-                        <Lock className="h-4 w-4 text-amber-600" />
-                        <span>Pre-Bill requested. Cart submissions are temporarily locked.</span>
-                    </div>
-                    <button
-                        onClick={() => setIsBillOpen(true)}
-                        className="underline font-bold text-amber-700 hover:text-amber-900"
-                    >
-                        View Check
-                    </button>
-                </div>
-            )}
-
-            {/* Header with Official Skylight Logo */}
-            <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#1c3a1e]/10 px-4 py-3 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-3">
-                    <Image
-                        src="/images/Skylight-logo-icon.png"
-                        alt="Skylight Village Logo"
-                        width={40}
-                        height={40}
-
-                        unoptimized
-                        className="h-10 w-auto object-contain filter invert"
-                    />
-                    <div>
-                        <h1 className="text-base font-black text-[#1c3a1e] leading-tight tracking-tight">Skylight Village</h1>
-                        <p className="text-xs text-[#d4af37] font-bold">Table #{table?.table_number || 1}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {/* Interactive Ordering Guide Button */}
-                    <button
-                        onClick={() => {
-                            setGuideStep(0);
-                            setIsGuideOpen(true);
-                        }}
-                        className="flex items-center gap-1.5 bg-[#eaf2eb] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/30 text-[#1c3a1e] text-xs px-2.5 py-2 rounded-xl font-bold transition-all"
-                        title="View Ordering Guide"
-                    >
-                        <HelpCircle className="h-4 w-4 text-[#1c3a1e]" />
-                        <span className="hidden sm:inline">Guide</span>
-                    </button>
-
-                    {/* Google Review Button */}
-                    <a
-                        href="https://g.page/r/CVjTZaAHNiz0EAI/review"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hidden sm:flex items-center gap-1.5 bg-[#faf5e6] border border-[#d4af37]/40 hover:border-[#d4af37] text-[#997a15] text-xs px-3 py-2 rounded-xl font-bold transition-all"
-                        title="Leave us a Google Review!"
-                    >
-                        <Star className="h-4 w-4 fill-[#d4af37] text-[#d4af37]" />
-                        <span>Review Us</span>
-                    </a>
-
-                    {/* Running Bill Button */}
-                    <button
-                        onClick={() => setIsBillOpen(true)}
-                        className="flex items-center gap-1.5 bg-[#eaf2eb] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/30 text-[#1c3a1e] text-xs px-3 py-2 rounded-xl font-bold transition-all"
-                    >
-                        <Receipt className="h-4 w-4 text-[#1c3a1e]" />
-                        <span>{formatUsd(liveBill.finalTotalUsd)}</span>
-                    </button>
-                </div>
-            </header>
+            <OrderHeader
+                table={table}
+                isBillRequested={isBillRequested}
+                liveBillTotalUsd={liveBill.finalTotalUsd}
+                onOpenGuide={() => {
+                    setGuideStep(0);
+                    setIsGuideOpen(true);
+                }}
+                onOpenBill={() => setIsBillOpen(true)}
+            />
 
             {/* Live Order Status Tracker Banner */}
             {(() => {
@@ -1335,77 +1279,19 @@ function CustomerOrderContent() {
                 </div>
             )}
 
-            {/* FLOATING STICKY BOTTOM CART BAR */}
-            {cart.length > 0 && !isCartOpen && (
-                <div className="fixed bottom-4 left-4 right-20 z-40 animate-in slide-in-from-bottom-4">
-                    <button
-                        onClick={() => setIsCartOpen(true)}
-                        className="w-full bg-[#1c3a1e] hover:bg-black text-white p-3 rounded-2xl shadow-2xl flex items-center justify-between border border-[#d4af37]/40 transition-all cursor-pointer"
-                    >
-                        <div className="flex items-center gap-2.5">
-                            <div className="h-7 w-7 bg-[#d4af37] text-[#1c3a1e] rounded-xl font-black text-xs flex items-center justify-center shadow-xs shrink-0">
-                                {cart.reduce((sum, item) => sum + item.quantity, 0)}
-                            </div>
-                            <div className="text-left">
-                                <p className="text-xs font-black text-white leading-tight">View Your Cart</p>
-                                <p className="text-[10px] text-gray-300 font-medium truncate max-w-[130px] sm:max-w-none">Tap to submit order</p>
-                            </div>
-                        </div>
+            {/* Toast Notification Banner */}
+            <OrderToastBanner message={addedToastMsg} />
 
-                        <div className="flex items-center gap-1">
-                            <span className="text-xs font-black text-[#d4af37]">{formatUsd(cartSubtotal)}</span>
-                            <ChevronRight className="h-4 w-4 text-white" />
-                        </div>
-                    </button>
-                </div>
-            )}
+            {/* Sticky Bottom Floating Cart Bar */}
+            <OrderFloatingCartBar
+                itemCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
+                subtotalUsd={cartSubtotal}
+                isOpen={isCartOpen}
+                onOpenCart={() => setIsCartOpen(true)}
+            />
 
-            {/* Floating Action Button (FAB) - Service Bell */}
-            <div className="fixed bottom-4 right-4 z-40">
-                <button
-                    onClick={() => setIsServiceBellOpen(!isServiceBellOpen)}
-                    className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white p-3.5 rounded-2xl shadow-2xl flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 border border-[#d4af37]/30"
-                >
-                    <Bell className="h-5 w-5" />
-                </button>
-
-                {/* Service Options Popover */}
-                {isServiceBellOpen && (
-                    <div className="absolute bottom-16 right-0 w-64 bg-white border border-[#1c3a1e]/15 rounded-2xl p-3 shadow-2xl space-y-2 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider px-2 py-1">
-                            Call Service
-                        </div>
-                        <button
-                            onClick={() => handleCallWaiter('waiter')}
-                            className="w-full text-left px-3 py-2.5 rounded-xl bg-[#fafbfa] hover:bg-[#eaf2eb] text-xs font-bold text-[#1c3a1e] flex items-center gap-2.5 transition-colors"
-                        >
-                            <Bell className="h-4 w-4 text-[#1c3a1e]" />
-                            <span>Call Waiter</span>
-                        </button>
-                        <button
-                            onClick={() => handleCallWaiter('charcoal')}
-                            className="w-full text-left px-3 py-2.5 rounded-xl bg-[#fafbfa] hover:bg-[#eaf2eb] text-xs font-bold text-[#1c3a1e] flex items-center gap-2.5 transition-colors"
-                        >
-                            <Flame className="h-4 w-4 text-orange-600" />
-                            <span>Request Charcoal Change</span>
-                        </button>
-                        <button
-                            onClick={() => handleCallWaiter('bill')}
-                            className="w-full text-left px-3 py-2.5 rounded-xl bg-[#fafbfa] hover:bg-[#eaf2eb] text-xs font-bold text-[#1c3a1e] flex items-center gap-2.5 transition-colors"
-                        >
-                            <Receipt className="h-4 w-4 text-emerald-700" />
-                            <span>Request Bill</span>
-                        </button>
-                    </div>
-                )}
-                {/* Added Item Toast Confirmation Banner (Positioned at top to avoid covering bottom cart bar) */}
-                {addedToastMsg && (
-                    <div className="fixed top-20 w-max max-w-[90vw] left-1/2 -translate-x-1/2 z-50 bg-[#1c3a1e] text-white font-black text-xs px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-[#d4af37] animate-in fade-in slide-in-from-top-4">
-                        <CheckCircle2 className="h-4 w-4 text-[#d4af37] shrink-0" />
-                        <span className="truncate">{addedToastMsg}</span>
-                    </div>
-                )}
-            </div>
+            {/* Floating Service Bell FAB */}
+            <OrderServiceBellFAB onCallWaiter={handleCallWaiter} />
 
             {/* FIRST-TIME CUSTOMER SELF-ORDERING WELCOME NOTICE MODAL */}
             {isWelcomeNoticeOpen && (

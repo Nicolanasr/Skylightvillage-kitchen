@@ -34,7 +34,7 @@ export async function getOrderPageData(tableNumber?: number | string, token?: st
 
       if (table) {
         const sessRes = await pool.query(
-          "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+          "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active'",
           [table.id]
         );
         if (sessRes.rows.length > 0) {
@@ -242,7 +242,7 @@ export async function submitCustomerOrder(data: {
         tableNumber = primaryTable.table_number;
 
         const activeSessRes = await pool.query(
-          "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+          "SELECT * FROM table_sessions WHERE (primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active'",
           [primaryTable.id]
         );
         if (activeSessRes.rows.length > 0) {
@@ -445,7 +445,7 @@ export async function addWaiterManualOrderItem(data: {
   let session: any = null;
   try {
     const sessRes = await pool.query(
-      "SELECT * FROM table_sessions WHERE (id = $1 OR primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+      "SELECT * FROM table_sessions WHERE (id = $1 OR primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active'",
       [data.tableId]
     );
     if (sessRes.rows.length > 0) {
@@ -579,7 +579,7 @@ export async function addBatchWaiterManualOrderItems(data: {
   let session: any = null;
   try {
     const sessRes = await pool.query(
-      "SELECT * FROM table_sessions WHERE (id = $1 OR primary_table_id = $1 OR $1 = ANY(merged_table_ids)) AND status = 'active'",
+      "SELECT * FROM table_sessions WHERE (id = $1 OR primary_table_id = $1 OR merged_table_ids @> jsonb_build_array($1::text)) AND status = 'active'",
       [data.tableId]
     );
     if (sessRes.rows.length > 0) {
@@ -743,7 +743,7 @@ export async function getKDSData(stationFilter: string = 'all') {
 
   try {
     const query = `
-      SELECT oi.id, oi.session_id, oi.table_number, oi.menu_item_id, oi.item_name, oi.quantity, oi.unit_price_usd, oi.selected_modifiers, oi.special_notes, oi.status, oi.is_paid, oi.created_at, oi.order_type, oi.customer_name, oi.customer_phone, COALESCE(mi.station, oi.station) AS station, ts.primary_table_id, ts.merged_table_ids
+      SELECT oi.id, oi.session_id, oi.table_number, oi.menu_item_id, oi.item_name, oi.quantity, oi.unit_price_usd, oi.selected_modifiers, oi.special_notes, oi.status, oi.is_paid, oi.created_at, oi.order_type, oi.customer_name, oi.customer_phone, COALESCE(mi.station, 'mezza') AS station, ts.primary_table_id, ts.merged_table_ids
       FROM order_items oi
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN table_sessions ts ON oi.session_id = ts.id

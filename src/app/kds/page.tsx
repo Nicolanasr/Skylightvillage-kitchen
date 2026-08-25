@@ -523,15 +523,15 @@ function KDSContent() {
                                     setActiveTab('tickets');
                                     setStationFilter(st.id);
                                 }}
-                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${activeTab === 'tickets' && stationFilter === st.id
-                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md'
+                                className={`px-4 sm:px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 border min-h-[48px] touch-manipulation cursor-pointer active:scale-95 ${activeTab === 'tickets' && stationFilter === st.id
+                                    ? 'bg-[#1c3a1e] text-white border-[#1c3a1e] shadow-md ring-2 ring-[#1c3a1e]/30'
                                     : 'bg-[#eaf2eb] text-[#1c3a1e] border-[#1c3a1e]/15 hover:bg-[#d8e6da]'
                                     }`}
                             >
-                                <Icon className="h-4 w-4" />
+                                <Icon className="h-4.5 w-4.5" />
                                 <span>{st.name}</span>
                                 {count > 0 && (
-                                    <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-[10px] font-black border border-[#1c3a1e]/10">
+                                    <span className="bg-white text-[#1c3a1e] px-2 py-0.5 rounded-lg text-xs font-black border border-[#1c3a1e]/10">
                                         {count}
                                     </span>
                                 )}
@@ -912,10 +912,10 @@ function KDSContent() {
                                                             await updateMultipleOrderItemsStatus(pendingIds, 'preparing');
                                                             await refreshKDSData();
                                                         }}
-                                                        className="flex-1 bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-black py-1.5 px-2 rounded-xl text-[11px] transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                                                        className="flex-1 bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-black py-2.5 px-3 rounded-2xl text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px] touch-manipulation active:scale-95"
                                                     >
                                                         <span>Start Cooking All</span>
-                                                        <ChevronRight className="h-3.5 w-3.5" />
+                                                        <ChevronRight className="h-4 w-4" />
                                                     </button>
                                                 )}
                                                 {hasPreparing && (
@@ -931,10 +931,10 @@ function KDSContent() {
                                                             await updateMultipleOrderItemsStatus(preparingIds, 'ready');
                                                             await refreshKDSData();
                                                         }}
-                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-1.5 px-2 rounded-xl text-[11px] transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-2.5 px-3 rounded-2xl text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px] touch-manipulation active:scale-95"
                                                     >
                                                         <span>Mark All Ready</span>
-                                                        <ChevronRight className="h-3.5 w-3.5" />
+                                                        <ChevronRight className="h-4 w-4" />
                                                     </button>
                                                 )}
                                             </div>
@@ -1034,7 +1034,7 @@ function KDSContent() {
                                                             <button
                                                                 disabled={isAnyBumping}
                                                                 onClick={() => handleStatusClick(item.id, item.status)}
-                                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all shadow-xs disabled:opacity-50 cursor-pointer ${statusButtonStyles[item.status]}`}
+                                                                className={`px-4 py-2.5 min-h-[44px] rounded-2xl text-xs sm:text-sm font-black transition-all shadow-xs disabled:opacity-50 cursor-pointer touch-manipulation active:scale-95 flex items-center gap-1.5 ${statusButtonStyles[item.status]}`}
                                                             >
                                                                 {item.status === 'pending'
                                                                     ? 'Start Cooking'

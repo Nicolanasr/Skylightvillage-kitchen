@@ -120,7 +120,12 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
     const activeItems = React.useMemo(() => {
         return [...tableItems]
             .filter((i) => i.status !== 'cancelled')
-            .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+            .sort((a, b) => {
+                const timeA = new Date(a.created_at || 0).getTime();
+                const timeB = new Date(b.created_at || 0).getTime();
+                if (timeB !== timeA) return timeB - timeA;
+                return (b.id || '').localeCompare(a.id || '');
+            });
     }, [tableItems]);
     const sessionDiscounts = activeSession ? discounts.filter((d) => d.session_id === activeSession.id) : [];
     const sessionPayments = activeSession ? payments.filter((p) => p.session_id === activeSession.id) : [];
@@ -337,7 +342,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
 
                         <button
                             onClick={onOpenMergeModal}
-                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] text-[#1c3a1e] border border-[#1c3a1e]/15 text-xs font-black px-2.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+                            className="bg-[#eaf2eb] hover:bg-[#d8e6da] text-[#1c3a1e] border border-[#1c3a1e]/15 text-xs font-black px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer shadow-xs min-h-[44px] touch-manipulation active:scale-95 flex items-center justify-center"
                         >
                             {activeSession?.merged_table_ids && activeSession.merged_table_ids.length > 0
                                 ? `🔗 Merged (${activeSession.merged_table_ids.length + 1})`
@@ -354,7 +359,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                 await updateTableStatusAction(selectedTable.id, 'available');
                                 refreshPOSData();
                             }}
-                            className="bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 text-xs font-black px-2.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+                            className="bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 text-xs font-black px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer shadow-xs min-h-[44px] touch-manipulation active:scale-95 flex items-center justify-center"
                             title="Close and reset table session to available"
                         >
                             Reset Table
@@ -362,7 +367,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
 
                         <button
                             onClick={onOpenAddItemModal}
-                            className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white text-xs font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+                            className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white text-xs font-black px-4 py-2.5 rounded-2xl transition-all cursor-pointer shadow-xs min-h-[44px] touch-manipulation active:scale-95 flex items-center justify-center"
                         >
                             + Add Item
                         </button>
@@ -522,18 +527,42 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                                             </div>
                                         </div>
 
-                                        <span
-                                            className={`text-xs font-black ${item.is_paid
-                                                    ? 'text-emerald-800'
-                                                    : item.status === 'cancelled'
-                                                        ? 'line-through text-red-500'
-                                                        : 'text-[#1c3a1e]'
-                                                }`}
-                                        >
-                                            {item.is_comped || item.status === 'cancelled'
-                                                ? '$0.00'
-                                                : formatUsd(Number(item.unit_price_usd) * item.quantity)}
-                                        </span>
+                                         <div className="flex items-center gap-3">
+                                            {!item.is_paid && item.status !== 'cancelled' && (
+                                                <div className="flex items-center gap-1 bg-[#eaf2eb] border border-[#1c3a1e]/15 rounded-xl p-1 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleQuantityEdit(item.id, -1)}
+                                                        className="w-8 h-8 rounded-lg bg-white text-[#1c3a1e] font-black text-sm hover:bg-gray-100 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
+                                                        title="Decrease Quantity"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <span className="w-6 text-center font-black text-xs sm:text-sm text-[#1c3a1e]">{item.quantity}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleQuantityEdit(item.id, 1)}
+                                                        className="w-8 h-8 rounded-lg bg-[#1c3a1e] text-white font-black text-sm hover:bg-[#d4af37] hover:text-[#1c3a1e] flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
+                                                        title="Increase Quantity"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            <span
+                                                className={`text-xs sm:text-sm font-black ${item.is_paid
+                                                        ? 'text-emerald-800'
+                                                        : item.status === 'cancelled'
+                                                            ? 'line-through text-red-500'
+                                                            : 'text-[#1c3a1e]'
+                                                    }`}
+                                            >
+                                                {item.is_comped || item.status === 'cancelled'
+                                                    ? '$0.00'
+                                                    : formatUsd(Number(item.unit_price_usd) * item.quantity)}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Per-item VIP Loyalty Badge */}
@@ -919,16 +948,16 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                             setItemVipResults([]);
                         }}
                         disabled={activeItems.filter((i) => !i.loyalty_phone && !i.is_paid).length === 0}
-                        className="bg-[#d4af37]/20 hover:bg-[#d4af37]/30 border border-[#d4af37]/40 text-[#1c3a1e] font-extrabold py-2.5 px-1 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="bg-[#d4af37]/20 hover:bg-[#d4af37]/30 border border-[#d4af37]/40 text-[#1c3a1e] font-extrabold py-3 px-1.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs min-h-[48px] touch-manipulation active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Assign one customer's phone to all unassigned items at once"
                     >
                         <Sparkles className="h-4 w-4 text-[#d4af37] shrink-0" />
-                        <span>Assign All</span>
+                        <span>Assign</span>
                     </button>
 
                     <button
                         onClick={onOpenDiscountModal}
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-2.5 px-1 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-3 px-1.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs min-h-[48px] touch-manipulation active:scale-95"
                     >
                         <Percent className="h-4 w-4 text-emerald-700" />
                         <span>Discount</span>
@@ -936,7 +965,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
 
                     <button
                         onClick={onOpenPreviewReceipt}
-                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-2.5 px-1 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
+                        className="bg-[#eaf2eb] hover:bg-[#d8e6da] border border-[#1c3a1e]/15 text-[#1c3a1e] font-extrabold py-3 px-1.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs min-h-[48px] touch-manipulation active:scale-95"
                     >
                         <Eye className="h-4 w-4 text-blue-700" />
                         <span>Preview</span>
@@ -945,7 +974,7 @@ export const POSCartPanel: React.FC<POSCartPanelProps> = ({
                     <button
                         onClick={onOpenPaymentModal}
                         disabled={activeItems.length === 0 || activeItems.every((i) => i.is_paid)}
-                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-2.5 px-1 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white font-black py-3 px-2 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md min-h-[50px] touch-manipulation active:scale-95 ring-2 ring-[#1c3a1e]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <CreditCard className="h-4 w-4 text-[#d4af37]" />
                         <span>Checkout</span>

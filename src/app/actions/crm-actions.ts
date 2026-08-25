@@ -52,8 +52,8 @@ export async function resolveOrUpsertCustomer(data: {
 
     if (existingRes.rows.length > 0) {
       const existing = existingRes.rows[0];
-      // Update name if currently default and a better name is provided
-      if (cleanName !== 'Valued Guest' && (existing.name === 'Valued Guest' || !existing.name)) {
+      // Update name if cleanName is provided and is not 'Valued Guest'
+      if (cleanName !== 'Valued Guest' && existing.name !== cleanName) {
         await pool.query('UPDATE customers SET name = $1, updated_at = NOW() WHERE id = $2', [cleanName, existing.id]);
         existing.name = cleanName;
       }

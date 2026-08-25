@@ -1,13 +1,16 @@
 import { Pool } from 'pg';
 import { Table, TableSession, MenuItem, MenuCategory, OrderItem, ServiceCall, Payment, Discount, StaffMember, ActivityLog } from './types';
 
-const connectionString = process.env.DATABASE_URL;
-export const pool = connectionString
+const rawDbUrl = process.env.DATABASE_URL || '';
+const cleanDbUrl = rawDbUrl.replace(/\?sslmode=[^&]*/, '');
+
+export const pool = rawDbUrl
   ? new Pool({
-      connectionString,
-      max: 20,
+      connectionString: cleanDbUrl,
+      max: 5,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 15000,
+      keepAlive: true,
       ssl: { rejectUnauthorized: false },
     })
   : null;
@@ -60,6 +63,12 @@ export async function ensureDatabaseSchemaAndIndexes() {
         order_type TEXT DEFAULT 'dine_in',
         customer_name TEXT,
         customer_phone TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS orders (
+        id TEXT PRIMARY KEY,
+        session_id TEXT REFERENCES table_sessions(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS order_items (
@@ -145,6 +154,7 @@ export async function ensureDatabaseSchemaAndIndexes() {
 
       CREATE TABLE IF NOT EXISTS customer_loyalty (
         id TEXT PRIMARY KEY,
+        customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
         phone_number TEXT UNIQUE,
         vip_code TEXT UNIQUE,
         customer_name TEXT DEFAULT 'Valued Guest',
@@ -267,14 +277,20 @@ export async function ensureDatabaseSchemaAndIndexes() {
       CREATE INDEX IF NOT EXISTS idx_table_sessions_status ON table_sessions(status);
       CREATE INDEX IF NOT EXISTS idx_table_sessions_primary ON table_sessions(primary_table_id);
       CREATE INDEX IF NOT EXISTS idx_table_sessions_order_type ON table_sessions(order_type);
+      CREATE INDEX IF NOT EXISTS idx_table_sessions_phone ON table_sessions(customer_phone);
       CREATE INDEX IF NOT EXISTS idx_order_items_session ON order_items(session_id);
       CREATE INDEX IF NOT EXISTS idx_order_items_status ON order_items(status);
       CREATE INDEX IF NOT EXISTS idx_order_items_created ON order_items(created_at);
+      CREATE INDEX IF NOT EXISTS idx_order_items_phone ON order_items(customer_phone);
+      CREATE INDEX IF NOT EXISTS idx_order_items_loyalty ON order_items(loyalty_phone);
       CREATE INDEX IF NOT EXISTS idx_discounts_session ON discounts(session_id);
       CREATE INDEX IF NOT EXISTS idx_payments_session ON payments(session_id);
       CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category_id);
       CREATE INDEX IF NOT EXISTS idx_menu_items_staff ON menu_items(is_staff_only);
       CREATE INDEX IF NOT EXISTS idx_menu_categories_available ON menu_categories(available);
+      CREATE INDEX IF NOT EXISTS idx_customer_loyalty_phone ON customer_loyalty(phone_number);
+      CREATE INDEX IF NOT EXISTS idx_customer_loyalty_customer_id ON customer_loyalty(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone_number);
     `);
   } catch (e) {
     console.warn('Schema Indexing Init Warning:', e);
