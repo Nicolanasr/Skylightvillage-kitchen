@@ -4,22 +4,26 @@ import { Table, TableSession, MenuItem, MenuCategory, OrderItem, ServiceCall, Pa
 const rawDbUrl = process.env.DATABASE_URL || '';
 const cleanDbUrl = rawDbUrl.replace(/\?sslmode=[^&]*/, '');
 
+const globalForDb = globalThis as unknown as {
+  conn: Pool | null | undefined;
+  isSchemaEnsured: boolean | undefined;
+  dbStore: SkylightStore | undefined;
+};
+
 export const pool = rawDbUrl
-  ? new Pool({
+  ? (globalForDb.conn ??= new Pool({
       connectionString: cleanDbUrl,
-      max: 5,
+      max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000,
       keepAlive: true,
       ssl: { rejectUnauthorized: false },
-    })
+    }))
   : null;
 
-let isSchemaEnsured = false;
-
 export async function ensureDatabaseSchemaAndIndexes() {
-  if (!pool || isSchemaEnsured) return;
-  isSchemaEnsured = true;
+  if (!pool || globalForDb.isSchemaEnsured) return;
+  globalForDb.isSchemaEnsured = true;
 
   try {
     await pool.query(`
@@ -322,23 +326,13 @@ class SkylightStore {
   async syncFromDatabase() {
     if (!pool) return;
     try {
-      const [
-        tablesRes,
-        sessionsRes,
-        categoriesRes,
-        itemsRes,
-        orderItemsRes,
-        callsRes,
-        logsRes
-      ] = await Promise.all([
-        pool.query('SELECT * FROM tables ORDER BY table_number ASC'),
-        pool.query("SELECT * FROM table_sessions WHERE status = 'active'"),
-        pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
-        pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC'),
-        pool.query('SELECT * FROM order_items ORDER BY created_at ASC'),
-        pool.query("SELECT * FROM service_calls WHERE status = 'pending'"),
-        pool.query('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100')
-      ]);
+      const tablesRes = await pool.query('SELECT * FROM tables ORDER BY table_number ASC');
+      const sessionsRes = await pool.query("SELECT * FROM table_sessions WHERE status = 'active'");
+      const categoriesRes = await pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC');
+      const itemsRes = await pool.query('SELECT * FROM menu_items ORDER BY sort_order ASC, name ASC');
+      const orderItemsRes = await pool.query('SELECT * FROM order_items ORDER BY created_at ASC');
+      const callsRes = await pool.query("SELECT * FROM service_calls WHERE status = 'pending'");
+      const logsRes = await pool.query('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100');
 
       if (tablesRes.rows.length > 0) this.tables = tablesRes.rows;
       if (sessionsRes.rows.length > 0) this.tableSessions = sessionsRes.rows;
@@ -360,4 +354,4 @@ class SkylightStore {
   }
 }
 
-export const dbStore = new SkylightStore();
+export const dbStore = (globalForDb.dbStore ??= new SkylightStore());
