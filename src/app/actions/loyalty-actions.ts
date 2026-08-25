@@ -633,38 +633,19 @@ export async function assignLoyaltyPhoneToSession(
   await ensureLoyaltyTables();
   await seedDefaultRewardTiers();
 
-  const cleanPhone = phoneNumber.trim();
-  const cleanName = customerName.trim() || 'Valued Guest';
-
   try {
-    // Upsert customer profile
-    const existingRes = await pool.query('SELECT * FROM customer_loyalty WHERE phone_number = $1 LIMIT 1', [cleanPhone]);
-    let customer;
-    if (existingRes.rows.length > 0) {
-      customer = existingRes.rows[0];
-    } else {
-      const newId = randomUUID();
-      const insertRes = await pool.query(
-        `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
-         VALUES ($1, $2, $3, 0, 0, 1) RETURNING *`,
-        [newId, cleanPhone, cleanName]
-      );
-      customer = insertRes.rows[0];
-    }
+    const res = await lookupOrCreateCustomerLoyalty(phoneNumber, customerName);
+    if (!res.success || !res.customer) return { success: false, error: 'Failed to find or create customer profile' };
 
-    // Attach phone to session
+    const customer = res.customer;
+    const canonicalPhone = customer.phone_number || normalizePhone(phoneNumber);
+    const masterCustomerId = (customer as any).customer_id || null;
+
+    // Attach phone & master customer_id to session
     await pool.query(
-      'UPDATE table_sessions SET customer_phone = $1, customer_name = $2 WHERE id = $3',
-      [cleanPhone, customer.customer_name || cleanName, sessionId]
+      'UPDATE table_sessions SET customer_phone = $1, customer_name = $2, customer_id = COALESCE($3, customer_id) WHERE id = $4',
+      [canonicalPhone, customer.customer_name || customerName, masterCustomerId, sessionId]
     );
-
-    // Fetch reward tiers
-    const tierRes = await pool.query('SELECT * FROM loyalty_reward_tiers WHERE active = true ORDER BY points_required ASC');
-    const rewardTiers = tierRes.rows.map((t) => ({
-      ...t,
-      points_required: Number(t.points_required || 0),
-      discount_value: Number(t.discount_value || 0),
-    }));
 
     revalidatePath('/pos');
     return {
@@ -675,7 +656,7 @@ export async function assignLoyaltyPhoneToSession(
         total_spent_usd: Number(customer.total_spent_usd || 0),
         total_visits: Number(customer.total_visits || 1),
       },
-      rewardTiers,
+      rewardTiers: res.rewardTiers,
     };
   } catch (e) {
     console.error('Error assigning loyalty phone to session:', e);
@@ -699,53 +680,28 @@ export async function assignLoyaltyPhoneToOrderItem(
   await ensureLoyaltyTables();
   await seedDefaultRewardTiers();
 
-  const cleanPhone = phoneNumber.trim();
-  const cleanName = customerName.trim() || 'Valued Guest';
-
   try {
-    // Upsert customer profile
-    const existingRes = await pool.query(
-      'SELECT * FROM customer_loyalty WHERE phone_number = $1 LIMIT 1',
-      [cleanPhone]
-    );
-    let customerNameResolved = cleanName;
-    let customer: any;
-    if (existingRes.rows.length > 0) {
-      customer = existingRes.rows[0];
-      if (customer.customer_name && customer.customer_name !== 'Valued Guest') {
-        customerNameResolved = customer.customer_name;
-      } else if (cleanName !== 'Valued Guest') {
-        // Update customer profile with specific name provided
-        await pool.query('UPDATE customer_loyalty SET customer_name = $1 WHERE id = $2', [cleanName, customer.id]);
-        customer.customer_name = cleanName;
-      }
-    } else {
-      const newId = randomUUID();
-      const insertRes = await pool.query(
-        `INSERT INTO customer_loyalty (id, phone_number, customer_name, points_balance, total_spent_usd, total_visits)
-         VALUES ($1, $2, $3, 0, 0, 1) RETURNING *`,
-        [newId, cleanPhone, cleanName]
-      );
-      customer = insertRes.rows[0];
-    }
+    const res = await lookupOrCreateCustomerLoyalty(phoneNumber, customerName);
+    if (!res.success || !res.customer) return { success: false, error: 'Failed to find or create customer profile' };
 
-    // Assign phone, guest_name and customer_name to the order item
+    const customer = res.customer;
+    const canonicalPhone = customer.phone_number || normalizePhone(phoneNumber);
+    const masterCustomerId = (customer as any).customer_id || null;
+
+    // Assign phone, guest_name and customer_id to the order item
     await pool.query(
       `UPDATE order_items 
-       SET loyalty_phone = $1, 
-           guest_name = $2,
-           customer_name = CASE WHEN $2 <> 'Valued Guest' THEN $2 ELSE COALESCE(customer_name, $2) END 
-       WHERE id = $3`,
-      [cleanPhone, customerNameResolved, orderItemId]
+       SET loyalty_phone = $1, customer_phone = $1, customer_name = $2, guest_name = $2, customer_id = COALESCE($3, customer_id)
+       WHERE id = $4`,
+      [canonicalPhone, customer.customer_name || customerName, masterCustomerId, orderItemId]
     );
 
     revalidatePath('/pos');
+    revalidatePath('/kds');
     return {
       success: true,
       customer: {
-        id: customer.id,
-        phone_number: customer.phone_number,
-        customer_name: customerNameResolved,
+        ...customer,
         points_balance: Number(customer.points_balance || 0),
         total_spent_usd: Number(customer.total_spent_usd || 0),
         total_visits: Number(customer.total_visits || 1),
