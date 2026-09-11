@@ -1106,15 +1106,15 @@ export async function getPublicViewOnlyMenuData() {
   }
 
   try {
-    const [catRes, itemRes] = await Promise.all([
-      pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
-      pool.query(`
-        SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
-               CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
-        FROM menu_items 
-        ORDER BY sort_order ASC, name ASC
-      `),
-    ]);
+    const multiRes = await pool.query(`
+      SELECT * FROM menu_categories ORDER BY sort_order ASC;
+      SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+             CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+      FROM menu_items 
+      ORDER BY sort_order ASC, name ASC;
+    `);
+
+    const [catRes, itemRes] = Array.isArray(multiRes) ? multiRes : [multiRes, { rows: [] }];
 
     const liveCategories = catRes.rows.filter((c: any) => c.available !== false);
     const disabledCatIds = new Set(

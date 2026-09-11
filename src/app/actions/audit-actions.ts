@@ -35,12 +35,23 @@ export async function logStaffActivity(data: {
   return { success: true };
 }
 
+let rosterCache: { timestamp: number; data: StaffMember[] } | null = null;
+
+export async function invalidateStaffRosterCache() {
+  rosterCache = null;
+}
+
 // Fetch Staff Roster
 export async function getStaffRoster(): Promise<StaffMember[]> {
   if (!pool) return [];
+
+  const now = Date.now();
+  if (rosterCache && (now - rosterCache.timestamp < 30000)) {
+    return rosterCache.data;
+  }
+
   try {
-    await pool.query('CREATE TABLE IF NOT EXISTS staff_members (id TEXT PRIMARY KEY, name TEXT NOT NULL, pin TEXT NOT NULL UNIQUE, role TEXT NOT NULL)');
-    const res = await pool.query('SELECT * FROM staff_members ORDER BY name ASC');
+    const res = await pool.query('SELECT id, name, COALESCE(pin, pin_code) as pin, role FROM staff_members ORDER BY name ASC');
     if (res.rows.length === 0) {
       // Seed default staff members into PostgreSQL if empty
       const defaultStaff: StaffMember[] = [
@@ -52,17 +63,19 @@ export async function getStaffRoster(): Promise<StaffMember[]> {
       ];
       for (const stf of defaultStaff) {
         await pool.query(
-          'INSERT INTO staff_members (id, name, pin, role) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
+          'INSERT INTO staff_members (id, name, pin, pin_code, role) VALUES ($1, $2, $3, $3, $4) ON CONFLICT DO NOTHING',
           [stf.id, stf.name, stf.pin, stf.role]
         );
       }
-      const seededRes = await pool.query('SELECT * FROM staff_members ORDER BY name ASC');
+      const seededRes = await pool.query('SELECT id, name, COALESCE(pin, pin_code) as pin, role FROM staff_members ORDER BY name ASC');
+      rosterCache = { timestamp: now, data: seededRes.rows };
       return seededRes.rows;
     }
+    rosterCache = { timestamp: now, data: res.rows };
     return res.rows;
   } catch (e) {
     console.error('Neon staff roster fetch error:', e);
-    return [];
+    return rosterCache?.data || [];
   }
 }
 
@@ -70,8 +83,6 @@ export async function getStaffRoster(): Promise<StaffMember[]> {
 export async function getStaffActivityLogs(): Promise<ActivityLog[]> {
   if (!pool) return [];
   try {
-    await pool.query('CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, staff_name TEXT, staff_role TEXT, action_type TEXT, table_number INT, details TEXT, created_at TIMESTAMPTZ DEFAULT NOW())');
-    await pool.query('ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()');
     const res = await pool.query('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100');
     return res.rows;
   } catch (e) {

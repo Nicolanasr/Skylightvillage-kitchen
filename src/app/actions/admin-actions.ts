@@ -5,6 +5,7 @@ import { StationType, MenuCategory, MenuItem, StaffMember, Table, ModifierGroup 
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 import { invalidateMenuCache } from './order-actions';
+import { invalidateStaffRosterCache } from './audit-actions';
 
 export async function createCategory(name: string) {
   if (!name || name.trim() === '' || !pool) return { success: false, error: 'Category name required' };
@@ -215,18 +216,16 @@ export async function addStaffMember(name: string, pin: string, role: string) {
   };
 
   try {
-    await pool.query('CREATE TABLE IF NOT EXISTS staff_members (id TEXT PRIMARY KEY, name TEXT NOT NULL, pin TEXT NOT NULL UNIQUE, role TEXT NOT NULL)');
-    await pool.query('INSERT INTO staff_members (id, name, pin, role) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, pin = EXCLUDED.pin, role = EXCLUDED.role', [
-      newStaff.id,
-      newStaff.name,
-      newStaff.pin,
-      newStaff.role,
-    ]);
+    await pool.query(
+      'INSERT INTO staff_members (id, name, pin, pin_code, role) VALUES ($1, $2, $3, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, pin = EXCLUDED.pin, pin_code = EXCLUDED.pin_code, role = EXCLUDED.role',
+      [newStaff.id, newStaff.name, newStaff.pin, newStaff.role]
+    );
   } catch (e: any) {
     console.error('Neon addStaffMember error:', e);
     return { success: false, error: e.message };
   }
 
+  await invalidateStaffRosterCache();
   revalidatePath('/pos');
   revalidatePath('/admin');
   return { success: true, staff: newStaff };
@@ -242,6 +241,7 @@ export async function deleteStaffMember(staffId: string) {
     return { success: false, error: e.message };
   }
 
+  await invalidateStaffRosterCache();
   revalidatePath('/pos');
   revalidatePath('/admin');
   return { success: true };

@@ -77,7 +77,7 @@ function ViewOnlyMenuContent() {
                         alt="Skylight Village Logo"
                         width={40}
                         height={40}
-
+                        style={{ width: '40px', height: '40px' }}
                         unoptimized
                         className="h-10 w-auto object-contain filter invert"
                     />
