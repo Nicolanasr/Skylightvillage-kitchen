@@ -1,6 +1,6 @@
 'use server';
 
-import { pool } from '@/lib/db';
+import { pool, ensureDatabaseSchemaAndIndexes } from '@/lib/db';
 import { StationType, MenuCategory, MenuItem, StaffMember, Table, ModifierGroup } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
@@ -9,6 +9,8 @@ import { invalidateStaffRosterCache } from './audit-actions';
 
 export async function createCategory(name: string, visibleChannels: string[] = ['dine_in', 'takeout', 'camping', 'pos']) {
   if (!name || name.trim() === '' || !pool) return { success: false, error: 'Category name required' };
+
+  await ensureDatabaseSchemaAndIndexes();
 
   const id = `cat-${randomUUID().slice(0, 8)}`;
   try {

@@ -298,6 +298,9 @@ export async function ensureDatabaseSchemaAndIndexes() {
       CREATE INDEX IF NOT EXISTS idx_customer_loyalty_customer_id ON customer_loyalty(customer_id);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone_unique ON customers(phone_number);
       CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone_number);
+
+      ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS visible_channels JSONB DEFAULT '["dine_in", "takeout", "camping", "pos"]'::jsonb;
+      UPDATE menu_categories SET visible_channels = '["dine_in", "takeout", "camping", "pos"]'::jsonb WHERE visible_channels IS NULL;
     `);
   } catch (e) {
     console.warn('Schema Indexing Init Warning:', e);
