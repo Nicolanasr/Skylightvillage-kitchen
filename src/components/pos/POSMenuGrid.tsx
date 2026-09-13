@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { MenuCategory, MenuItem, getMenuItemPrice } from '@/lib/types';
+import { MenuCategory, MenuItem, getMenuItemPrice, isCategoryVisibleInChannel } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { Search, ImageIcon, Plus, Loader2 } from 'lucide-react';
 
@@ -24,8 +24,12 @@ export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
     const [selectedCatFilter, setSelectedCatFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState<string>('');
 
+    const posCategories = categories.filter((c) => isCategoryVisibleInChannel(c, 'pos'));
+
     const filteredItems = menuItems.filter((item) => {
         if (selectedCatFilter !== 'all' && item.category_id !== selectedCatFilter) return false;
+        const catObj = categories.find((c) => c.id === item.category_id);
+        if (catObj && !isCategoryVisibleInChannel(catObj, 'pos')) return false;
         const term = searchQuery.toLowerCase().trim();
         if (!term) return true;
         return (
@@ -50,7 +54,7 @@ export const POSMenuGrid: React.FC<POSMenuGridProps> = ({
                         <span>All Dishes ({menuItems.length})</span>
                     </button>
 
-                    {categories.map((c) => {
+                    {posCategories.map((c) => {
                         const icon =
                             c.name.toLowerCase().includes('cold') ? '🥗' :
                                 c.name.toLowerCase().includes('hot') ? '🧆' :

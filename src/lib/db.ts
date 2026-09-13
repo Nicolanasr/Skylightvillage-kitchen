@@ -31,7 +31,8 @@ export async function ensureDatabaseSchemaAndIndexes() {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         sort_order INT DEFAULT 0,
-        available BOOLEAN DEFAULT true
+        available BOOLEAN DEFAULT true,
+        visible_channels JSONB DEFAULT '["dine_in", "takeout", "camping", "pos"]'::jsonb
       );
 
       CREATE TABLE IF NOT EXISTS menu_items (

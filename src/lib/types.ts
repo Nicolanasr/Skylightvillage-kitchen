@@ -42,11 +42,22 @@ export interface SelectedModifier {
   price_extra: number;
 }
 
+export type ChannelType = 'dine_in' | 'takeout' | 'camping' | 'pos';
+
 export interface MenuCategory {
   id: string;
   name: string;
   sort_order: number;
   available?: boolean;
+  visible_channels?: ChannelType[];
+}
+
+export function isCategoryVisibleInChannel(category: MenuCategory, channel: ChannelType): boolean {
+  if (category.available === false) return false;
+  if (!category.visible_channels || !Array.isArray(category.visible_channels) || category.visible_channels.length === 0) {
+    return true; // Default fallback for all channels
+  }
+  return category.visible_channels.includes(channel);
 }
 
 export interface MenuItem {

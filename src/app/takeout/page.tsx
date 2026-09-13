@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import { getOrderPageData, submitCustomerOrder, createTakeoutOrCampingSession } from '@/app/actions/order-actions';
-import { MenuItem, MenuCategory, SelectedModifier, getMenuItemPrice } from '@/lib/types';
+import { MenuItem, MenuCategory, SelectedModifier, getMenuItemPrice, isCategoryVisibleInChannel, ChannelType } from '@/lib/types';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { ShoppingBag, CheckCircle, Search, Sparkles, User, Phone, MapPin, PackageCheck, AlertCircle, ArrowRight, Edit3, Plus } from 'lucide-react';
 
@@ -68,8 +68,10 @@ function TakeoutContent({ forcedOrderType }: { forcedOrderType?: 'takeout' | 'ca
     );
   }
 
-  const categories: MenuCategory[] = data?.categories || [];
-  const menuItems: MenuItem[] = (data?.menuItems || []).filter((m: MenuItem) => m.available && !m.is_staff_only);
+  const activeChannel: ChannelType = orderType === 'camping' ? 'camping' : 'takeout';
+  const categories: MenuCategory[] = (data?.categories || []).filter((c: MenuCategory) => isCategoryVisibleInChannel(c, activeChannel));
+  const visibleCatIds = new Set(categories.map((c) => c.id));
+  const menuItems: MenuItem[] = (data?.menuItems || []).filter((m: MenuItem) => m.available && !m.is_staff_only && visibleCatIds.has(m.category_id));
 
   const filteredItems = menuItems.filter((item) => {
     const matchesCategory = selectedCategory === 'all' || item.category_id === selectedCategory;
