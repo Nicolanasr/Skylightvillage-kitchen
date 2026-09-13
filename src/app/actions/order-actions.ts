@@ -555,24 +555,6 @@ export async function addWaiterManualOrderItem(data: {
       invalidateKDSCache();
       notifyKDSUpdate();
       notifyPOSUpdate();
-
-      // Trigger Telegram Push Notification
-      try {
-        await sendTelegramOrderNotification({
-          orderType: effOrderType,
-          tableNumber: effTableNumber,
-          customerName: effCustName,
-          customerPhone: effCustPhone,
-          items: [{
-            itemName: data.itemName,
-            quantity: data.quantity,
-            selectedModifiers: data.selectedModifiers,
-            specialNotes: data.specialNotes,
-          }],
-        });
-      } catch (err) {
-        console.error('Telegram notification error:', err);
-      }
     }
   } catch (e) {
     console.error('Waiter manual order item insert error:', e);
@@ -683,24 +665,6 @@ export async function addBatchWaiterManualOrderItems(data: {
       invalidateKDSCache();
       notifyKDSUpdate();
       notifyPOSUpdate();
-
-      // Trigger Telegram Push Notification
-      try {
-        await sendTelegramOrderNotification({
-          orderType: effOrderType,
-          tableNumber: effTableNumber,
-          customerName: effCustName,
-          customerPhone: effCustPhone,
-          items: data.items.map(i => ({
-            itemName: i.itemName,
-            quantity: i.quantity,
-            selectedModifiers: i.selectedModifiers,
-            specialNotes: i.specialNotes,
-          })),
-        });
-      } catch (err) {
-        console.error('Telegram notification error:', err);
-      }
     }
   } catch (e) {
     console.error('addBatchWaiterManualOrderItems error:', e);
@@ -1106,15 +1070,15 @@ export async function getPublicViewOnlyMenuData() {
   }
 
   try {
-    const [catRes, itemRes] = await Promise.all([
-      pool.query('SELECT * FROM menu_categories ORDER BY sort_order ASC'),
-      pool.query(`
-        SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
-               CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
-        FROM menu_items 
-        ORDER BY sort_order ASC, name ASC
-      `),
-    ]);
+    const multiRes = await pool.query(`
+      SELECT * FROM menu_categories ORDER BY sort_order ASC;
+      SELECT id, category_id, name, description, price_usd, price_camping_usd, station, available, is_staff_only, sort_order, is_bestseller, modifier_groups,
+             CASE WHEN image_url IS NOT NULL AND image_url != '' THEN (CASE WHEN image_url LIKE 'data:image/%' THEN '/api/dish-image?id=' || id ELSE image_url END) ELSE '' END as image_url
+      FROM menu_items 
+      ORDER BY sort_order ASC, name ASC;
+    `);
+
+    const [catRes, itemRes] = Array.isArray(multiRes) ? multiRes : [multiRes, { rows: [] }];
 
     const liveCategories = catRes.rows.filter((c: any) => c.available !== false);
     const disabledCatIds = new Set(

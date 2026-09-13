@@ -47,7 +47,7 @@ export const OrderHeader: React.FC<OrderHeaderProps> = ({
                         alt="Skylight Village Logo"
                         width={40}
                         height={40}
-
+                        style={{ width: '40px', height: '40px' }}
                         className="h-10 w-auto object-contain filter invert"
                     />
                     <div>

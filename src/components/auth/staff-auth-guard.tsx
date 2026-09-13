@@ -120,7 +120,7 @@ export function StaffAuthGuard({ children, pageTitle = 'Staff Portal' }: StaffAu
                             alt="Skylight Village Logo"
                             width={48}
                             height={48}
-
+                            style={{ width: '40px', height: '40px' }}
                             unoptimized
                             className="h-12 w-auto object-contain mb-2"
                         />
