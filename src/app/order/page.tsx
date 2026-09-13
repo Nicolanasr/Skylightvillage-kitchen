@@ -13,6 +13,7 @@ import {
     TableSession,
     MenuCategory,
     getMenuItemPrice,
+    isCategoryVisibleInChannel,
 } from '@/lib/types';
 import { calculateBillTotals, formatLbp, formatUsd } from '@/lib/currency';
 import { getOrderPageData, submitCustomerOrder, triggerServiceCall } from '../actions/order-actions';
@@ -278,10 +279,14 @@ function CustomerOrderContent() {
 
         try {
             const data = await getOrderPageData(tableNum, token);
+            const visibleCats = (data.categories || []).filter((c: MenuCategory) => isCategoryVisibleInChannel(c, 'dine_in'));
+            const visibleCatIds = new Set(visibleCats.map((c: MenuCategory) => c.id));
+            const visibleItems = (data.menuItems || []).filter((m: MenuItem) => visibleCatIds.has(m.category_id));
+
             setTable(data.table);
             setSession(data.session);
-            setCategories(data.categories);
-            setMenuItems(data.menuItems);
+            setCategories(visibleCats);
+            setMenuItems(visibleItems);
             setLiveOrderItems(data.orderItems);
             setLiveDiscounts(data.discounts);
             setLivePayments(data.payments);

@@ -6,26 +6,28 @@ import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 import { invalidateMenuCache } from './order-actions';
 
-export async function createCategory(name: string) {
+export async function createCategory(name: string, visibleChannels: string[] = ['dine_in', 'takeout', 'camping', 'pos']) {
   if (!name || name.trim() === '' || !pool) return { success: false, error: 'Category name required' };
 
   const id = `cat-${randomUUID().slice(0, 8)}`;
   try {
     const countRes = await pool.query('SELECT COUNT(*)::int as count FROM menu_categories');
     const sortOrder = (countRes.rows[0]?.count || 0) + 1;
-    const newCat: MenuCategory = { id, name, sort_order: sortOrder, available: true };
+    const channelsJson = JSON.stringify(visibleChannels && visibleChannels.length > 0 ? visibleChannels : ['dine_in', 'takeout', 'camping', 'pos']);
+    const newCat: MenuCategory = { id, name, sort_order: sortOrder, available: true, visible_channels: JSON.parse(channelsJson) };
 
-    await pool.query('INSERT INTO menu_categories (id, name, sort_order, available) VALUES ($1, $2, $3, true)', [
-      id,
-      name,
-      sortOrder,
-    ]);
+    await pool.query(
+      'INSERT INTO menu_categories (id, name, sort_order, available, visible_channels) VALUES ($1, $2, $3, true, $4::jsonb)',
+      [id, name, sortOrder, channelsJson]
+    );
 
     invalidateMenuCache();
     revalidatePath('/pos');
     revalidatePath('/order');
     revalidatePath('/admin');
     revalidatePath('/menu');
+    revalidatePath('/takeout');
+    revalidatePath('/camping');
     return { success: true, category: newCat };
   } catch (e: any) {
     console.error('Neon createCategory error:', e);
@@ -353,14 +355,24 @@ export async function deleteTableAction(tableId: string) {
   return { success: true };
 }
 
-export async function updateCategory(categoryId: string, name: string, sortOrder?: number) {
+export async function updateCategory(categoryId: string, name: string, sortOrder?: number, visibleChannels?: string[]) {
   if (!pool) return { success: false, error: 'DB connection error' };
 
   try {
-    await pool.query(
-      'UPDATE menu_categories SET name = $1, sort_order = COALESCE($2, sort_order) WHERE id = $3',
-      [name, sortOrder, categoryId]
-    );
+    if (visibleChannels !== undefined) {
+      const channelsJson = JSON.stringify(visibleChannels);
+      await pool.query(
+        'UPDATE menu_categories SET name = $1, sort_order = COALESCE($2, sort_order), visible_channels = $3::jsonb WHERE id = $4',
+        [name, sortOrder, channelsJson, categoryId]
+      );
+    } else {
+      await pool.query(
+        'UPDATE menu_categories SET name = $1, sort_order = COALESCE($2, sort_order) WHERE id = $3',
+        [name, sortOrder, categoryId]
+      );
+    }
+
+    invalidateMenuCache();
   } catch (e: any) {
     console.error('Neon updateCategory error:', e);
     return { success: false, error: e.message };
@@ -369,6 +381,31 @@ export async function updateCategory(categoryId: string, name: string, sortOrder
   revalidatePath('/pos');
   revalidatePath('/order');
   revalidatePath('/admin');
+  revalidatePath('/menu');
+  revalidatePath('/takeout');
+  revalidatePath('/camping');
+  return { success: true };
+}
+
+export async function updateCategoryVisibilityChannelsAction(categoryId: string, visibleChannels: string[]) {
+  if (!pool) return { success: false, error: 'DB connection error' };
+
+  try {
+    const channelsJson = JSON.stringify(visibleChannels);
+    await pool.query('UPDATE menu_categories SET visible_channels = $1::jsonb WHERE id = $2', [channelsJson, categoryId]);
+
+    invalidateMenuCache();
+  } catch (e: any) {
+    console.error('updateCategoryVisibilityChannelsAction error:', e);
+    return { success: false, error: e.message };
+  }
+
+  revalidatePath('/pos');
+  revalidatePath('/order');
+  revalidatePath('/admin');
+  revalidatePath('/menu');
+  revalidatePath('/takeout');
+  revalidatePath('/camping');
   return { success: true };
 }
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { MenuCategory, MenuItem, getMenuItemPrice } from '@/lib/types';
+import { MenuCategory, MenuItem, getMenuItemPrice, isCategoryVisibleInChannel, ChannelType } from '@/lib/types';
 import { formatUsd, formatLbp } from '@/lib/currency';
 import { transformGoogleDriveUrl } from '@/lib/drive';
 import { getPublicViewOnlyMenuData } from '../actions/order-actions';
@@ -21,7 +21,7 @@ import {
 
 function ViewOnlyMenuContent() {
     const searchParams = useSearchParams();
-    const menuMode = searchParams.get('mode') === 'camping' ? 'camping' : 'dine_in';
+    const menuMode: ChannelType = searchParams.get('mode') === 'camping' ? 'camping' : 'dine_in';
 
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -44,12 +44,16 @@ function ViewOnlyMenuContent() {
 
     useEffect(() => {
         getPublicViewOnlyMenuData().then((data) => {
-            setCategories(data.categories || []);
-            setMenuItems(data.menuItems || []);
+            const visibleCats = (data.categories || []).filter((c: MenuCategory) => isCategoryVisibleInChannel(c, menuMode));
+            const visibleCatIds = new Set(visibleCats.map((c: MenuCategory) => c.id));
+            const visibleItems = (data.menuItems || []).filter((m: MenuItem) => visibleCatIds.has(m.category_id));
+
+            setCategories(visibleCats);
+            setMenuItems(visibleItems);
             setExchangeRate(data.exchangeRate || 89500);
             setLoading(false);
         });
-    }, []);
+    }, [menuMode]);
 
     const handleCategoryClick = (catId: string) => {
         setActiveCategory(catId);
