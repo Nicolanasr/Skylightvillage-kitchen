@@ -413,7 +413,7 @@ function TakeoutContent({ forcedOrderType }: { forcedOrderType?: 'takeout' | 'ca
               All Items
             </button>
             {categories
-              .filter((cat) => cat.available !== false && menuItems.some((m) => m.category_id === cat.id))
+              .filter((cat) => cat.available !== false)
               .map((cat) => (
                 <button
                   key={cat.id}
@@ -443,7 +443,28 @@ function TakeoutContent({ forcedOrderType }: { forcedOrderType?: 'takeout' | 'ca
               return a.name.localeCompare(b.name);
             });
 
-          if (catItems.length === 0) return null;
+          if (catItems.length === 0) {
+            if (selectedCategory === cat.id) {
+              return (
+                <section key={cat.id} className="scroll-mt-36">
+                  <div className="sticky top-[110px] z-20 bg-[#fafbfa]/95 backdrop-blur-md px-4 py-1.5 mb-3 border-b border-[#1c3a1e]/15 flex items-center justify-between shadow-xs">
+                    <h2 className="text-base font-black text-[#1c3a1e] flex items-center gap-2 tracking-wide">
+                      <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
+                      <span>{cat.name}</span>
+                    </h2>
+                    <span className="text-[11px] font-bold text-gray-500 bg-[#eaf2eb] px-2.5 py-1 rounded-full border border-[#1c3a1e]/10">
+                      0 items
+                    </span>
+                  </div>
+                  <div className="bg-white border border-dashed border-[#1c3a1e]/20 rounded-2xl p-8 text-center space-y-2">
+                    <p className="text-sm font-black text-[#1c3a1e]">No items currently available under "{cat.name}"</p>
+                    <p className="text-xs text-gray-500 font-medium">Dishes added to this category in Admin will appear here.</p>
+                  </div>
+                </section>
+              );
+            }
+            return null;
+          }
 
           return (
             <section key={cat.id} className="scroll-mt-36">
