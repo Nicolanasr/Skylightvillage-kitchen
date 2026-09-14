@@ -26,6 +26,7 @@ import {
     Search,
     X,
     Shield,
+    User,
 } from 'lucide-react';
 
 export default function KDSPage() {
@@ -273,19 +274,34 @@ function KDSContent() {
         tableNumber: number;
         station: string;
         stationName: string;
+        personName: string;
         ticketItems: OrderItem[];
     }>>((acc, item) => {
-        const tblNum = item.table_number || 1;
+        const tblNum = item.table_number || 0;
         let st: string = item.station || 'mezza';
         if (st === 'cold_mezza' || st === 'hot_mezza') st = 'mezza';
         const stName = stationDisplayNames[st] || st.replace('_', ' ').toUpperCase();
 
-        let existing = acc.find((g) => g.tableNumber === tblNum && g.station === st);
+        const personName = (item.guest_name && item.guest_name.trim())
+            || (item.customer_name && item.customer_name.trim() !== 'Valued Guest' ? item.customer_name.trim() : '')
+            || '';
+
+        // For camping orders or when guest/customer names are present, group by person so each person prints alone
+        const isCampingOrHasPerson = item.order_type === 'camping' || tblNum === 0 || !!personName;
+
+        let existing = acc.find((g) => {
+            if (isCampingOrHasPerson) {
+                return g.tableNumber === tblNum && g.station === st && g.personName === personName;
+            }
+            return g.tableNumber === tblNum && g.station === st;
+        });
+
         if (!existing) {
             existing = {
                 tableNumber: tblNum,
                 station: st,
                 stationName: stName,
+                personName,
                 ticketItems: [],
             };
             acc.push(existing);
@@ -363,52 +379,63 @@ function KDSContent() {
             {/* ESC/POS THERMAL STATION CHIT PRINT CONTAINER PORTAL */}
             {isMounted && createPortal(
                 <div className="print-kds-container hidden print:block print:w-full print:m-0 print:p-0 font-mono text-black text-xs">
-                    {groupedKDSPrintTickets.map((ticket, tIdx) => (
-                        <div key={tIdx} className="kds-chit-ticket mb-2 pb-2 border-b border-dashed border-black print:p-1">
-                            {/* Compact Station & Table Header */}
-                            <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-baseline">
-                                <span className="text-base font-black uppercase tracking-tight">{ticket.stationName}</span>
-                                <span className="text-lg font-black bg-black text-white px-2 py-0.5">
-                                    {ticket.ticketItems[0]?.order_type === 'takeout' || ticket.tableNumber === 0
-                                        ? `TAKEOUT ${ticket.ticketItems[0]?.customer_name ? `— ${ticket.ticketItems[0].customer_name}` : ''}`
-                                        : ticket.ticketItems[0]?.order_type === 'camping'
-                                        ? `CAMPING ${ticket.ticketItems[0]?.customer_name ? `— ${ticket.ticketItems[0].customer_name}` : ''}`
-                                        : `TBL #${ticket.tableNumber}`}
-                                </span>
-                            </div>
+                    {groupedKDSPrintTickets.map((ticket, tIdx) => {
+                        const effPerson = ticket.personName || ticket.ticketItems[0]?.customer_name || ticket.ticketItems[0]?.guest_name || '';
+                        return (
+                            <div key={tIdx} className="kds-chit-ticket mb-2 pb-2 border-b border-dashed border-black print:p-1">
+                                {/* Compact Station & Table Header */}
+                                <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-baseline">
+                                    <span className="text-base font-black uppercase tracking-tight">{ticket.stationName}</span>
+                                    <span className="text-lg font-black bg-black text-white px-2 py-0.5">
+                                        {ticket.ticketItems[0]?.order_type === 'takeout'
+                                            ? `TAKEOUT ${effPerson ? `— ${effPerson}` : ''}`
+                                            : ticket.ticketItems[0]?.order_type === 'camping' || ticket.tableNumber === 0
+                                            ? `CAMPING ${effPerson ? `— ${effPerson}` : ''}`
+                                            : `TBL #${ticket.tableNumber}${effPerson ? ` (${effPerson})` : ''}`}
+                                    </span>
+                                </div>
 
-                            {/* Timestamp Sub-header */}
-                            <div className="flex justify-between text-[10px] font-bold mb-1 border-b border-black/20 pb-0.5">
-                                <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                <span>Chit #{tIdx + 1} ({ticket.ticketItems.length} items)</span>
-                            </div>
-
-                            {/* Compact Ticket Items List */}
-                            <div className="space-y-1 py-1">
-                                {ticket.ticketItems.map((item, iIdx) => (
-                                    <div key={iIdx} className="text-xs leading-snug border-b border-gray-200 pb-1">
-                                        <div className="font-black text-sm text-black flex justify-between">
-                                            <span>{item.quantity}x {item.item_name}</span>
-                                        </div>
-
-                                        {item.special_notes && item.special_notes.trim() !== '' && (
-                                            <div className="text-[11px] font-black pl-2 mt-0.5 text-black">
-                                                *** NOTE: {item.special_notes} ***
-                                            </div>
-                                        )}
-
-                                        {Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
-                                            <div className="text-[11px] font-bold pl-2 mt-0.5 text-black">
-                                                {item.selected_modifiers.map((m: any, mIdx: number) => (
-                                                    <div key={mIdx}>+ {m.group ? `${m.group}: ` : ''}{m.option || m.name}</div>
-                                                ))}
-                                            </div>
-                                        )}
+                                {/* Person Tag Banner */}
+                                {effPerson && (
+                                    <div className="bg-black text-white font-black text-xs px-2 py-0.5 mb-1 uppercase tracking-wider flex justify-between">
+                                        <span>GUEST / PERSON:</span>
+                                        <span>{effPerson}</span>
                                     </div>
-                                ))}
+                                )}
+
+                                {/* Timestamp Sub-header */}
+                                <div className="flex justify-between text-[10px] font-bold mb-1 border-b border-black/20 pb-0.5">
+                                    <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>Chit #{tIdx + 1} ({ticket.ticketItems.length} items)</span>
+                                </div>
+
+                                {/* Compact Ticket Items List */}
+                                <div className="space-y-1 py-1">
+                                    {ticket.ticketItems.map((item, iIdx) => (
+                                        <div key={iIdx} className="text-xs leading-snug border-b border-gray-200 pb-1">
+                                            <div className="font-black text-sm text-black flex justify-between">
+                                                <span>{item.quantity}x {item.item_name}</span>
+                                            </div>
+
+                                            {item.special_notes && item.special_notes.trim() !== '' && (
+                                                <div className="text-[11px] font-black pl-2 mt-0.5 text-black">
+                                                    *** NOTE: {item.special_notes} ***
+                                                </div>
+                                            )}
+
+                                            {Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
+                                                <div className="text-[11px] font-bold pl-2 mt-0.5 text-black">
+                                                    {item.selected_modifiers.map((m: any, mIdx: number) => (
+                                                        <div key={mIdx}>+ {m.group ? `${m.group}: ` : ''}{m.option || m.name}</div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>,
                 document.body
             )}
@@ -938,114 +965,153 @@ function KDSContent() {
                                             </div>
                                         )}
 
-                                        {/* Table Items List */}
+                                        {/* Table Items List Grouped Per-Person */}
                                         <div className="space-y-3">
-                                            {tableItems.map((item) => {
-                                                const mItem = menuItems.find((m) => m.id === item.menu_item_id);
-                                                const statusButtonStyles = {
-                                                    pending: 'bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-extrabold',
-                                                    preparing: 'bg-blue-600 hover:bg-blue-700 text-white font-extrabold',
-                                                    ready: 'bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold',
-                                                    delivered: 'bg-gray-200 text-gray-600',
-                                                    cancelled: 'bg-red-500/10 text-red-700',
-                                                };
+                                            {(() => {
+                                                const personGroups = tableItems.reduce<Record<string, OrderItem[]>>((pAcc, pItem) => {
+                                                    const pKey = (pItem.guest_name && pItem.guest_name.trim())
+                                                        || (pItem.customer_name && pItem.customer_name.trim() !== 'Valued Guest' ? pItem.customer_name.trim() : '')
+                                                        || (isCamping ? 'Camping Guest' : 'Main Ticket');
+                                                    if (!pAcc[pKey]) pAcc[pKey] = [];
+                                                    pAcc[pKey].push(pItem);
+                                                    return pAcc;
+                                                }, {});
 
-                                                return (
-                                                    <div
-                                                        key={item.id}
-                                                        className="bg-[#fafbfa] border border-[#1c3a1e]/15 p-3 rounded-2xl space-y-2 shadow-2xs"
-                                                    >
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="flex items-center gap-2.5">
-                                                                {mItem?.image_url && (
-                                                                    <div className="relative h-9 w-9 rounded-lg overflow-hidden border border-[#1c3a1e]/15 flex-shrink-0">
-                                                                        <Image
-                                                                            src={mItem.image_url}
-                                                                            alt={item.item_name}
-                                                                            fill
-                                                                            unoptimized
-                                                                            className="object-cover"
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                                <div>
-                                                                    <div className="font-black text-sm text-[#1c3a1e]">
-                                                                        {item.quantity}x {item.item_name}
-                                                                    </div>
-                                                                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                                                                        STATION: {(stationDisplayNames[item.station] || item.station).replace(' Station', '').replace(' (Hot/Cold & Salads)', '')}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                                const groupKeys = Object.keys(personGroups);
+                                                const showPersonSections = isCamping || groupKeys.length > 1;
 
-                                                            <span className={`uppercase px-2 py-0.5 rounded-md text-[9px] font-black border ${item.status === 'pending'
-                                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                                                    : item.status === 'preparing'
-                                                                        ? 'bg-blue-100 text-blue-900 border-blue-300'
-                                                                        : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                                                }`}>{item.status}</span>
-                                                        </div>
-
-                                                        {/* Modifiers List */}
-                                                        {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                                            <div className="space-y-0.5 pl-1">
-                                                                {item.selected_modifiers.map((mod: any, idx: number) => (
-                                                                    <div
-                                                                        key={idx}
-                                                                        className="text-[11px] text-[#1c3a1e] font-medium"
+                                                return groupKeys.map((pKey) => {
+                                                    const pItems = personGroups[pKey];
+                                                    return (
+                                                        <div key={pKey} className={showPersonSections ? "bg-[#f4f8f5] border border-[#1c3a1e]/20 p-3 rounded-2xl space-y-2 mb-3 shadow-2xs" : "space-y-3"}>
+                                                            {showPersonSections && (
+                                                                <div className="flex justify-between items-center pb-2 border-b border-[#1c3a1e]/15 mb-2">
+                                                                    <span className="text-xs font-black text-[#1c3a1e] flex items-center gap-1.5">
+                                                                        <User className="h-3.5 w-3.5 text-[#d4af37]" />
+                                                                        <span>{pKey} ({pItems.length} {pItems.length === 1 ? 'item' : 'items'})</span>
+                                                                    </span>
+                                                                    <button
+                                                                        disabled={isPrinting}
+                                                                        onClick={() => handlePrintSingleChit(pItems)}
+                                                                        className="bg-[#1c3a1e] hover:bg-[#d4af37] hover:text-[#1c3a1e] text-white text-[11px] font-black px-2.5 py-1 rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                                                                        title={`Print chit for ${pKey} alone`}
                                                                     >
-                                                                        + {mod.group}: <span className="font-black">{mod.option}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Special Notes */}
-                                                        {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
-                                                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1 text-[11px] text-red-800 font-semibold">
-                                                                *** NOTE: {item.special_notes} ***
-                                                            </div>
-                                                        )}
-
-                                                        {/* Action Buttons for this item */}
-                                                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-[#1c3a1e]/10">
-                                                            <button
-                                                                disabled={isPrinting}
-                                                                onClick={() => handlePrintSingleChit([item])}
-                                                                className="bg-gray-100 hover:bg-[#1c3a1e] hover:text-white border border-gray-300 text-gray-700 p-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
-                                                                title="Print Chit for this 1 item"
-                                                            >
-                                                                <Printer className="h-3.5 w-3.5" />
-                                                            </button>
-
-                                                            {item.status !== 'pending' && (
-                                                                <button
-                                                                    disabled={isAnyBumping}
-                                                                    onClick={() => handleUndoStatus(item.id)}
-                                                                    className="bg-[#eaf2eb] hover:bg-gray-200 border border-[#1c3a1e]/20 text-[#1c3a1e] p-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
-                                                                    title="Undo Status"
-                                                                >
-                                                                    <RotateCcw className="h-3.5 w-3.5" />
-                                                                </button>
+                                                                        <Printer className="h-3.5 w-3.5" />
+                                                                        <span>Print {pKey} Chit</span>
+                                                                    </button>
+                                                                </div>
                                                             )}
 
-                                                            <button
-                                                                disabled={isAnyBumping}
-                                                                onClick={() => handleStatusClick(item.id, item.status)}
-                                                                className={`px-4 py-2.5 min-h-[44px] rounded-2xl text-xs sm:text-sm font-black transition-all shadow-xs disabled:opacity-50 cursor-pointer touch-manipulation active:scale-95 flex items-center gap-1.5 ${statusButtonStyles[item.status]}`}
-                                                            >
-                                                                {item.status === 'pending'
-                                                                    ? 'Start Cooking'
-                                                                    : item.status === 'preparing'
-                                                                        ? 'Mark Ready'
-                                                                        : item.status === 'ready'
-                                                                            ? 'Deliver'
-                                                                            : 'Done'}
-                                                            </button>
+                                                            {pItems.map((item) => {
+                                                                const mItem = menuItems.find((m) => m.id === item.menu_item_id);
+                                                                const statusButtonStyles = {
+                                                                    pending: 'bg-[#d4af37] hover:bg-[#b89728] text-[#1c3a1e] font-extrabold',
+                                                                    preparing: 'bg-blue-600 hover:bg-blue-700 text-white font-extrabold',
+                                                                    ready: 'bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold',
+                                                                    delivered: 'bg-gray-200 text-gray-600',
+                                                                    cancelled: 'bg-red-500/10 text-red-700',
+                                                                };
+
+                                                                return (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        className="bg-white border border-[#1c3a1e]/15 p-3 rounded-xl space-y-2 shadow-2xs"
+                                                                    >
+                                                                        <div className="flex justify-between items-start">
+                                                                            <div className="flex items-center gap-2.5">
+                                                                                {mItem?.image_url && (
+                                                                                    <div className="relative h-9 w-9 rounded-lg overflow-hidden border border-[#1c3a1e]/15 flex-shrink-0">
+                                                                                        <Image
+                                                                                            src={mItem.image_url}
+                                                                                            alt={item.item_name}
+                                                                                            fill
+                                                                                            unoptimized
+                                                                                            className="object-cover"
+                                                                                        />
+                                                                                    </div>
+                                                                                )}
+                                                                                <div>
+                                                                                    <div className="font-black text-sm text-[#1c3a1e]">
+                                                                                        {item.quantity}x {item.item_name}
+                                                                                    </div>
+                                                                                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                                                                                        STATION: {(stationDisplayNames[item.station] || item.station).replace(' Station', '').replace(' (Hot/Cold & Salads)', '')}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <span className={`uppercase px-2 py-0.5 rounded-md text-[9px] font-black border ${item.status === 'pending'
+                                                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                                                    : item.status === 'preparing'
+                                                                                        ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                                                                        : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                                                }`}>{item.status}</span>
+                                                                        </div>
+
+                                                                        {/* Modifiers List */}
+                                                                        {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                                                            <div className="space-y-0.5 pl-1">
+                                                                                {item.selected_modifiers.map((mod: any, idx: number) => (
+                                                                                    <div
+                                                                                        key={idx}
+                                                                                        className="text-[11px] text-[#1c3a1e] font-medium"
+                                                                                    >
+                                                                                        + {mod.group}: <span className="font-black">{mod.option}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Special Notes */}
+                                                                        {item.special_notes && item.special_notes.trim() !== '' && item.special_notes !== 'Added by Waiter' && (
+                                                                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1 text-[11px] text-red-800 font-semibold">
+                                                                                *** NOTE: {item.special_notes} ***
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Action Buttons for this item */}
+                                                                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-[#1c3a1e]/10">
+                                                                            <button
+                                                                                disabled={isPrinting}
+                                                                                onClick={() => handlePrintSingleChit([item])}
+                                                                                className="bg-gray-100 hover:bg-[#1c3a1e] hover:text-white border border-gray-300 text-gray-700 p-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                                                                                title="Print Chit for this 1 item"
+                                                                            >
+                                                                                <Printer className="h-3.5 w-3.5" />
+                                                                            </button>
+
+                                                                            {item.status !== 'pending' && (
+                                                                                <button
+                                                                                    disabled={isAnyBumping}
+                                                                                    onClick={() => handleUndoStatus(item.id)}
+                                                                                    className="bg-[#eaf2eb] hover:bg-gray-200 border border-[#1c3a1e]/20 text-[#1c3a1e] p-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                                                                                    title="Undo Status"
+                                                                                >
+                                                                                    <RotateCcw className="h-3.5 w-3.5" />
+                                                                                </button>
+                                                                            )}
+
+                                                                            <button
+                                                                                disabled={isAnyBumping}
+                                                                                onClick={() => handleStatusClick(item.id, item.status)}
+                                                                                className={`px-4 py-2.5 min-h-[44px] rounded-2xl text-xs sm:text-sm font-black transition-all shadow-xs disabled:opacity-50 cursor-pointer touch-manipulation active:scale-95 flex items-center gap-1.5 ${statusButtonStyles[item.status]}`}
+                                                                            >
+                                                                                {item.status === 'pending'
+                                                                                    ? 'Start Cooking'
+                                                                                    : item.status === 'preparing'
+                                                                                        ? 'Mark Ready'
+                                                                                        : item.status === 'ready'
+                                                                                            ? 'Deliver'
+                                                                                            : 'Done'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                });
+                                            })()}
                                         </div>
                                     </div>
                                 </div>

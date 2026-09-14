@@ -218,6 +218,7 @@ export async function submitCustomerOrder(data: {
     station: StationType;
     selectedModifiers: SelectedModifier[];
     specialNotes?: string;
+    guestName?: string;
   }>;
 }) {
   if (!data.items || data.items.length === 0 || !pool) {
@@ -352,6 +353,7 @@ export async function submitCustomerOrder(data: {
         order_type: effOrderType,
         customer_name: resolvedCustName,
         customer_phone: canonicalPhone,
+        guest_name: item.guestName || undefined,
         menu_item_id: item.menuItemId,
         item_name: item.itemName,
         quantity: 1,
@@ -379,7 +381,7 @@ export async function submitCustomerOrder(data: {
     let pIdx = 1;
 
     for (const newItem of itemsToInsert) {
-      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14}, $${pIdx+15}, $${pIdx+16})`);
+      valuePlaceholders.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14}, $${pIdx+15}, $${pIdx+16}, $${pIdx+17})`);
       params.push(
         newItem.id,
         newItem.order_id,
@@ -397,14 +399,15 @@ export async function submitCustomerOrder(data: {
         resolvedCustName,
         canonicalPhone,
         canonicalPhone || null, // loyalty_phone
-        masterCustomerId
+        masterCustomerId,
+        newItem.guest_name || null
       );
-      pIdx += 17;
+      pIdx += 18;
     }
 
     if (valuePlaceholders.length > 0) {
       await pool.query(
-        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone, loyalty_phone, customer_id)
+        `INSERT INTO order_items (id, order_id, session_id, table_number, menu_item_id, item_name, quantity, unit_price_usd, station, status, selected_modifiers, special_notes, order_type, customer_name, customer_phone, loyalty_phone, customer_id, guest_name)
          VALUES ${valuePlaceholders.join(', ')}`,
         params
       );
