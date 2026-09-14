@@ -42,14 +42,14 @@ function KDSContent() {
     const [selectedTables, setSelectedTables] = useState<number[]>([]); // Empty = ALL tables
     const [selectedStatuses, setSelectedStatuses] = useState<ItemStatus[]>([]); // Empty = ALL statuses
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [groupByMode, setGroupByMode] = useState<'single' | 'table' | 'customer'>('table');
+    const [groupByMode, setGroupByMode] = useState<'single' | 'table' | 'customer'>('single');
     const groupByTable = groupByMode === 'table';
     const [activePrintOverride, setActivePrintOverride] = useState<string[] | null>(null);
     const [activeTab, setActiveTab] = useState<'tickets' | 'expediter'>('tickets');
     const [sortBy, setSortBy] = useState<'received' | 'status' | 'time' | 'alphabet'>('received');
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
-    const [showOverview, setShowOverview] = useState<boolean>(true);
+    const [showOverview, setShowOverview] = useState<boolean>(false);
     const [printedItemIds, setPrintedItemIds] = useState<string[]>([]);
     const [bumpingItemIds, setBumpingItemIds] = useState<Record<string, boolean>>({});
     const isAnyBumping = Object.values(bumpingItemIds).some(Boolean);
