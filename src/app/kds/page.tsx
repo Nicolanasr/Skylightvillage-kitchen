@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { useRealtimeKDS } from '@/hooks/useRealtimeKDS';
@@ -50,12 +50,13 @@ function KDSContent() {
     const [showPrintedItems, setShowPrintedItems] = useState<boolean>(false);
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
     const [showOverview, setShowOverview] = useState<boolean>(false);
+    const [overviewSubMode, setOverviewSubMode] = useState<'compact' | 'detailed'>('detailed');
     const [printedItemIds, setPrintedItemIds] = useState<string[]>([]);
     const [bumpingItemIds, setBumpingItemIds] = useState<Record<string, boolean>>({});
     const isAnyBumping = Object.values(bumpingItemIds).some(Boolean);
     const [bumpingTrayTableNum, setBumpingTrayTableNum] = useState<number | null>(null);
     const [isPrinting, setIsPrinting] = useState<boolean>(false);
-    const [printMode, setPrintMode] = useState<'station' | 'customer_grouped'>('station');
+    const [printMode, setPrintMode] = useState<'station' | 'customer_grouped' | 'overview_section'>('station');
     const [currentTime, setCurrentTime] = useState<number>(Date.now());
     const [isMounted, setIsMounted] = useState(false);
 
@@ -131,100 +132,110 @@ function KDSContent() {
         }
     };
 
-    const activeKitchenItems = localItems.filter(
-        (i) => i.status !== 'cancelled' && i.status !== 'delivered' && i.order_type !== 'event' && i.order_type !== 'event_voucher'
-    );
+    const activeKitchenItems = useMemo(() => {
+        return localItems.filter(
+            (i) => i.status !== 'cancelled' && i.status !== 'delivered' && i.order_type !== 'event' && i.order_type !== 'event_voucher'
+        );
+    }, [localItems]);
 
-    const readyItemsByTable = activeKitchenItems
-        .filter((i) => i.status === 'ready')
-        .reduce<Record<number, OrderItem[]>>((acc, item) => {
-            const tblNum = item.table_number || 1;
-            if (!acc[tblNum]) acc[tblNum] = [];
-            acc[tblNum].push(item);
-            return acc;
-        }, {});
+    const readyItemsByTable = useMemo(() => {
+        return activeKitchenItems
+            .filter((i) => i.status === 'ready')
+            .reduce<Record<number, OrderItem[]>>((acc, item) => {
+                const tblNum = item.table_number || 1;
+                if (!acc[tblNum]) acc[tblNum] = [];
+                acc[tblNum].push(item);
+                return acc;
+            }, {});
+    }, [activeKitchenItems]);
 
-    const sortedItems = [...activeKitchenItems].sort((a, b) => {
-        if (sortBy === 'received' || sortBy === 'time') {
-            // Default: Oldest received orders first (FIFO). Strict deterministic tie-breaker so card position NEVER changes when status is updated!
-            const timeA = new Date(a.created_at).getTime();
-            const timeB = new Date(b.created_at).getTime();
-            if (timeA !== timeB) {
-                return timeA - timeB;
+    const sortedItems = useMemo(() => {
+        return [...activeKitchenItems].sort((a, b) => {
+            if (sortBy === 'received' || sortBy === 'time') {
+                // Default: Oldest received orders first (FIFO). Strict deterministic tie-breaker so card position NEVER changes when status is updated!
+                const timeA = new Date(a.created_at).getTime();
+                const timeB = new Date(b.created_at).getTime();
+                if (timeA !== timeB) {
+                    return timeA - timeB;
+                }
+                return a.id.localeCompare(b.id);
             }
-            return a.id.localeCompare(b.id);
-        }
 
-        if (sortBy === 'status') {
-            const statusPriority: Record<string, number> = {
-                pending: 1,
-                preparing: 2,
-                ready: 3,
-            };
-            const prioA = statusPriority[a.status] || 99;
-            const prioB = statusPriority[b.status] || 99;
-            if (prioA !== prioB) {
-                return prioA - prioB;
+            if (sortBy === 'status') {
+                const statusPriority: Record<string, number> = {
+                    pending: 1,
+                    preparing: 2,
+                    ready: 3,
+                };
+                const prioA = statusPriority[a.status] || 99;
+                const prioB = statusPriority[b.status] || 99;
+                if (prioA !== prioB) {
+                    return prioA - prioB;
+                }
+                const timeA = new Date(a.created_at).getTime();
+                const timeB = new Date(b.created_at).getTime();
+                if (timeA !== timeB) {
+                    return timeA - timeB;
+                }
+                return a.id.localeCompare(b.id);
             }
-            const timeA = new Date(a.created_at).getTime();
-            const timeB = new Date(b.created_at).getTime();
-            if (timeA !== timeB) {
-                return timeA - timeB;
+
+            if (sortBy === 'alphabet') {
+                const nameComp = a.item_name.localeCompare(b.item_name);
+                if (nameComp !== 0) return nameComp;
+                return a.id.localeCompare(b.id);
             }
-            return a.id.localeCompare(b.id);
-        }
 
-        if (sortBy === 'alphabet') {
-            const nameComp = a.item_name.localeCompare(b.item_name);
-            if (nameComp !== 0) return nameComp;
             return a.id.localeCompare(b.id);
-        }
-
-        return a.id.localeCompare(b.id);
-    });
+        });
+    }, [activeKitchenItems, sortBy]);
 
     // Dynamic List of active table numbers
-    const availableTableNumbers = Array.from(
-        new Set(activeKitchenItems.map((i) => i.table_number || 1))
-    ).sort((a, b) => a - b);
+    const availableTableNumbers = useMemo(() => {
+        return Array.from(
+            new Set(activeKitchenItems.map((i) => i.table_number || 1))
+        ).sort((a, b) => a - b);
+    }, [activeKitchenItems]);
 
     // Filter Items by Station, Multi-Table, Multi-Status & Search Query
-    const displayedItems = sortedItems.filter((item) => {
-        // Station Filter
-        if (stationFilter !== 'all' && item.station !== stationFilter) return false;
+    const displayedItems = useMemo(() => {
+        return sortedItems.filter((item) => {
+            // Station Filter
+            if (stationFilter !== 'all' && item.station !== stationFilter) return false;
 
-        // Multi-Table Selection Filter (If any selected)
-        if (selectedTables.length > 0 && !selectedTables.includes(item.table_number || 1)) {
-            return false;
-        }
+            // Multi-Table Selection Filter (If any selected)
+            if (selectedTables.length > 0 && !selectedTables.includes(item.table_number || 1)) {
+                return false;
+            }
 
-        // Multi-Status Selection Filter (If any selected)
-        if (selectedStatuses.length > 0 && !selectedStatuses.includes(item.status)) {
-            return false;
-        }
+            // Multi-Status Selection Filter (If any selected)
+            if (selectedStatuses.length > 0 && !selectedStatuses.includes(item.status)) {
+                return false;
+            }
 
-        // Search Query Filter
-        if (searchQuery.trim() !== '') {
-            const q = searchQuery.toLowerCase().trim();
-            const tblStr = `table #${item.table_number || 1} tbl #${item.table_number || 1} #${item.table_number || 1} ${item.table_number || 1}`;
-            const nameStr = item.item_name.toLowerCase();
-            const noteStr = (item.special_notes || '').toLowerCase();
-            const modStr = (item.selected_modifiers || []).map((m: any) => `${m.group} ${m.option}`).join(' ').toLowerCase();
+            // Search Query Filter
+            if (searchQuery.trim() !== '') {
+                const q = searchQuery.toLowerCase().trim();
+                const tblStr = `table #${item.table_number || 1} tbl #${item.table_number || 1} #${item.table_number || 1} ${item.table_number || 1}`;
+                const nameStr = item.item_name.toLowerCase();
+                const noteStr = (item.special_notes || '').toLowerCase();
+                const modStr = (item.selected_modifiers || []).map((m: any) => `${m.group} ${m.option}`).join(' ').toLowerCase();
 
-            const matches =
-                tblStr.includes(q) ||
-                nameStr.includes(q) ||
-                noteStr.includes(q) ||
-                modStr.includes(q);
+                const matches =
+                    tblStr.includes(q) ||
+                    nameStr.includes(q) ||
+                    noteStr.includes(q) ||
+                    modStr.includes(q);
 
-            if (!matches) return false;
-        }
+                if (!matches) return false;
+            }
 
-        return true;
-    });
+            return true;
+        });
+    }, [sortedItems, stationFilter, selectedTables, selectedStatuses, searchQuery]);
 
     // Helper for customer identification & mobile number grouping
-    const getCustomerGroupInfo = (item: OrderItem) => {
+    const getCustomerGroupInfo = useCallback((item: OrderItem) => {
         const rawPhone = (item.customer_phone || item.loyalty_phone || '').trim();
         const rawName = (item.guest_name && item.guest_name.trim())
             || (item.customer_name && item.customer_name.trim() !== 'Valued Guest' ? item.customer_name.trim() : '');
@@ -259,85 +270,244 @@ function KDSContent() {
             phone: rawPhone,
             name: rawName,
         };
-    };
+    }, []);
 
     // Grouping by Session / Table for Grouped View
-    const itemsGroupedByCard = displayedItems.reduce<Record<string, OrderItem[]>>((acc, item) => {
-        const isCamping = item.order_type === 'camping';
-        const isTakeout = item.order_type === 'takeout';
-        const isTable = !isCamping && !isTakeout && item.table_number && item.table_number > 0;
+    const itemsGroupedByCard = useMemo(() => {
+        return displayedItems.reduce<Record<string, OrderItem[]>>((acc, item) => {
+            const isCamping = item.order_type === 'camping';
+            const isTakeout = item.order_type === 'takeout';
+            const isTable = !isCamping && !isTakeout && item.table_number && item.table_number > 0;
 
-        let key = '';
-        if (isTable) {
-            key = `table-${item.table_number}`;
-        } else {
-            const info = getCustomerGroupInfo(item);
-            key = `cust-${info.groupKey}`;
-        }
+            let key = '';
+            if (isTable) {
+                key = `table-${item.table_number}`;
+            } else {
+                const info = getCustomerGroupInfo(item);
+                key = `cust-${info.groupKey}`;
+            }
 
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(item);
-        return acc;
-    }, {});
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
+            return acc;
+        }, {});
+    }, [displayedItems, getCustomerGroupInfo]);
 
     // Grouping by Customer (primarily mobile number) for Customer View Mode
-    const itemsGroupedByCustomer = displayedItems.reduce<Record<string, {
-        groupKey: string;
-        customerName: string;
-        phone: string;
-        orderType: string;
-        tableNumber: number;
-        items: OrderItem[];
-    }>>((acc, item) => {
-        const info = getCustomerGroupInfo(item);
+    const itemsGroupedByCustomer = useMemo(() => {
+        return displayedItems.reduce<Record<string, {
+            groupKey: string;
+            customerName: string;
+            phone: string;
+            orderType: string;
+            tableNumber: number;
+            items: OrderItem[];
+        }>>((acc, item) => {
+            const info = getCustomerGroupInfo(item);
 
-        if (!acc[info.groupKey]) {
-            acc[info.groupKey] = {
-                groupKey: info.groupKey,
-                customerName: info.displayTitle,
-                phone: info.phone,
-                orderType: item.order_type || 'dine_in',
-                tableNumber: item.table_number || 0,
-                items: [],
-            };
-        }
-        acc[info.groupKey].items.push(item);
-        return acc;
-    }, {});
+            if (!acc[info.groupKey]) {
+                acc[info.groupKey] = {
+                    groupKey: info.groupKey,
+                    customerName: info.displayTitle,
+                    phone: info.phone,
+                    orderType: item.order_type || 'dine_in',
+                    tableNumber: item.table_number || 0,
+                    items: [],
+                };
+            }
+            acc[info.groupKey].items.push(item);
+            return acc;
+        }, {});
+    }, [displayedItems, getCustomerGroupInfo]);
+
+    // Helper to get unique signature for an item's customization (dish name + special notes + modifiers)
+    const getItemVariantSignature = useCallback((item: OrderItem) => {
+        const rawNotes = (item.special_notes || '').trim();
+        const cleanNotes = (rawNotes === 'Added by Waiter' || rawNotes === 'None') ? '' : rawNotes;
+
+        const mods = (Array.isArray(item.selected_modifiers) ? item.selected_modifiers : [])
+            .map((m: any) => {
+                const group = m.group ? `${m.group}: ` : '';
+                const opt = m.option || m.name || '';
+                return `${group}${opt}`.trim();
+            })
+            .filter(Boolean)
+            .sort();
+
+        const modifiersText = mods.join(', ');
+        const notesText = cleanNotes;
+        const variantKey = `${item.item_name.toLowerCase()}||notes:${cleanNotes.toLowerCase()}||mods:${modifiersText.toLowerCase()}`;
+
+        return {
+            variantKey,
+            notesText,
+            modifiersText,
+        };
+    }, []);
+
+    // Aggregate Detailed Active Items Quantity Overview (Item Name + Notes + Modifiers)
+    const detailedItemQuantitySummary = useMemo(() => {
+        return displayedItems.reduce<Array<{
+            variantKey: string;
+            itemName: string;
+            notesText: string;
+            modifiersText: string;
+            station: string;
+            totalQty: number;
+            pendingQty: number;
+            preparingQty: number;
+            readyQty: number;
+        }>>((acc, item) => {
+            if (item.status === 'cancelled' || item.status === 'delivered') return acc;
+
+            const { variantKey, notesText, modifiersText } = getItemVariantSignature(item);
+            let existing = acc.find((i) => i.variantKey === variantKey);
+            const qty = item.quantity || 1;
+
+            if (!existing) {
+                existing = {
+                    variantKey,
+                    itemName: item.item_name,
+                    notesText,
+                    modifiersText,
+                    station: item.station || 'mezza',
+                    totalQty: 0,
+                    pendingQty: 0,
+                    preparingQty: 0,
+                    readyQty: 0,
+                };
+                acc.push(existing);
+            }
+
+            existing.totalQty += qty;
+            if (item.status === 'pending') existing.pendingQty += qty;
+            else if (item.status === 'preparing') existing.preparingQty += qty;
+            else if (item.status === 'ready') existing.readyQty += qty;
+
+            return acc;
+        }, []).sort((a, b) => b.totalQty - a.totalQty);
+    }, [displayedItems, getItemVariantSignature]);
 
     // Aggregate Active Items Quantity Overview (Item Name -> Total Qty, Pending Qty, Preparing Qty, Ready Qty)
-    const itemQuantitySummary = displayedItems.reduce<Array<{
-        itemName: string;
-        station: string;
-        totalQty: number;
-        pendingQty: number;
-        preparingQty: number;
-        readyQty: number;
-    }>>((acc, item) => {
-        if (item.status === 'cancelled' || item.status === 'delivered') return acc;
+    const itemQuantitySummary = useMemo(() => {
+        return displayedItems.reduce<Array<{
+            itemName: string;
+            station: string;
+            totalQty: number;
+            pendingQty: number;
+            preparingQty: number;
+            readyQty: number;
+        }>>((acc, item) => {
+            if (item.status === 'cancelled' || item.status === 'delivered') return acc;
 
-        let existing = acc.find((i) => i.itemName.toLowerCase() === item.item_name.toLowerCase());
-        const qty = item.quantity || 1;
+            let existing = acc.find((i) => i.itemName.toLowerCase() === item.item_name.toLowerCase());
+            const qty = item.quantity || 1;
 
-        if (!existing) {
-            existing = {
-                itemName: item.item_name,
-                station: item.station || 'mezza',
-                totalQty: 0,
-                pendingQty: 0,
-                preparingQty: 0,
-                readyQty: 0,
-            };
-            acc.push(existing);
+            if (!existing) {
+                existing = {
+                    itemName: item.item_name,
+                    station: item.station || 'mezza',
+                    totalQty: 0,
+                    pendingQty: 0,
+                    preparingQty: 0,
+                    readyQty: 0,
+                };
+                acc.push(existing);
+            }
+
+            existing.totalQty += qty;
+            if (item.status === 'pending') existing.pendingQty += qty;
+            else if (item.status === 'preparing') existing.preparingQty += qty;
+            else if (item.status === 'ready') existing.readyQty += qty;
+
+            return acc;
+        }, []).sort((a, b) => b.totalQty - a.totalQty);
+    }, [displayedItems]);
+
+    const stationDisplayNames: Record<string, string> = useMemo(() => ({
+        mezza: 'Mezza Station (Hot/Cold & Salads)',
+        cold_mezza: 'Mezza Station (Hot/Cold & Salads)',
+        hot_mezza: 'Mezza Station (Hot/Cold & Salads)',
+        sajj: 'Sajj Station',
+        grill: 'BBQ Station',
+        subs_sandwiches: 'Subs, Sandwiches & Kids Meals',
+        bar: 'Bar & Refreshments',
+        shisha: 'Shisha Lounge',
+    }), []);
+
+    // Aggregate Active Kitchen Items Overview by Station / Section
+    const overviewBySection = useMemo(() => {
+        if (overviewSubMode === 'detailed') {
+            const groups: Record<string, {
+                stationKey: string;
+                stationName: string;
+                items: Array<{
+                    variantKey: string;
+                    itemName: string;
+                    notesText: string;
+                    modifiersText: string;
+                    station: string;
+                    totalQty: number;
+                    pendingQty: number;
+                    preparingQty: number;
+                    readyQty: number;
+                }>;
+                totalQty: number;
+            }> = {};
+
+            detailedItemQuantitySummary.forEach((item) => {
+                let stKey = item.station || 'mezza';
+                if (stKey === 'cold_mezza' || stKey === 'hot_mezza') stKey = 'mezza';
+                const stName = stationDisplayNames[stKey] || stKey.replace('_', ' ').toUpperCase();
+
+                if (!groups[stKey]) {
+                    groups[stKey] = {
+                        stationKey: stKey,
+                        stationName: stName,
+                        items: [],
+                        totalQty: 0,
+                    };
+                }
+                groups[stKey].items.push(item);
+                groups[stKey].totalQty += item.totalQty;
+            });
+
+            return Object.values(groups);
+        } else {
+            const groups: Record<string, {
+                stationKey: string;
+                stationName: string;
+                items: Array<{
+                    itemName: string;
+                    station: string;
+                    totalQty: number;
+                    pendingQty: number;
+                    preparingQty: number;
+                    readyQty: number;
+                }>;
+                totalQty: number;
+            }> = {};
+
+            itemQuantitySummary.forEach((item) => {
+                let stKey = item.station || 'mezza';
+                if (stKey === 'cold_mezza' || stKey === 'hot_mezza') stKey = 'mezza';
+                const stName = stationDisplayNames[stKey] || stKey.replace('_', ' ').toUpperCase();
+
+                if (!groups[stKey]) {
+                    groups[stKey] = {
+                        stationKey: stKey,
+                        stationName: stName,
+                        items: [],
+                        totalQty: 0,
+                    };
+                }
+                groups[stKey].items.push(item);
+                groups[stKey].totalQty += item.totalQty;
+            });
+
+            return Object.values(groups);
         }
-
-        existing.totalQty += qty;
-        if (item.status === 'pending') existing.pendingQty += qty;
-        else if (item.status === 'preparing') existing.preparingQty += qty;
-        else if (item.status === 'ready') existing.readyQty += qty;
-
-        return acc;
-    }, []).sort((a, b) => b.totalQty - a.totalQty);
+    }, [overviewSubMode, detailedItemQuantitySummary, itemQuantitySummary, stationDisplayNames]);
 
     const toggleTableSelection = (tbl: number) => {
         setSelectedTables((prev) =>
@@ -358,132 +528,127 @@ function KDSContent() {
         setStationFilter('all');
     };
 
-    const stationDisplayNames: Record<string, string> = {
-        mezza: 'Mezza Station (Hot/Cold & Salads)',
-        cold_mezza: 'Mezza Station (Hot/Cold & Salads)',
-        hot_mezza: 'Mezza Station (Hot/Cold & Salads)',
-        sajj: 'Sajj Station',
-        grill: 'BBQ Station',
-        subs_sandwiches: 'Subs, Sandwiches & Kids Meals',
-        bar: 'Bar & Refreshments',
-        shisha: 'Shisha Lounge',
-    };
-
-    const itemsToPrint = items.filter((item) => {
-        if (activePrintOverride) {
-            return activePrintOverride.includes(item.id);
-        }
-        if (item.status === 'cancelled' || item.status === 'delivered') return false;
-        if (!showPrintedItems && (item.is_printed || printedItemIds.includes(item.id))) return false;
-        if (stationFilter !== 'all' && item.station !== stationFilter) return false;
-        return true;
-    });
+    const itemsToPrint = useMemo(() => {
+        return localItems.filter((item) => {
+            if (activePrintOverride && activePrintOverride.length > 0) {
+                return activePrintOverride.includes(item.id);
+            }
+            if (item.status === 'cancelled' || item.status === 'delivered') return false;
+            if (!showPrintedItems && (item.is_printed || printedItemIds.includes(item.id))) return false;
+            if (stationFilter !== 'all' && item.station !== stationFilter) return false;
+            return true;
+        });
+    }, [localItems, activePrintOverride, showPrintedItems, printedItemIds, stationFilter]);
 
     // Standard Station Chit Grouping:
     // If Table: Group by Table Number then Station
     // If Camping / Mobile: Group by Mobile Number then Station
-    const groupedKDSPrintTickets = itemsToPrint.reduce<Array<{
-        groupKey: string;
-        tableNumber: number;
-        customerName: string;
-        orderType: string;
-        station: string;
-        stationName: string;
-        ticketItems: OrderItem[];
-    }>>((acc, item) => {
-        let st: string = item.station || 'mezza';
-        if (st === 'cold_mezza' || st === 'hot_mezza') st = 'mezza';
-        const stName = stationDisplayNames[st] || st.replace('_', ' ').toUpperCase();
+    const groupedKDSPrintTickets = useMemo(() => {
+        return itemsToPrint.reduce<Array<{
+            groupKey: string;
+            tableNumber: number;
+            customerName: string;
+            orderType: string;
+            station: string;
+            stationName: string;
+            ticketItems: OrderItem[];
+        }>>((acc, item) => {
+            let st: string = item.station || 'mezza';
+            if (st === 'cold_mezza' || st === 'hot_mezza') st = 'mezza';
+            const stName = stationDisplayNames[st] || st.replace('_', ' ').toUpperCase();
 
-        const isCamping = item.order_type === 'camping';
-        const isTakeout = item.order_type === 'takeout';
-        const isTableOrder = !isCamping && !isTakeout && (item.table_number && item.table_number > 0);
+            const isCamping = item.order_type === 'camping';
+            const isTakeout = item.order_type === 'takeout';
+            const isTableOrder = !isCamping && !isTakeout && (item.table_number && item.table_number > 0);
 
-        let groupKey = '';
-        let customerDisplay = '';
+            let groupKey = '';
+            let customerDisplay = '';
 
-        if (isTableOrder) {
-            const tblNum = item.table_number || 1;
-            groupKey = `TBL-${tblNum}-${st}`;
-            customerDisplay = `TBL #${tblNum}`;
-        } else {
-            // Camping or Mobile/Takeout order -> group by Mobile Number / Customer Info, then station
-            const info = getCustomerGroupInfo(item);
-            groupKey = `MOBILE-${info.groupKey}-${st}`;
-            if (isCamping) {
-                customerDisplay = `CAMPING — ${info.displayTitle}`;
-            } else if (isTakeout) {
-                customerDisplay = `TAKEOUT — ${info.displayTitle}`;
+            if (isTableOrder) {
+                const tblNum = item.table_number || 1;
+                groupKey = `TBL-${tblNum}-${st}`;
+                customerDisplay = `TBL #${tblNum}`;
             } else {
-                customerDisplay = info.displayTitle;
+                // Camping or Mobile/Takeout order -> group by Mobile Number / Customer Info, then station
+                const info = getCustomerGroupInfo(item);
+                groupKey = `MOBILE-${info.groupKey}-${st}`;
+                if (isCamping) {
+                    customerDisplay = `CAMPING — ${info.displayTitle}`;
+                } else if (isTakeout) {
+                    customerDisplay = `TAKEOUT — ${info.displayTitle}`;
+                } else {
+                    customerDisplay = info.displayTitle;
+                }
             }
-        }
 
-        let existing = acc.find((g) => g.groupKey === groupKey);
-        if (!existing) {
-            existing = {
-                groupKey,
-                tableNumber: item.table_number || 0,
-                customerName: customerDisplay,
-                orderType: item.order_type || 'dine_in',
-                station: st,
-                stationName: stName,
-                ticketItems: [],
-            };
-            acc.push(existing);
-        }
-        existing.ticketItems.push(item);
-        return acc;
-    }, []);
+            let existing = acc.find((g) => g.groupKey === groupKey);
+            if (!existing) {
+                existing = {
+                    groupKey,
+                    tableNumber: item.table_number || 0,
+                    customerName: customerDisplay,
+                    orderType: item.order_type || 'dine_in',
+                    station: st,
+                    stationName: stName,
+                    ticketItems: [],
+                };
+                acc.push(existing);
+            }
+            existing.ticketItems.push(item);
+            return acc;
+        }, []);
+    }, [itemsToPrint, getCustomerGroupInfo]);
 
     // Grouping for "Print By Customer" option: Customer -> Category (Station) -> Item Name
-    const groupedByCustomerTickets = itemsToPrint.reduce<Array<{
-        groupKey: string;
-        customerName: string;
-        phone: string;
-        orderType: string;
-        tableNumber: number;
-        stations: Array<{
-            stationKey: string;
-            stationName: string;
-            items: OrderItem[];
-        }>;
-        totalItemsCount: number;
-    }>>((acc, item) => {
-        const info = getCustomerGroupInfo(item);
+    const groupedByCustomerTickets = useMemo(() => {
+        return itemsToPrint.reduce<Array<{
+            groupKey: string;
+            customerName: string;
+            phone: string;
+            orderType: string;
+            tableNumber: number;
+            stations: Array<{
+                stationKey: string;
+                stationName: string;
+                items: OrderItem[];
+            }>;
+            totalItemsCount: number;
+        }>>((acc, item) => {
+            const info = getCustomerGroupInfo(item);
 
-        let existingCust = acc.find((c) => c.groupKey === info.groupKey);
-        if (!existingCust) {
-            existingCust = {
-                groupKey: info.groupKey,
-                customerName: info.displayTitle,
-                phone: info.phone,
-                orderType: item.order_type || 'dine_in',
-                tableNumber: item.table_number || 0,
-                stations: [],
-                totalItemsCount: 0,
-            };
-            acc.push(existingCust);
-        }
+            let existingCust = acc.find((c) => c.groupKey === info.groupKey);
+            if (!existingCust) {
+                existingCust = {
+                    groupKey: info.groupKey,
+                    customerName: info.displayTitle,
+                    phone: info.phone,
+                    orderType: item.order_type || 'dine_in',
+                    tableNumber: item.table_number || 0,
+                    stations: [],
+                    totalItemsCount: 0,
+                };
+                acc.push(existingCust);
+            }
 
-        let st: string = item.station || 'mezza';
-        if (st === 'cold_mezza' || st === 'hot_mezza') st = 'mezza';
-        const stName = stationDisplayNames[st] || st.replace('_', ' ').toUpperCase();
+            let st: string = item.station || 'mezza';
+            if (st === 'cold_mezza' || st === 'hot_mezza') st = 'mezza';
+            const stName = stationDisplayNames[st] || st.replace('_', ' ').toUpperCase();
 
-        let existingStation = existingCust.stations.find((s) => s.stationKey === st);
-        if (!existingStation) {
-            existingStation = {
-                stationKey: st,
-                stationName: stName,
-                items: [],
-            };
-            existingCust.stations.push(existingStation);
-        }
+            let existingStation = existingCust.stations.find((s) => s.stationKey === st);
+            if (!existingStation) {
+                existingStation = {
+                    stationKey: st,
+                    stationName: stName,
+                    items: [],
+                };
+                existingCust.stations.push(existingStation);
+            }
 
-        existingStation.items.push(item);
-        existingCust.totalItemsCount += item.quantity || 1;
-        return acc;
-    }, []);
+            existingStation.items.push(item);
+            existingCust.totalItemsCount += item.quantity || 1;
+            return acc;
+        }, []);
+    }, [itemsToPrint, getCustomerGroupInfo]);
 
     const handlePrintSingleChit = async (targetItems: OrderItem[]) => {
         if (!targetItems || targetItems.length === 0) return;
@@ -527,6 +692,7 @@ function KDSContent() {
         setPrintMode(targetPrintMode);
 
         const printedIds = itemsToPrint.map((i) => i.id);
+        setActivePrintOverride(printedIds);
 
         // Optimistically update local state: mark items printed & switch pending -> preparing ("Start Cooking")
         setLocalItems((prev) =>
@@ -545,6 +711,7 @@ function KDSContent() {
 
         setTimeout(async () => {
             window.print();
+            setActivePrintOverride(null);
             try {
                 await markKDSItemsPrinted(printedIds);
                 await refreshKDSData();
@@ -561,6 +728,7 @@ function KDSContent() {
         setPrintMode('customer_grouped');
 
         const printedIds = itemsToPrint.map((i) => i.id);
+        setActivePrintOverride(printedIds);
 
         setLocalItems((prev) =>
             prev.map((item) => {
@@ -578,6 +746,7 @@ function KDSContent() {
 
         setTimeout(async () => {
             window.print();
+            setActivePrintOverride(null);
             try {
                 await markKDSItemsPrinted(printedIds);
                 await refreshKDSData();
@@ -587,22 +756,94 @@ function KDSContent() {
         }, 100);
     };
 
+    const handlePrintOverview = async () => {
+        if (itemQuantitySummary.length === 0) return;
+        setIsPrinting(true);
+        setPrintMode('overview_section');
+
+        setTimeout(() => {
+            window.print();
+            setIsPrinting(false);
+        }, 100);
+    };
+
     return (
         <div className="min-h-screen bg-[#fafbfa] text-[#1c3a1e] p-4 md:p-6 print:p-0 print:bg-white">
             {/* ESC/POS THERMAL STATION CHIT PRINT CONTAINER PORTAL */}
-            {isMounted && createPortal(
+            {isMounted && isPrinting && createPortal(
                 <div className="print-kds-container hidden print:block print:w-full print:m-0 print:p-0 font-mono text-black text-xs">
-                    {printMode === 'customer_grouped' ? (
+                    {printMode === 'overview_section' ? (
+                        overviewBySection.map((sec, sIdx) => (
+                            <div key={sIdx} className="kds-chit-ticket mb-3 pb-3 border-b-2 border-black print:p-2">
+                                {/* Header */}
+                                <div className="border-b-2 border-black pb-1 mb-1.5 flex justify-between items-baseline bg-black text-white px-2 py-1">
+                                    <span className="text-base font-black uppercase tracking-tight">
+                                        KITCHEN PREP OVERVIEW
+                                    </span>
+                                    <span className="text-xs font-black bg-white text-black px-2 py-0.5 rounded">
+                                        {overviewSubMode === 'detailed' ? 'DETAILED BY NOTES' : 'BY DISH'}
+                                    </span>
+                                </div>
+
+                                {/* Timestamp Sub-header */}
+                                <div className="flex justify-between text-[10px] font-bold mb-2 border-b border-black/30 pb-0.5">
+                                    <span>PRINTED: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>SECTION {sIdx + 1}/{overviewBySection.length} ({sec.totalQty} ITEMS)</span>
+                                </div>
+
+                                {/* Section Card Header */}
+                                <div className="border-2 border-black p-1.5 rounded mb-2">
+                                    <div className="font-black text-xs uppercase bg-black text-white px-2 py-1 mb-1.5 flex justify-between items-center">
+                                        <span>SECTION: {sec.stationName}</span>
+                                        <span className="bg-white text-black text-[10px] px-1.5 py-0.5 rounded font-black">
+                                            {sec.totalQty} ITEMS
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-1.5 pt-0.5">
+                                        {sec.items.map((item: any, iIdx: number) => {
+                                            const isDetailed = overviewSubMode === 'detailed';
+                                            const hasNotes = Boolean(item.notesText);
+                                            const hasMods = Boolean(item.modifiersText);
+
+                                            return (
+                                                <div key={iIdx} className="text-xs leading-snug border-b border-gray-300 pb-1 last:border-b-0">
+                                                    <div className="font-black text-sm text-black flex justify-between items-baseline">
+                                                        <span>• {item.totalQty}x {item.itemName}</span>
+                                                        {isDetailed && !hasNotes && !hasMods && (
+                                                            <span className="text-[10px] bg-gray-200 text-black px-1 rounded font-bold">NORMAL</span>
+                                                        )}
+                                                    </div>
+
+                                                    {isDetailed && hasNotes && (
+                                                        <div className="text-[11px] font-black pl-3 mt-0.5 text-black">
+                                                            *** NOTE: {item.notesText} ***
+                                                        </div>
+                                                    )}
+
+                                                    {isDetailed && hasMods && (
+                                                        <div className="text-[11px] font-bold pl-3 mt-0.5 text-black">
+                                                            + {item.modifiersText}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : printMode === 'customer_grouped' ? (
                         groupedByCustomerTickets.map((custTicket, cIdx) => (
                             <div key={cIdx} className="kds-chit-ticket mb-3 pb-3 border-b-2 border-black print:p-2">
                                 {/* Customer Header */}
                                 <div className="border-b-2 border-black pb-1 mb-1.5 flex justify-between items-baseline bg-black text-white px-2 py-1">
-                                    <span className="text-base font-black uppercase tracking-tight">👤 {custTicket.customerName}</span>
+                                    <span className="text-base font-black uppercase tracking-tight">{custTicket.customerName}</span>
                                     <span className="text-xs font-black bg-white text-black px-2 py-0.5 rounded">
                                         {custTicket.orderType === 'camping'
-                                            ? '🏕️ CAMPING'
+                                            ? 'CAMPING'
                                             : custTicket.orderType === 'takeout'
-                                            ? '🛍️ TAKEOUT'
+                                            ? 'TAKEOUT'
                                             : `TBL #${custTicket.tableNumber}`}
                                     </span>
                                 </div>
@@ -971,6 +1212,15 @@ function KDSContent() {
                                     {showOverview ? 'ON' : 'OFF'}
                                 </span>
                             </button>
+                            {showOverview && (
+                                <button
+                                    onClick={handlePrintOverview}
+                                    className="w-full mt-2 py-1.5 px-3 bg-[#1c3a1e] hover:bg-[#275029] text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                                >
+                                    <Printer className="h-3.5 w-3.5" />
+                                    <span>Print Prep Overview by Section</span>
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -1013,57 +1263,155 @@ function KDSContent() {
             {/* LIVE KITCHEN ITEM QUANTITY OVERVIEW BANNER */}
             {activeTab === 'tickets' && showOverview && itemQuantitySummary.length > 0 && (
                 <div className="bg-white rounded-3xl p-4 border border-[#1c3a1e]/15 shadow-sm mb-4 print:hidden transition-all">
-                    <div className="flex justify-between items-center pb-2.5 mb-3 border-b border-[#1c3a1e]/10">
-                        <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 mb-3 border-b border-[#1c3a1e]/10">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className="bg-[#1c3a1e] text-white text-xs font-black px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs">
                                 🔥 Active Kitchen Prep Summary
                             </span>
-                            <span className="text-xs font-bold text-gray-600">
-                                Total: <strong className="text-[#1c3a1e] font-black">{itemQuantitySummary.reduce((sum, i) => sum + i.totalQty, 0)} items</strong> across {itemQuantitySummary.length} dishes
-                            </span>
+
+                            {/* Sub-mode Toggle Pill */}
+                            <div className="flex items-center gap-1 bg-[#eaf2eb] p-1 rounded-2xl border border-[#1c3a1e]/15">
+                                <button
+                                    onClick={() => setOverviewSubMode('compact')}
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        overviewSubMode === 'compact' ? 'bg-[#1c3a1e] text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-white/60'
+                                    }`}
+                                    title="Group strictly by Dish Name"
+                                >
+                                    📋 By Dish ({itemQuantitySummary.length})
+                                </button>
+                                <button
+                                    onClick={() => setOverviewSubMode('detailed')}
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        overviewSubMode === 'detailed' ? 'bg-amber-600 text-white shadow-xs' : 'text-[#1c3a1e] hover:bg-white/60'
+                                    }`}
+                                    title="Separate normal items and items with special notes / modifiers"
+                                >
+                                    📝 Detailed by Notes ({detailedItemQuantitySummary.length})
+                                </button>
+                            </div>
                         </div>
-                        <button
-                            onClick={() => setShowOverview(false)}
-                            className="text-xs text-gray-400 hover:text-gray-700 font-bold px-2 py-1 cursor-pointer"
-                            title="Hide Summary Banner"
-                        >
-                            ✕ Close
-                        </button>
+
+                        <div className="flex items-center gap-2 justify-between sm:justify-end flex-wrap">
+                            <span className="text-xs font-bold text-gray-600">
+                                Total: <strong className="text-[#1c3a1e] font-black">{itemQuantitySummary.reduce((sum, i) => sum + i.totalQty, 0)} items</strong>
+                            </span>
+                            <button
+                                onClick={handlePrintOverview}
+                                className="bg-[#1c3a1e] hover:bg-[#275029] text-white px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                                title="Print Active Kitchen Prep Summary grouped by Section on POS printer"
+                            >
+                                <Printer className="h-3.5 w-3.5" />
+                                <span>Print by Section</span>
+                            </button>
+                            <button
+                                onClick={() => setShowOverview(false)}
+                                className="text-xs text-gray-400 hover:text-gray-700 font-bold px-2 py-1 cursor-pointer"
+                                title="Hide Summary Banner"
+                            >
+                                ✕ Close
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2.5 max-h-[160px] overflow-y-auto pr-1">
-                        {itemQuantitySummary.map((summaryItem, idx) => (
-                            <div
-                                key={idx}
-                                className="bg-[#fafbfa] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/40 rounded-2xl px-3.5 py-2 flex items-center gap-3 shadow-2xs transition-all"
-                            >
-                                <div className="bg-[#1c3a1e] text-white font-black text-sm px-2.5 py-1 rounded-xl flex items-center justify-center min-w-[34px] shadow-2xs">
-                                    {summaryItem.totalQty}x
-                                </div>
-                                <div>
-                                    <div className="font-black text-xs text-[#1c3a1e] leading-tight">
-                                        {summaryItem.itemName}
+                    <div className="flex flex-wrap gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+                        {overviewSubMode === 'detailed' ? (
+                            detailedItemQuantitySummary.map((summaryItem, idx) => {
+                                const hasNotes = Boolean(summaryItem.notesText);
+                                const hasMods = Boolean(summaryItem.modifiersText);
+                                const hasCustomization = hasNotes || hasMods;
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`border rounded-2xl px-3.5 py-2 flex items-start gap-3 shadow-2xs transition-all ${
+                                            hasNotes
+                                                ? 'bg-red-500/5 border-red-500/30'
+                                                : hasMods
+                                                ? 'bg-amber-500/5 border-amber-500/30'
+                                                : 'bg-[#fafbfa] border-[#1c3a1e]/15'
+                                        }`}
+                                    >
+                                        <div className="bg-[#1c3a1e] text-white font-black text-sm px-2.5 py-1 rounded-xl flex items-center justify-center min-w-[34px] shadow-2xs mt-0.5">
+                                            {summaryItem.totalQty}x
+                                        </div>
+                                        <div>
+                                            <div className="font-black text-xs text-[#1c3a1e] leading-tight flex items-center gap-1.5">
+                                                <span>{summaryItem.itemName}</span>
+                                                {!hasCustomization && (
+                                                    <span className="text-[10px] text-gray-500 font-extrabold bg-gray-100 px-1.5 py-0.2 rounded">
+                                                        Normal
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {summaryItem.notesText && (
+                                                <div className="text-[11px] font-black text-red-700 mt-0.5">
+                                                    *** NOTE: {summaryItem.notesText} ***
+                                                </div>
+                                            )}
+
+                                            {summaryItem.modifiersText && (
+                                                <div className="text-[11px] font-bold text-amber-900 mt-0.5">
+                                                    + {summaryItem.modifiersText}
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold mt-1">
+                                                {summaryItem.preparingQty > 0 && (
+                                                    <span className="bg-amber-500/15 text-amber-800 px-1.5 py-0.5 rounded-md font-black">
+                                                        {summaryItem.preparingQty} preparing
+                                                    </span>
+                                                )}
+                                                {summaryItem.pendingQty > 0 && (
+                                                    <span className="bg-blue-500/15 text-blue-800 px-1.5 py-0.5 rounded-md font-black">
+                                                        {summaryItem.pendingQty} pending
+                                                    </span>
+                                                )}
+                                                {summaryItem.readyQty > 0 && (
+                                                    <span className="bg-emerald-500/15 text-emerald-800 px-1.5 py-0.5 rounded-md font-black">
+                                                        {summaryItem.readyQty} ready
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold mt-1">
-                                        {summaryItem.preparingQty > 0 && (
-                                            <span className="bg-amber-500/15 text-amber-800 px-1.5 py-0.5 rounded-md font-black">
-                                                {summaryItem.preparingQty} preparing
-                                            </span>
-                                        )}
-                                        {summaryItem.pendingQty > 0 && (
-                                            <span className="bg-blue-500/15 text-blue-800 px-1.5 py-0.5 rounded-md font-black">
-                                                {summaryItem.pendingQty} pending
-                                            </span>
-                                        )}
-                                        {summaryItem.readyQty > 0 && (
-                                            <span className="bg-emerald-500/15 text-emerald-800 px-1.5 py-0.5 rounded-md font-black">
-                                                {summaryItem.readyQty} ready
-                                            </span>
-                                        )}
+                                );
+                            })
+                        ) : (
+                            itemQuantitySummary.map((summaryItem, idx) => (
+                                <div
+                                    key={idx}
+                                    className="bg-[#fafbfa] border border-[#1c3a1e]/15 hover:border-[#1c3a1e]/40 rounded-2xl px-3.5 py-2 flex items-center gap-3 shadow-2xs transition-all"
+                                >
+                                    <div className="bg-[#1c3a1e] text-white font-black text-sm px-2.5 py-1 rounded-xl flex items-center justify-center min-w-[34px] shadow-2xs">
+                                        {summaryItem.totalQty}x
+                                    </div>
+                                    <div>
+                                        <div className="font-black text-xs text-[#1c3a1e] leading-tight">
+                                            {summaryItem.itemName}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold mt-1">
+                                            {summaryItem.preparingQty > 0 && (
+                                                <span className="bg-amber-500/15 text-amber-800 px-1.5 py-0.5 rounded-md font-black">
+                                                    {summaryItem.preparingQty} preparing
+                                                </span>
+                                            )}
+                                            {summaryItem.pendingQty > 0 && (
+                                                <span className="bg-blue-500/15 text-blue-800 px-1.5 py-0.5 rounded-md font-black">
+                                                    {summaryItem.pendingQty} pending
+                                                </span>
+                                            )}
+                                            {summaryItem.readyQty > 0 && (
+                                                <span className="bg-emerald-500/15 text-emerald-800 px-1.5 py-0.5 rounded-md font-black">
+                                                    {summaryItem.readyQty} ready
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 </div>
             )}
